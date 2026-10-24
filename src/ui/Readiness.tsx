@@ -16,7 +16,7 @@ export const TASK_NAMES: Record<string, string> = {
   'PA.I.H': 'Human Factors',
 };
 
-export function Readiness({ goReview }: { goReview: () => void }) {
+export function Readiness({ goReview, embedded }: { goReview: () => void; embedded?: boolean }) {
   const mastery = masteryByTask();
   const byAcs = new Map(mastery.map((m) => [m.acs, m]));
   const tasks = Object.keys(TASK_NAMES);
@@ -30,17 +30,21 @@ export function Readiness({ goReview }: { goReview: () => void }) {
 
   return (
     <>
-      <PageHead
-        title="Readiness"
-        lead="Where you stand against the Private Pilot ACS, Area I. Recent answers weigh more than old ones."
-        meta={<>Standard <b>FAA-S-ACS-6C</b></>}
-      />
+      {embedded ? (
+        <div className="card-head"><h2>Review readiness</h2><span className="sub">Private Pilot ACS, Area I, FAA-S-ACS-6C. Recent answers weigh more than old ones.</span></div>
+      ) : (
+        <PageHead
+          title="Readiness"
+          lead="Where you stand against the Private Pilot ACS, Area I. Recent answers weigh more than old ones."
+          meta={<>Standard <b>FAA-S-ACS-6C</b></>}
+        />
+      )}
       {answered === 0 ? (
         <div className="empty">
-          <EmptyGlyph />
-          <h2>No data yet</h2>
-          <p>Readiness fills in as you answer review items and make go/no-go decisions. Eight Area I tasks are tracked; each needs a few answers before the bar means anything.</p>
-          <button type="button" className="btn primary" onClick={goReview}>Start a review session</button>
+          {!embedded && <EmptyGlyph />}
+          <h2>No review answers yet</h2>
+          <p>Readiness fills in as you answer items in the review deck. Eight Area I tasks are tracked; each needs a few answers before the bar means anything.</p>
+          <button type="button" className="btn" onClick={goReview}>Open the review deck</button>
         </div>
       ) : (
         <div className="grid-2">

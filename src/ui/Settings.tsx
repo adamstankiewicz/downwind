@@ -4,11 +4,12 @@ import { useState } from 'react';
 import type { Airport } from '../data/airports';
 import type { PilotProfile } from '../data/pilot';
 import { resetReview } from '../review/scheduler';
-import { Card, Field, NumInput, PageHead } from './common';
+import { Card, Field, NumInput } from './common';
 import type { Theme } from './state';
 
-export function Settings({ airport, pilot, setPilot, theme, setTheme, onReviewReset, onRerunSetup }: {
+export function Settings({ airport, pilot, setPilot, theme, setTheme, onReviewReset, onCourseReset, onRerunSetup }: {
   airport: Airport | null;
+  onCourseReset: () => void;
   pilot: PilotProfile;
   setPilot: (p: PilotProfile) => void;
   theme: Theme;
@@ -17,13 +18,21 @@ export function Settings({ airport, pilot, setPilot, theme, setTheme, onReviewRe
   onRerunSetup: () => void;
 }) {
   const [confirm, setConfirm] = useState(false);
+  const [confirmCourse, setConfirmCourse] = useState(false);
   const mins = pilot.minimums;
   const setMin = (patch: Partial<PilotProfile['minimums']>) => setPilot({ ...pilot, minimums: { ...mins, ...patch } });
   const ap = airport;
 
   return (
     <>
-      <PageHead title="Settings" lead="Personal minimums are yours to set and yours to honor. The brief grades against them." />
+      <div className="strip-head">
+        <div className="strip-title">
+          <div>
+            <h1>Pilot</h1>
+            <span className="muted">Personal minimums are yours to set and yours to honor. Every lesson and the daily flight grade against them.</span>
+          </div>
+        </div>
+      </div>
       <div className="grid-2">
         <div className="stack">
           <Card title="Personal minimums" sub="Saved as you type">
@@ -74,7 +83,16 @@ export function Settings({ airport, pilot, setPilot, theme, setTheme, onReviewRe
             </div>
           </Card>
           <Card title="Reset">
-            <p>Clears every review answer and the FSRS schedule. Readiness starts over. The airplane profile and minimums stay.</p>
+            <p>Start the course over: clears lessons flown and filed briefings. The airplane, airport and minimums stay.</p>
+            {!confirmCourse ? (
+              <button type="button" className="btn danger" onClick={() => setConfirmCourse(true)}>Reset course progress</button>
+            ) : (
+              <div className="btn-row">
+                <button type="button" className="btn danger" onClick={() => { onCourseReset(); setConfirmCourse(false); }}>Reset course progress</button>
+                <button type="button" className="btn quiet" onClick={() => setConfirmCourse(false)}>Keep it</button>
+              </div>
+            )}
+            <p>Clears every review answer and the FSRS schedule. Readiness starts over.</p>
             {!confirm ? (
               <button type="button" className="btn danger" onClick={() => setConfirm(true)}>Reset review history</button>
             ) : (
@@ -85,7 +103,7 @@ export function Settings({ airport, pilot, setPilot, theme, setTheme, onReviewRe
             )}
           </Card>
           <Card title="About">
-            <p>Downwind Ground School, phase 0 prototype. Weather from aviationweather.gov when reachable. Crosswind, density altitude and weight and balance are computed in the app from the parsed report and your profile. No model output touches a number.</p>
+            <p>Downwind, a guided private-pilot ground school. Weather from aviationweather.gov when reachable; lesson weather is written for each lesson and labeled as practice. Crosswind, density altitude and weight and balance are computed in the app from the parsed report and your profile. No model output touches a number.</p>
             <p className="help">Training aid. Not for navigation. Not a substitute for an official briefing or a CFI.</p>
           </Card>
         </div>

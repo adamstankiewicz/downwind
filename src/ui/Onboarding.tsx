@@ -86,15 +86,15 @@ function Welcome({ onNext }: { onNext: () => void }) {
     <div className="onboard-col">
       <div>
         <h1 className="onboard-title">Downwind</h1>
-        <p className="onboard-sub">Ground school for one pilot, one airplane, one airport.</p>
+        <p className="onboard-sub">A guided ground school for one pilot, one airplane, one airport.</p>
       </div>
       <p className="lead-lg">
-        Every session starts with a real decision about a real flight from your home field: live weather, your airplane's numbers, your personal minimums. You decide, then the app grades the call against the ACS and schedules what you missed.
+        Nine modules in the order of the Private Pilot ACS. Every lesson is a short flight out of your home field, built with your runways, your airplane's numbers and your personal minimums. An instructor briefs, works one example, then hands you the controls and grades the call.
       </p>
       <ol className="loop">
-        <li><span className="n">1</span><h3>Brief</h3><p>METAR, TAF, runway wind, density altitude, weight and balance.</p></li>
-        <li><span className="n">2</span><h3>Decide</h3><p>Go, go with a plan, delay or cancel. Rate your confidence.</p></li>
-        <li><span className="n">3</span><h3>Debrief</h3><p>The grade, the findings that drove it, the references.</p></li>
+        <li><span className="n">1</span><h3>Brief</h3><p>The instructor sets the scene and works the first one on a practice report.</p></li>
+        <li><span className="n">2</span><h3>Your turn</h3><p>You fill the blanks and make the call. Grades stay hidden until you commit.</p></li>
+        <li><span className="n">3</span><h3>Debrief</h3><p>The grade, the reasoning, the references. Then today's real conditions, with what you have learned.</p></li>
       </ol>
       <p className="help">Setup takes about a minute. Every step can be skipped and changed later.</p>
       <StepNav onNext={onNext} nextLabel="Set up" />
@@ -174,7 +174,7 @@ function AirportStep({ airport, setAirport, pilot, setPilot, onBack, onNext }: {
     <div className="onboard-col">
       <div>
         <h2 className="onboard-h2">Home airport</h2>
-        <p className="muted">Where the daily brief is built. Live METAR and TAF, runway winds and density altitude all come from this field.</p>
+        <p className="muted">Where every lesson flies from, and where the daily flight pulls live weather. Runway headings and variation are what the wind lessons are built on.</p>
       </div>
 
       <form
@@ -280,7 +280,7 @@ function AircraftStep({ aircraft, setAircraft, onBack, onNext }: { aircraft: Air
     <div className="onboard-col">
       <div>
         <h2 className="onboard-h2">Your airplane</h2>
-        <p className="muted">Weight and balance, crosswind limits and performance all key off these. Copy them from your POH and the current weight and balance record, not from memory.</p>
+        <p className="muted">Weight and balance, the demonstrated crosswind and performance all key off these. Copy them from your POH and the current weight and balance record, not from memory.</p>
       </div>
 
       <div className="field">
@@ -325,14 +325,14 @@ function AircraftStep({ aircraft, setAircraft, onBack, onNext }: { aircraft: Air
           <Field label="Usable fuel" hint="gal" size="sm"><NumInput value={draft.usableFuelGal} step={1} onChange={(n) => upd({ usableFuelGal: n })} /></Field>
           <Field label="Demonstrated crosswind" hint="kt" size="md"><NumInput value={draft.demonstratedCrosswindKt} step={1} onChange={(n) => upd({ demonstratedCrosswindKt: n })} /></Field>
         </div>
-        <p className="help">Station arms and the CG envelope are edited on the Airplane screen, where you can see the polygon as you type.</p>
+        <p className="help">Station arms and the CG envelope are edited under Tools, Airplane, where you can see the polygon as you type.</p>
         <label className="check">
           <input type="checkbox" checked={fromPoh} onChange={(e) => setFromPoh(e.target.checked)} />
           <span>These are my airplane's numbers, copied from the POH and current W&amp;B record.</span>
         </label>
         {!fromPoh && !isBlank && (
           <Notice label="Sample numbers">
-            Fine for now. Every screen that uses them will say so until you check the box above or save edits on the Airplane screen.
+            Fine for now. Every screen that uses them will say so until you check the box above or save edits under Tools, Airplane.
           </Notice>
         )}
       </Card>
@@ -355,7 +355,7 @@ function PilotStep({ pilot, setPilot, onBack, onNext }: { pilot: PilotProfile; s
     <div className="onboard-col">
       <div>
         <h2 className="onboard-h2">You</h2>
-        <p className="muted">Personal minimums are the line between a legal flight and one you're comfortable with. The brief grades against them, so set them honestly and change them on the ground, not on the ramp.</p>
+        <p className="muted">Personal minimums are the line between a legal flight and one you're comfortable with. Lessons and the daily flight grade against them, so set them honestly and change them on the ground, not on the ramp.</p>
       </div>
       <Card title="Pilot">
         <div className="inputs">
@@ -392,7 +392,7 @@ function DoneStep({ airport, aircraft, pilot, onBack, onFinish }: { airport: Air
     <div className="onboard-col">
       <div>
         <h2 className="onboard-h2">Ready{pilot.name ? `, ${pilot.name}` : ''}</h2>
-        <p className="muted">This is what the brief will use. Everything can be changed from Settings and Airplane.</p>
+        <p className="muted">This is what the lessons and the daily flight will use. Everything can be changed later from Pilot and Tools.</p>
       </div>
       <Card>
         <dl className="kv">
@@ -403,9 +403,10 @@ function DoneStep({ airport, aircraft, pilot, onBack, onFinish }: { airport: Air
         </dl>
       </Card>
       {aircraft.sampleValues && (
-        <Notice label="Sample airplane">Weight and balance and crosswind results are practice only until you enter your POH numbers on the Airplane screen.</Notice>
+        <Notice label="Sample airplane">Weight and balance and crosswind results are practice only until you enter your POH numbers under Tools, Airplane.</Notice>
       )}
-      <StepNav onBack={onBack} onNext={onFinish} nextLabel={airport ? `Open Today at ${airport.icao}` : 'Open Today'} />
+      <p className="voice">{airport && airport.runways.length ? `Lessons will fly from ${airport.icao} with your runways and minimums.` : 'Without a home field with runways, lessons fly from a practice field and say so. You can add one any time.'} The first lesson is a METAR read before you drive out.</p>
+      <StepNav onBack={onBack} onNext={onFinish} nextLabel="Start the course" />
     </div>
   );
 }

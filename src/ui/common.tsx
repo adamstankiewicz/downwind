@@ -120,34 +120,29 @@ export function Mark() {
 }
 
 export const Icons = {
-  today: (
+  course: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 7v5l3 2" />
+      <path d="M3 12h4M10 12h4M17 12h4" />
+      <circle cx="5" cy="12" r="2" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="2.4" />
+      <circle cx="19" cy="12" r="2" />
     </svg>
   ),
-  airplane: (
+  tools: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
       <path d="M12 3v7l8 4v2l-8-2v4l2 2v1l-4-1-4 1v-1l2-2v-4l-8 2v-2l8-4V3" strokeLinejoin="round" />
     </svg>
   ),
-  review: (
+  logbook: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-      <rect x="4" y="4" width="16" height="16" rx="1" />
-      <path d="M8 10h8M8 14h5" />
+      <rect x="4" y="3" width="16" height="18" rx="1" />
+      <path d="M8 8h8M8 12h8M8 16h5" />
     </svg>
   ),
-  readiness: (
+  pilot: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-      <path d="M4 20V10M10 20V4M16 20v-8M22 20H2" />
-    </svg>
-  ),
-  settings: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-      <path d="M4 7h16M4 12h16M4 17h16" />
-      <circle cx="9" cy="7" r="2" fill="var(--paper)" />
-      <circle cx="15" cy="12" r="2" fill="var(--paper)" />
-      <circle cx="8" cy="17" r="2" fill="var(--paper)" />
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" />
     </svg>
   ),
   refresh: (
