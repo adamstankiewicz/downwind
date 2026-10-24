@@ -8,7 +8,9 @@ import { sampleC172K } from '../../data/aircraft';
 import { KASH } from '../../data/airports';
 import { defaultPilot } from '../../data/pilot';
 import { buildBrief, debrief } from '../../scenarios/goNoGo';
-import { sampleMetar, sampleTaf } from '../../data/sampleWeather';
+import { sampleMetar, sampleTaf, sampleMetarFor } from '../../data/sampleWeather';
+import { sampleWeather } from '../weather';
+import { blankAircraft, isConfigured } from '../../data/aircraft';
 import { reviewItems } from '../../review/items';
 
 describe('METAR', () => {
@@ -54,7 +56,7 @@ describe('METAR', () => {
 describe('TAF', () => {
   it('splits base and FM groups with end times', () => {
     const t = parseTaf(sampleTaf);
-    expect(t.station).toBe('KMHT');
+    expect(t.station).toBe('KXYZ');
     expect(t.periods.map((p) => p.kind)).toEqual(['BASE', 'FM', 'FM']);
     expect(t.periods[0].wind).toMatchObject({ dirTrue: 280, speedKt: 12, gustKt: 20 });
     expect(t.periods[0].to).toEqual({ day: 24, hour: 22, minute: 0 });
@@ -168,5 +170,21 @@ describe('review items', () => {
       expect(i.answer).toBeLessThan(i.options.length);
       expect(i.ref.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('no built-in home base or airplane', () => {
+  it('starts with an empty pilot profile', () => {
+    expect(defaultPilot.homeBase).toBe('');
+    expect(defaultPilot.name).toBe('');
+  });
+  it('labels practice weather with the pilot\'s own station', () => {
+    expect(parseMetar(sampleMetarFor('KPSM')).station).toBe('KPSM');
+    expect(sampleWeather('KBVY').source).toBe('sample');
+    expect(sampleWeather('KBVY').taf?.station).toBe('KBVY');
+  });
+  it('knows when an aircraft profile is usable', () => {
+    expect(isConfigured(blankAircraft)).toBe(false);
+    expect(isConfigured(sampleC172K)).toBe(true);
   });
 });

@@ -30,7 +30,7 @@ export const reviewItems: ReviewItem[] = [
   },
   {
     id: 'pax-day', acs: 'PA.I.A',
-    prompt: 'To carry passengers in the 172 during the day, you need how many takeoffs and landings in the last 90 days?',
+    prompt: 'To carry passengers in a single-engine airplane during the day, you need how many takeoffs and landings in the last 90 days?',
     options: ['1 in any airplane', '3 in the same category, class and type (if a type rating is required)', '3 to a full stop', '5 in the same make and model'],
     answer: 1,
     explanation: 'Three takeoffs and landings in the preceding 90 days, as sole manipulator, in the same category and class. Tailwheel currency requires full stops.',
@@ -54,7 +54,7 @@ export const reviewItems: ReviewItem[] = [
   },
   {
     id: 'annual', acs: 'PA.I.B',
-    prompt: 'Your 172 is used only for personal flying. Which inspection keeps it legal?',
+    prompt: 'Your airplane is used only for personal flying. Which inspection keeps it legal?',
     options: ['A 100-hour inspection every 100 hours', 'An annual inspection within the preceding 12 calendar months', 'A progressive inspection', 'An annual and a 100-hour'],
     answer: 1,
     explanation: 'An annual inspection within the preceding 12 calendar months. The 100-hour applies when the airplane carries people for hire or is used for flight instruction for hire.',
@@ -97,7 +97,7 @@ export const reviewItems: ReviewItem[] = [
     prompt: 'Wind directions in a METAR are referenced to:',
     options: ['Magnetic north', 'True north', 'The runway in use', 'Grid north'],
     answer: 1,
-    explanation: 'Written reports (METAR, TAF, winds aloft) are true. Spoken winds from the tower, ATIS and ASOS broadcast are magnetic. Near Nashua the difference is about 14 degrees.',
+    explanation: 'Written reports (METAR, TAF, winds aloft) are true. Spoken winds from the tower, ATIS and ASOS broadcast are magnetic. In New England the difference is about 14 to 16 degrees.',
     ref: 'AIM 7-1, Aviation Weather Handbook',
   },
   {
@@ -142,7 +142,7 @@ export const reviewItems: ReviewItem[] = [
   },
   {
     id: 'class-c-entry', acs: 'PA.I.E',
-    prompt: 'What do you need before entering Manchester\'s Class C?',
+    prompt: 'What do you need before entering Class C airspace?',
     options: ['An explicit clearance', 'Two-way radio communication established, plus a Mode C transponder and ADS-B Out', 'Only a Mode C transponder', 'A filed flight plan'],
     answer: 1,
     explanation: 'Two-way communication is established when the controller responds using your call sign. Class C also requires a Mode C transponder and ADS-B Out.',
@@ -150,7 +150,7 @@ export const reviewItems: ReviewItem[] = [
   },
   {
     id: 'class-b-entry', acs: 'PA.I.E',
-    prompt: 'Boston Approach answers "N1234, standby." May you enter the Boston Class B?',
+    prompt: 'Approach answers "N1234, standby." May you enter the Class B?',
     options: ['Yes, two-way communication is established', 'No, you need to hear "cleared into the Class Bravo"', 'Yes, if you are squawking 1200', 'Only below 3,000 ft'],
     answer: 1,
     explanation: 'Class B requires an explicit ATC clearance. Two-way communication is only enough for Class C and D.',
@@ -158,7 +158,7 @@ export const reviewItems: ReviewItem[] = [
   },
   {
     id: 'class-d-entry', acs: 'PA.I.E',
-    prompt: 'Nashua Tower replies "Aircraft calling Nashua Tower, standby." May you enter the Class D?',
+    prompt: 'The tower replies "Aircraft calling tower, standby." May you enter the Class D?',
     options: ['Yes', 'No, the controller didn\'t use your call sign', 'Yes, once you are within 2 miles', 'Only if the ATIS is current'],
     answer: 1,
     explanation: 'Two-way communication means the controller responded using your call sign. "Aircraft calling, standby" doesn\'t establish it.',

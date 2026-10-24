@@ -15,8 +15,9 @@ export interface PilotProfile {
 }
 
 export const defaultPilot: PilotProfile = {
-  name: 'Adam',
-  homeBase: 'KASH',
+  name: '',
+  /** Empty until onboarding sets it. */
+  homeBase: '',
   minimums: { ceilingFt: 3000, visibilitySm: 5, crosswindKt: 12, gustSpreadKt: 10 },
   lastFlightReview: null,
 };

@@ -1,4 +1,4 @@
-// "Today at KASH": a go/no-go decision built from live weather, the pilot's
+// "Today": a go/no-go decision at the pilot's home field, built from live weather, the pilot's
 // aircraft and loading, and their personal minimums. All facts and grades are
 // deterministic so a CFI can audit why a choice scored the way it did.
 

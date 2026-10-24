@@ -1,13 +1,14 @@
 # Downwind Ground School
 
-A scenario-based ground school and flight review prep app for private pilots. Every lesson starts with a real decision about a real flight, built from live weather, your own airplane and your home airport, and scored against the FAA Private Pilot ACS (FAA-S-ACS-6C).
+A scenario-based ground school and flight review prep app for private pilots. Every lesson starts with a real decision about a real flight, built from live weather, your own airplane and your home airport (all set up on first launch; nothing is assumed), and scored against the FAA Private Pilot ACS (FAA-S-ACS-6C).
 
 > Training aid. Not for navigation. Not a substitute for an official weather briefing, your POH, or a CFI.
 
 ## Phase 0
 
-- **Today at KASH.** A go/no-go decision from the live METAR and TAF. It converts the true METAR wind to magnetic, picks the runway, computes steady and gust crosswind, density altitude, and weight and balance, then checks everything against VFR minimums, your airplane's demonstrated crosswind, and your personal minimums. You commit to a decision with a confidence rating before the debrief.
-- **Airplane.** An aircraft profile and loading sheet with a CG envelope chart. It ships with sample C172K-shaped numbers that you replace from your POH and weight and balance record.
+- **Setup.** First launch asks for your home airport (looked up from aviationweather.gov, every value editable), your airplane (from a template or blank, with numbers from your POH) and your personal minimums.
+- **Today.** A go/no-go decision at your home airport from the live METAR and TAF. It converts the true METAR wind to magnetic, picks the runway, computes steady and gust crosswind, density altitude, and weight and balance, then checks everything against VFR minimums, your airplane's demonstrated crosswind, and your personal minimums. You commit to a decision with a confidence rating before the debrief.
+- **Airplane.** An aircraft profile and loading sheet with a CG envelope chart. Templates provide sample numbers to start from; the app labels them as samples until you replace them from your POH and weight and balance record.
 - **Review.** ACS Area I questions scheduled with FSRS spaced repetition. Correctness and confidence together pick the review interval.
 - **Readiness.** Per-ACS-task mastery, including how often you were confidently wrong.
 
@@ -22,7 +23,7 @@ npm test
 npm run build
 ```
 
-When weather can't be fetched, the app falls back to clearly labeled sample data.
+When weather can't be fetched, the app falls back to clearly labeled practice weather, which is not a real report.
 
 ## Layout
 
@@ -41,7 +42,7 @@ When weather can't be fetched, the app falls back to clearly labeled sample data
 - Regulations and references: 14 CFR, the AIM, and FAA handbooks (PHAK, AFH, Aviation Weather Handbook, Risk Management Handbook), all public domain
 - Planned: FAA VFR raster charts and NASR data for New England, and ADS-B traffic from adsb.lol (ODbL)
 
-Airport details in `src/data/airports.ts` are marked for checking against the current Chart Supplement until NASR import lands.
+Airports bundled in `src/data/airports.ts` exist only so lookup works offline; they are not defaults. Each carries a list of fields to check against the current Chart Supplement until NASR import lands.
 
 ## Smoke test
 

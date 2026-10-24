@@ -89,7 +89,7 @@ export async function lookupAirport(input: string, signal?: AbortSignal): Promis
 export function manualAirport(input: string): Airport {
   const ident = normalizeIdent(input);
   return {
-    icao: ident, name: ident, city: '', elevationFt: 0, magneticVariationDeg: -14, airspace: 'D',
+    icao: ident, name: ident, city: '', elevationFt: 0, magneticVariationDeg: 0, airspace: 'D',
     runways: [], tafStations: [ident], verify: ['everything'],
   };
 }
