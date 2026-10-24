@@ -198,7 +198,7 @@ export function buildBrief(input: GoNoGoInput): Brief {
   // Ceiling and visibility against personal minimums.
   if (metar.ceilingFtAgl !== null && metar.ceilingFtAgl >= 1000 && metar.ceilingFtAgl < mins.ceilingFt) {
     add({ id: 'ceiling-personal', severity: 'personal', title: 'Ceiling below your personal minimum',
-      detail: `${metar.ceilingFtAgl} ft against your ${mins.ceilingFt} ft minimum.`,
+      detail: `${metar.ceilingFtAgl.toLocaleString('en-US')} ft against your ${mins.ceilingFt.toLocaleString('en-US')} ft minimum.`,
       acs: ['PA.I.C'], refs: ['Risk Management Handbook, personal minimums'] });
   }
   if (metar.visibilitySm !== null && metar.visibilitySm >= 3 && metar.visibilitySm < mins.visibilitySm) {

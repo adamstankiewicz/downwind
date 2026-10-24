@@ -227,7 +227,7 @@ export function DailyFlight({ airport, aircraft, loading, pilot, progress, log, 
                 {result.confidentlyWrong && (
                   <div className="callout">
                     <b>Confidently wrong</b>
-                    <span>You were {confidence}% sure of a {result.grade} call. That gap is the thing to study, more than the answer itself.</span>
+                    <span>You were {confidence}% sure of {result.grade === 'unsafe' ? 'an unsafe' : `a ${result.grade}`} call. That gap is the thing to study, more than the answer itself.</span>
                   </div>
                 )}
                 {brief.findings.length === 0
