@@ -188,3 +188,17 @@ describe('no built-in home base or airplane', () => {
     expect(isConfigured(sampleC172K)).toBe(true);
   });
 });
+
+describe('go/no-go without airplane numbers', () => {
+  it('skips W&B and demonstrated-crosswind checks', () => {
+    const b = buildBrief({
+      airport: KASH, aircraft: blankAircraft, wb: null, minimums: defaultPilot.minimums,
+      metar: parseMetar(sampleMetar), taf: null, departure: new Date(Date.UTC(2026, 9, 24, 17)), tripHours: 3,
+    });
+    const ids = b.findings.map((f) => f.id);
+    expect(ids).not.toContain('xw-demo');
+    expect(ids).not.toContain('wb-gross');
+    expect(ids).not.toContain('wb-cg');
+    expect(ids).toContain('xw-personal');
+  });
+});

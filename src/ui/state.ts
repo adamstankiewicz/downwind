@@ -3,9 +3,9 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { load, save } from '../lib/storage';
-import { sampleC172K, type AircraftProfile } from '../data/aircraft';
+import { aircraftTemplates, blankAircraft, type AircraftProfile } from '../data/aircraft';
 import { defaultPilot, type PilotProfile } from '../data/pilot';
-import { KASH, type Airport } from '../data/airports';
+import type { Airport } from '../data/airports';
 import { computeWb, FUEL_LB_PER_GAL, type LoadItem, type WbResult } from '../lib/wb';
 
 export const KEYS = {
@@ -24,7 +24,7 @@ export interface OnboardingState {
 }
 
 export function useAirport() {
-  return usePersisted<Airport>(KEYS.airport, KASH);
+  return usePersisted<Airport | null>(KEYS.airport, null);
 }
 export function useOnboarding() {
   return usePersisted<OnboardingState>(KEYS.onboarding, { complete: false, step: 0 });
@@ -69,7 +69,7 @@ export function usePersisted<T>(key: string, fallback: T): [T, (next: T | ((prev
 }
 
 export function useAircraft() {
-  return usePersisted<AircraftProfile>(KEYS.aircraft, sampleC172K);
+  return usePersisted<AircraftProfile>(KEYS.aircraft, blankAircraft);
 }
 export function useLoading() {
   return usePersisted<Loading>(KEYS.loading, defaultLoading);
@@ -85,6 +85,12 @@ export function loadItems(aircraft: AircraftProfile, loading: Loading): LoadItem
   }));
 }
 
+/** Which template this profile started from, if any. */
+export function templateLabel(aircraft: AircraftProfile): string | null {
+  return aircraftTemplates.find((t) => t.profile.id === aircraft.id)?.label ?? null;
+}
+
+/** A result that trips no check, for briefs built before the airplane has numbers. */
 export function wbFor(aircraft: AircraftProfile, loading: Loading): WbResult {
   return computeWb(
     aircraft.emptyWeightLb,

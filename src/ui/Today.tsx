@@ -1,17 +1,19 @@
 // Today at <home airport>: Brief -> Decide -> Debrief. The answer stays hidden until the
 // pilot commits to a choice and a confidence (retrieval practice).
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { AircraftProfile } from '../data/aircraft';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { isConfigured, type AircraftProfile } from '../data/aircraft';
 import type { Airport } from '../data/airports';
 import type { PilotProfile } from '../data/pilot';
 import { fetchWeather, sampleWeather, type WeatherBundle } from '../lib/weather';
-import { buildBrief, debrief as runDebrief, type ChoiceId, type Finding } from '../scenarios/goNoGo';
-import { Card, Field, GRADE_LABEL, Icons, Notice, SEVERITY_LABEL, SampleAircraftNotice } from './common';
+import type { Metar } from '../lib/metar';
+import { buildBrief, debrief as runDebrief, type Brief, type ChoiceId, type Finding } from '../scenarios/goNoGo';
+import type { WbResult } from '../lib/wb';
+import { Card, Field, GRADE_LABEL, Icons, NoAircraftNotice, Notice, PageHead, SEVERITY_LABEL, SampleAircraftNotice } from './common';
 import { RawReport, MetarLegend } from './MetarBlock';
 import { WindDiagram } from './WindDiagram';
 import { TafTimeline } from './TafTimeline';
-import { fmtZ, nextWholeHour, toLocalInput, wbFor, type Loading } from './state';
+import { fmtZ, nextWholeHour, templateLabel, toLocalInput, wbFor, type Loading } from './state';
 
 const KEYS = ['A', 'B', 'C', 'D'];
 
@@ -36,7 +38,7 @@ export function Today({ airport, aircraft, loading, pilot, goAirplane }: { airpo
         if (!ac.signal.aborted) setWx(b);
       })
       .catch(() => {
-        if (!ac.signal.aborted) setWx(sampleWeather('Request aborted'));
+        if (!ac.signal.aborted) setWx(sampleWeather(airport.icao, 'Request aborted'));
       })
       .finally(() => {
         if (!ac.signal.aborted) setBusy(false);
@@ -57,7 +59,8 @@ export function Today({ airport, aircraft, loading, pilot, goAirplane }: { airpo
     setCommitted(false);
   }, [departure, tripHours]);
 
-  const wb = useMemo(() => wbFor(aircraft, loading), [aircraft, loading]);
+  const configured = isConfigured(aircraft);
+  const wb = useMemo(() => (configured ? wbFor(aircraft, loading) : null), [aircraft, loading, configured]);
   const brief = useMemo(
     () =>
       wx
@@ -75,7 +78,7 @@ export function Today({ airport, aircraft, loading, pilot, goAirplane }: { airpo
     return (
       <>
         <Head airport={airport} wx={null} />
-        <p className="muted">Pulling the current METAR and TAF…</p>
+        <p className="muted">Pulling the current METAR and TAF.</p>
       </>
     );
   }
@@ -87,14 +90,17 @@ export function Today({ airport, aircraft, loading, pilot, goAirplane }: { airpo
   const steadyX = rw?.steady?.crosswindKt ?? null;
   const gustX = rw?.gust?.crosswindKt ?? null;
   const worstX = gustX ?? steadyX;
-  const xwClass = worstX === null ? '' : worstX > aircraft.demonstratedCrosswindKt ? 'bad' : worstX > mins.crosswindKt ? 'warn' : 'ok';
+  const demo = configured && aircraft.demonstratedCrosswindKt > 0 ? aircraft.demonstratedCrosswindKt : null;
+  const xwClass = worstX === null ? '' : demo !== null && worstX > demo ? 'bad' : worstX > mins.crosswindKt ? 'warn' : 'ok';
   const ceilingToken = m.clouds.find((c) => c.baseFtAgl === m.ceilingFtAgl && (c.cover === 'BKN' || c.cover === 'OVC' || c.cover === 'VV'));
   const ceilingTok = ceilingToken ? `${ceilingToken.cover}${String(ceilingToken.baseFtAgl / 100).padStart(3, '0')}${ceilingToken.type ?? ''}` : null;
   const windTxt = m.wind
     ? m.wind.dirTrue === null
-      ? m.wind.speedKt === 0 ? 'Calm' : `VRB ${m.wind.speedKt} kt`
-      : `${String(m.wind.dirTrue).padStart(3, '0')}° at ${m.wind.speedKt}${m.wind.gustKt ? ` G ${m.wind.gustKt}` : ''} kt`
+      ? m.wind.speedKt === 0 ? 'Calm' : `Variable at ${m.wind.speedKt} kt`
+      : `${String(m.wind.dirTrue).padStart(3, '0')}° at ${m.wind.speedKt}${m.wind.gustKt ? ` gusting ${m.wind.gustKt}` : ''} kt`
     : 'Not reported';
+  const ceilingClass = m.ceilingFtAgl !== null && m.ceilingFtAgl < 1000 ? 'bad' : m.ceilingFtAgl !== null && m.ceilingFtAgl < mins.ceilingFt ? 'warn' : 'ok';
+  const visClass = m.visibilitySm !== null && m.visibilitySm < 3 ? 'bad' : m.visibilitySm !== null && m.visibilitySm < mins.visibilitySm ? 'warn' : 'ok';
   const step = committed ? 3 : choice ? 2 : 1;
 
   return (
@@ -103,16 +109,18 @@ export function Today({ airport, aircraft, loading, pilot, goAirplane }: { airpo
 
       {wx.source === 'sample' && (
         <Notice label="Sample weather">
-          Live weather could not be fetched{wx.error ? ` (${wx.error})` : ''}. This is a stored KASH report for practice, not today's conditions at {airport.icao}. Do not plan a flight from it.
+          Live weather could not be fetched{wx.error ? ` (${wx.error})` : ''}. This is practice weather, not a real report for {airport.icao}. Do not plan a flight from it.
         </Notice>
       )}
-      {aircraft.sampleValues && <SampleAircraftNotice onGo={goAirplane} />}
+      {!configured ? <NoAircraftNotice onGo={goAirplane} /> : aircraft.sampleValues && <SampleAircraftNotice onGo={goAirplane} template={templateLabel(aircraft)} />}
 
-      <div className="steps" aria-label="Progress">
-        <span className={step === 1 ? 'on' : 'done'}><i>1</i> Brief</span>
-        <span className={step === 2 ? 'on' : step > 2 ? 'done' : ''}><i>2</i> Decide</span>
-        <span className={step === 3 ? 'on' : ''}><i>3</i> Debrief</span>
-      </div>
+      <Spoken m={m} brief={brief} airport={airport} demo={demo} mins={mins} wb={configured ? wb : null} ceilingClass={ceilingClass} visClass={visClass} xwClass={xwClass} />
+
+      <ol className="steps" aria-label="Progress">
+        <li className={step === 1 ? 'on' : 'done'}><i>1</i> Brief</li>
+        <li className={step === 2 ? 'on' : step > 2 ? 'done' : ''}><i>2</i> Decide</li>
+        <li className={step === 3 ? 'on' : ''}><i>3</i> Debrief</li>
+      </ol>
 
       <div className="today">
         {/* ---------------- Brief ---------------- */}
@@ -124,54 +132,50 @@ export function Today({ airport, aircraft, loading, pilot, goAirplane }: { airpo
           >
             <div>
               <RawReport raw={m.raw} label={`METAR ${m.station}`} ceilingToken={ceilingTok} />
-              {wx.taf && <RawReport raw={wx.taf.raw} label={`TAF ${wx.taf.station}${wx.taf.station !== airport.icao ? ' (nearest TAF station)' : ''}`} />}
+              {wx.taf && <RawReport raw={wx.taf.raw} label={`TAF ${wx.taf.station}${wx.taf.station !== airport.icao ? ', nearest TAF station' : ''}`} />}
             </div>
             <MetarLegend />
-            <div className="calc">
+            <dl className="numbers">
               <div>
-                <span className="k">Ceiling</span>
-                <span className={`v ${m.ceilingFtAgl !== null && m.ceilingFtAgl < 1000 ? 'bad' : m.ceilingFtAgl !== null && m.ceilingFtAgl < mins.ceilingFt ? 'warn' : 'ok'}`}>
-                  {m.ceilingFtAgl !== null ? `${m.ceilingFtAgl.toLocaleString()} ft` : 'None'}
-                  <small>AGL · your min {mins.ceilingFt.toLocaleString()}</small>
-                </span>
+                <dt>Ceiling</dt>
+                <dd className={ceilingClass}>{m.ceilingFtAgl !== null ? `${m.ceilingFtAgl.toLocaleString()} ft AGL` : 'None'}</dd>
+                <span className="note">Your minimum {mins.ceilingFt.toLocaleString()} ft</span>
               </div>
               <div>
-                <span className="k">Visibility</span>
-                <span className={`v ${m.visibilitySm !== null && m.visibilitySm < 3 ? 'bad' : m.visibilitySm !== null && m.visibilitySm < mins.visibilitySm ? 'warn' : 'ok'}`}>
-                  {m.visibilitySm !== null ? `${m.visibilityPlus ? '>' : ''}${m.visibilitySm} SM` : 'n/a'}
-                  <small>your min {mins.visibilitySm} SM</small>
-                </span>
+                <dt>Visibility</dt>
+                <dd className={visClass}>{m.visibilitySm !== null ? `${m.visibilityPlus ? 'more than ' : ''}${m.visibilitySm} SM` : 'Not reported'}</dd>
+                <span className="note">Your minimum {mins.visibilitySm} SM</span>
               </div>
               <div>
-                <span className="k">Wind (true)</span>
-                <span className="v">
-                  {windTxt}
-                  {m.wind?.gustKt && <small>spread {m.wind.gustKt - m.wind.speedKt} kt · your max {mins.gustSpreadKt}</small>}
-                </span>
+                <dt>Wind, true</dt>
+                <dd>{windTxt}</dd>
+                {m.wind?.gustKt && <span className="note">Gust spread {m.wind.gustKt - m.wind.speedKt} kt, your maximum {mins.gustSpreadKt} kt</span>}
               </div>
               <div>
-                <span className="k">Crosswind rwy {rw?.runway.id ?? '—'}</span>
-                <span className={`v ${xwClass}`}>
-                  {steadyX !== null ? `${Math.round(steadyX)} kt` : 'n/a'}
-                  {gustX !== null && ` G ${Math.round(gustX)}`}
-                  <small>demo {aircraft.demonstratedCrosswindKt} · your min {mins.crosswindKt}</small>
-                </span>
+                <dt>Crosswind on runway {rw?.runway.id ?? '—'}</dt>
+                <dd className={xwClass}>
+                  {steadyX !== null ? `${Math.round(steadyX)} kt` : 'Not computed'}
+                  {gustX !== null && `, ${Math.round(gustX)} kt in gusts`}
+                </dd>
+                <span className="note">{demo !== null ? `Demonstrated ${demo} kt, your` : 'Your'} minimum {mins.crosswindKt} kt</span>
               </div>
               <div>
-                <span className="k">Density altitude</span>
-                <span className={`v ${f.densityAltitudeFt !== null && f.densityAltitudeFt > 2000 ? 'warn' : ''}`}>
-                  {f.densityAltitudeFt !== null ? `${f.densityAltitudeFt.toLocaleString()} ft` : 'n/a'}
-                  <small>field {airport.elevationFt} ft · {m.tempC ?? '?'}°C · {m.altimeterInHg ?? '?'}</small>
-                </span>
+                <dt>Density altitude</dt>
+                <dd className={f.densityAltitudeFt !== null && f.densityAltitudeFt > 2000 ? 'warn' : ''}>{f.densityAltitudeFt !== null ? `${f.densityAltitudeFt.toLocaleString()} ft` : 'Not computed'}</dd>
+                <span className="note">Field {airport.elevationFt} ft, {m.tempC ?? '?'}°C, altimeter {m.altimeterInHg ?? '?'}</span>
               </div>
               <div>
-                <span className="k">Weight and balance</span>
-                <span className={`v ${wb.overGross || !wb.withinEnvelope ? 'bad' : 'ok'}`}>
-                  {wb.totalLb.toLocaleString()} lb
-                  <small>CG {wb.cgIn} in · {wb.overGross ? 'over gross' : wb.withinEnvelope ? 'in envelope' : 'outside envelope'}</small>
-                </span>
+                <dt>Weight and balance</dt>
+                {configured && wb ? (
+                  <>
+                    <dd className={wb.overGross || !wb.withinEnvelope ? 'bad' : 'ok'}>{wb.totalLb.toLocaleString()} lb</dd>
+                    <span className="note">CG {wb.cgIn} in, {wb.overGross ? 'over gross' : wb.withinEnvelope ? 'in the envelope' : 'outside the envelope'}</span>
+                  </>
+                ) : (
+                  <dd><button type="button" className="linkish" onClick={goAirplane}>Add your airplane</button></dd>
+                )}
               </div>
-            </div>
+            </dl>
           </Card>
 
           <Card title="Wind on the runway" sub={rw?.windMag !== null && rw?.windMag !== undefined ? `${String(m.wind?.dirTrue).padStart(3, '0')}°T becomes ${String(rw.windMag).padStart(3, '0')}°M` : undefined}>
@@ -191,7 +195,7 @@ export function Today({ airport, aircraft, loading, pilot, goAirplane }: { airpo
                       {Math.round(rw.steady.crosswindKt)} kt steady{rw.gust ? `, ${Math.round(rw.gust.crosswindKt)} kt in gusts` : ''}
                     </dd>
                     <dt>Demonstrated</dt>
-                    <dd>{aircraft.demonstratedCrosswindKt} kt{aircraft.sampleValues ? ' (sample)' : ''}</dd>
+                    <dd>{demo !== null ? `${demo} kt${aircraft.sampleValues ? ' (sample)' : ''}` : 'Not entered'}</dd>
                     <dt>Your minimum</dt>
                     <dd>{mins.crosswindKt} kt</dd>
                   </dl>
@@ -214,11 +218,9 @@ export function Today({ airport, aircraft, loading, pilot, goAirplane }: { airpo
         {/* ---------------- Decide / Debrief ---------------- */}
         <div className="stack">
           <Card title="The flight">
-            <p style={{ fontSize: '0.95rem' }}>
-              Local flight out of {airport.icao}, back the same day. Pick your departure and how long you'll be gone, then decide.
-            </p>
+            <p>Local flight out of {airport.icao}, back the same day. Set your departure and how long you'll be gone, then decide.</p>
             <div className="inputs">
-              <Field label="Departure (local)" hint={fmtZ(departure)} size="md">
+              <Field label="Departure, local time" hint={fmtZ(departure)} size="md">
                 <input
                   type="datetime-local"
                   value={toLocalInput(departure)}
@@ -228,13 +230,13 @@ export function Today({ airport, aircraft, loading, pilot, goAirplane }: { airpo
                   }}
                 />
               </Field>
-              <Field label="Trip hours" size="sm">
+              <Field label="Hours away" size="sm">
                 <input type="number" inputMode="numeric" min={1} max={12} step={1} value={tripHours} onChange={(e) => setTripHours(Math.min(12, Math.max(1, Math.round(e.target.valueAsNumber || 1))))} />
               </Field>
             </div>
           </Card>
 
-          <Card title="Decide" sub={committed ? 'Committed' : 'Answer is hidden until you commit'}>
+          <Card title="Decide" sub={committed ? 'Committed' : 'The grades stay hidden until you commit'} className="decide">
             <p className="prompt">Given the brief, your airplane and your personal minimums, what do you do?</p>
             <div className="choices" role="group" aria-label="Choices">
               {brief.choices.map((c, i) => {
@@ -277,20 +279,18 @@ export function Today({ airport, aircraft, loading, pilot, goAirplane }: { airpo
 
           {result && (
             <div ref={debriefRef} className="stack">
-              <div className="debrief">
-                <div className="debrief-head">
-                  <span className="eyebrow">Debrief</span>
-                  <span className="lcg">Learner-centered grade: {result.lcg}</span>
+              <Card title="Debrief" sub={`Learner-centered grade: ${result.lcg}`}>
+                <div className="debrief">
+                  <div className={`grade ${result.grade}`}>{GRADE_LABEL[result.grade]}</div>
+                  <p>{result.rationale}</p>
+                  {result.confidentlyWrong && (
+                    <div className="callout">
+                      <b>Confidently wrong</b>
+                      <span>You were {confidence}% sure of a {result.grade} call. That gap is the thing to study, more than the answer itself. This item comes back sooner.</span>
+                    </div>
+                  )}
                 </div>
-                <div className={`grade ${result.grade}`}>{GRADE_LABEL[result.grade]}</div>
-                <p>{result.rationale}</p>
-                {result.confidentlyWrong && (
-                  <div className="callout">
-                    <b>Confidently wrong</b>
-                    <span>You were {confidence}% sure of a {result.grade} call. That gap is the thing to study, more than the answer itself. This item comes back sooner.</span>
-                  </div>
-                )}
-              </div>
+              </Card>
               <Card title="What drove the grade" sub={`${brief.findings.length} finding${brief.findings.length === 1 ? '' : 's'}`}>
                 {brief.findings.length === 0 ? (
                   <p className="muted">Nothing flagged. Legal, inside the airplane's numbers and inside your minimums.</p>
@@ -301,10 +301,8 @@ export function Today({ airport, aircraft, loading, pilot, goAirplane }: { airpo
                     </ul>
                     {brief.findings.length > result.keyFindings.length && (
                       <details>
-                        <summary className="muted" style={{ cursor: 'pointer', fontSize: '0.9rem' }}>
-                          {brief.findings.length - result.keyFindings.length} more
-                        </summary>
-                        <ul className="findings" style={{ marginTop: 8 }}>
+                        <summary>Show {brief.findings.length - result.keyFindings.length} more</summary>
+                        <ul className="findings">
                           {brief.findings.filter((x) => !result.keyFindings.includes(x)).map((x) => <FindingRow key={x.id} f={x} />)}
                         </ul>
                       </details>
@@ -315,6 +313,76 @@ export function Today({ airport, aircraft, loading, pilot, goAirplane }: { airpo
             </div>
           )}
         </div>
+      </div>
+    </>
+  );
+}
+
+const COVER: Record<string, string> = { BKN: 'broken', OVC: 'overcast', VV: 'indefinite' };
+
+/** The brief as a CFI would say it out loud. Numbers over the pilot's own minimums are marked. */
+function Spoken({ m, brief, airport, demo, mins, wb, ceilingClass, visClass, xwClass }: {
+  m: Metar; brief: Brief; airport: Airport; demo: number | null; mins: PilotProfile['minimums']; wb: WbResult | null;
+  ceilingClass: string; visClass: string; xwClass: string;
+}) {
+  const rw = brief.facts.runwayWind;
+  const mark = (cls: string, node: ReactNode) => (cls === 'warn' || cls === 'bad' ? <span className={cls}>{node}</span> : <b>{node}</b>);
+  const ceilingCloud = m.clouds.find((c) => c.baseFtAgl === m.ceilingFtAgl && (c.cover === 'BKN' || c.cover === 'OVC' || c.cover === 'VV'));
+  const ceiling = m.ceilingFtAgl !== null
+    ? <>Ceiling {mark(ceilingClass, `${m.ceilingFtAgl.toLocaleString()} ${COVER[ceilingCloud?.cover ?? ''] ?? ''}`.trim())}</>
+    : <>No ceiling</>;
+  const vis = m.visibilitySm !== null
+    ? mark(visClass, `${m.visibilityPlus ? 'more than ' : ''}${m.visibilitySm} ${m.visibilitySm === 1 ? 'mile' : 'miles'}`)
+    : 'visibility not reported';
+
+  let wind: ReactNode;
+  if (!m.wind) wind = <>Wind not reported.</>;
+  else if (m.wind.dirTrue === null) wind = m.wind.speedKt === 0 ? <>Wind calm.</> : <>Wind variable at {m.wind.speedKt}, so treat all of it as crosswind.</>;
+  else {
+    const steady = rw?.steady ? Math.round(rw.steady.crosswindKt) : null;
+    const gust = rw?.gust ? Math.round(rw.gust.crosswindKt) : null;
+    const worst = gust ?? steady;
+    const over = worst !== null && demo !== null && worst > demo
+      ? `, past the ${demo}-knot demonstrated crosswind`
+      : worst !== null && worst > mins.crosswindKt
+        ? `, over your ${mins.crosswindKt}-knot minimum`
+        : '';
+    wind = (
+      <>
+        Wind {String(m.wind.dirTrue).padStart(3, '0')} at {m.wind.speedKt}{m.wind.gustKt ? ` gusting ${m.wind.gustKt}` : ''}
+        {rw && steady !== null ? (
+          <>
+            : {mark(xwClass, `${worst} knots across runway ${rw.runway.id}`)}{over}.
+          </>
+        ) : '.'}
+      </>
+    );
+  }
+  const wbNode = wb
+    ? mark(wb.overGross || !wb.withinEnvelope ? 'bad' : 'ok', wb.overGross ? `${wb.totalLb.toLocaleString()} lb, over gross` : wb.withinEnvelope ? `${wb.totalLb.toLocaleString()} lb, in the envelope` : `${wb.totalLb.toLocaleString()} lb, outside the envelope`)
+    : 'No airplane numbers yet';
+  const da = brief.facts.densityAltitudeFt;
+
+  return (
+    <div className="hero">
+      <span className={`cat ${m.category ?? ''}`}>{m.category ?? 'No flight category'} at {airport.icao}</span>
+      <p>
+        {ceiling}, {vis}. {wind} {wbNode}{da !== null ? <>, density altitude {mark(da > 2000 ? 'warn' : '', `${da.toLocaleString()} ft`)}</> : ''}.
+      </p>
+      <span className="legend-line">Underlined numbers are over your personal minimums or the airplane's limits.</span>
+    </div>
+  );
+}
+
+/** Today before a home airport exists. */
+export function NoAirport({ onSetup }: { onSetup: () => void }) {
+  return (
+    <>
+      <PageHead title="Today" lead="The daily brief is built from your home airport's METAR and TAF, your airplane and your personal minimums." />
+      <div className="empty">
+        <h2>No home airport yet</h2>
+        <p>Choose the field you fly from and the brief will pull its current weather, pick the runway and run the numbers against your minimums.</p>
+        <button type="button" className="btn primary" onClick={onSetup}>Set home airport</button>
       </div>
     </>
   );
@@ -341,13 +409,13 @@ function Head({ airport, wx, onRefresh, busy }: { airport: Airport; wx: WeatherB
       <div>
         <h1>Today at {airport.icao}</h1>
         <p className="lead">
-          {airport.name}{airport.city ? `, ${airport.city}` : ''} · Class {airport.airspace} · field elevation {airport.elevationFt} ft{rwys ? ` · runway ${rwys}` : ''}
+          {airport.name}{airport.city ? `, ${airport.city}` : ''}. Class {airport.airspace}, field elevation {airport.elevationFt} ft{rwys ? `, runway ${rwys}` : ''}.
         </p>
       </div>
       <div className="btn-row">
         {wx && (
-          <span className="mono muted" style={{ fontSize: '0.74rem' }}>
-            {wx.source === 'live' ? 'Live' : 'Sample'} · fetched {wx.fetchedAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+          <span className="muted small">
+            {wx.source === 'live' ? 'Live weather' : 'Practice weather'}, fetched {wx.fetchedAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
           </span>
         )}
         <button type="button" className="btn" onClick={onRefresh} disabled={busy || !onRefresh}>

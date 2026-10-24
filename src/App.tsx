@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { Today } from './ui/Today';
+import { Today, NoAirport } from './ui/Today';
 import { Airplane } from './ui/Airplane';
 import { Review } from './ui/Review';
 import { Readiness } from './ui/Readiness';
 import { Settings } from './ui/Settings';
 import { Onboarding } from './ui/Onboarding';
-import { Icons } from './ui/common';
+import { Icons, Mark } from './ui/common';
 import { useAircraft, useAirport, useLoading, useOnboarding, usePilot, useTheme } from './ui/state';
 
 type Screen = 'today' | 'airplane' | 'review' | 'readiness' | 'settings';
@@ -54,11 +54,7 @@ export function App() {
     <div className="shell">
       <header className="topbar">
         <div className="brand">
-          <svg viewBox="0 0 64 64" aria-hidden="true">
-            <rect width="64" height="64" fill="var(--ink)" />
-            <circle cx="32" cy="32" r="20" fill="none" stroke="var(--magenta)" strokeWidth="4" />
-            <rect x="29" y="8" width="6" height="48" fill="var(--paper)" transform="rotate(-40 32 32)" />
-          </svg>
+          <Mark />
           <span>Downwind</span>
           <small>Ground school</small>
         </div>
@@ -71,14 +67,16 @@ export function App() {
           ))}
         </nav>
         <div className="topbar-right">
-          <span>{airport.icao}</span>
-          <span aria-hidden="true">·</span>
-          <span>{aircraft.tailNumber}</span>
+          {aircraft.tailNumber && <b>{aircraft.tailNumber}</b>}
+          {aircraft.tailNumber && airport ? ' at ' : ''}
+          {airport?.icao}
         </div>
       </header>
 
       <main className="page">
-        {screen === 'today' && <Today airport={airport} aircraft={aircraft} loading={loading} pilot={pilot} goAirplane={() => go('airplane')} />}
+        {screen === 'today' && (airport
+          ? <Today airport={airport} aircraft={aircraft} loading={loading} pilot={pilot} goAirplane={() => go('airplane')} />
+          : <NoAirport onSetup={() => setOnboarding({ complete: false, step: 1 })} />)}
         {screen === 'airplane' && <Airplane aircraft={aircraft} setAircraft={setAircraft} loading={loading} setLoading={setLoading} />}
         {screen === 'review' && <Review key={epoch} />}
         {screen === 'readiness' && <Readiness key={epoch} goReview={() => go('review')} />}
@@ -89,7 +87,7 @@ export function App() {
 
       <footer className="about">
         <span>Training aid. Not for navigation. Not a substitute for an official briefing or a CFI.</span>
-        <span>Downwind Phase 0</span>
+        <span>Downwind, phase 0</span>
       </footer>
     </div>
   );

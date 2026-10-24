@@ -62,7 +62,8 @@ export interface Brief {
 export interface GoNoGoInput {
   airport: Airport;
   aircraft: AircraftProfile;
-  wb: WbResult;
+  /** Null when the pilot hasn't entered their airplane's numbers yet. */
+  wb: WbResult | null;
   minimums: PersonalMinimums;
   metar: Metar;
   taf: Taf | null;
@@ -155,11 +156,11 @@ export function buildBrief(input: GoNoGoInput): Brief {
   }
 
   // Legal: operating limitations (91.9).
-  if (wb.overGross) {
+  if (wb?.overGross) {
     add({ id: 'wb-gross', severity: 'illegal', title: 'Over maximum gross weight',
       detail: `${wb.totalLb} lb against a maximum of ${aircraft.maxGrossLb} lb.`,
       acs: ['PA.I.F'], refs: ['14 CFR 91.9', 'PHAK ch. 10'] });
-  } else if (!wb.withinEnvelope) {
+  } else if (wb && !wb.withinEnvelope) {
     add({ id: 'wb-cg', severity: 'illegal', title: 'CG outside the envelope',
       detail: `CG ${wb.cgIn} in at ${wb.totalLb} lb falls outside the POH envelope.`,
       acs: ['PA.I.F'], refs: ['14 CFR 91.9', 'PHAK ch. 10'] });
@@ -170,7 +171,8 @@ export function buildBrief(input: GoNoGoInput): Brief {
     const steadyX = rw.steady.crosswindKt;
     const gustX = rw.gust?.crosswindKt ?? null;
     const worstX = gustX ?? steadyX;
-    if (worstX > aircraft.demonstratedCrosswindKt) {
+    // A demonstrated crosswind of 0 means it hasn't been entered.
+    if (aircraft.demonstratedCrosswindKt > 0 && worstX > aircraft.demonstratedCrosswindKt) {
       add({ id: 'xw-demo', severity: 'limit', title: 'Crosswind beyond the demonstrated value',
         detail: `Runway ${rw.runway.id}: ${Math.round(steadyX)} kt crosswind${gustX !== null ? `, ${Math.round(gustX)} kt in gusts` : ''}. The demonstrated crosswind is ${aircraft.demonstratedCrosswindKt} kt. That isn't a legal limit, but nobody tested the airplane past it.`,
         acs: ['PA.I.F', 'PA.IV.A'], refs: ['POH section 4 or 5', 'AFH, crosswind takeoff and landing'] });

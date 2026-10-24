@@ -76,13 +76,13 @@ export function Review() {
             <div className="stat"><span className="k">Confidently wrong</span><span className={`v ${cw ? 'warn' : ''}`}>{cw}</span></div>
           </div>
           {cw > 0 && (
-            <p className="muted" style={{ fontSize: '0.9rem' }}>
+            <p className="help">
               Confidently wrong answers come back soonest. They are the ones that would bite you on a checkride or in the airplane.
             </p>
           )}
           <ul className="findings">
             {done.map((d) => (
-              <li key={d.item.id} className={`finding ${d.correct ? 'info' : 'illegal'}`}>
+              <li key={d.item.id} className={`finding ${d.correct ? 'right' : 'illegal'}`}>
                 <span className="sev">{d.correct ? 'Right' : 'Missed'}</span>
                 <h4>{d.item.prompt}</h4>
                 <p>{d.item.options[d.item.answer]}</p>
@@ -103,12 +103,12 @@ export function Review() {
       <PageHead
         title="Review"
         lead="Answer first, then read. Rate your confidence before you reveal."
-        meta={<><span>Item</span><b>{idx + 1} of {session.length}</b></>}
+        meta={<>Item <b>{idx + 1}</b> of {session.length}</>}
       />
       <div className="progress" aria-hidden="true"><i style={{ width: `${(idx / session.length) * 100}%` }} /></div>
 
       <div className="grid-2">
-        <Card title={item.acs} sub="ACS task">
+        <Card title="Question" sub={`ACS ${item.acs}`}>
           <p className="review-q">{item.prompt}</p>
           <div className="choices" role="group" aria-label="Options">
             {item.options.map((o, i) => {
@@ -118,11 +118,10 @@ export function Review() {
                 <button
                   key={i}
                   type="button"
-                  className={`choice ${revealed ? 'revealed' : ''} ${isPicked || isAnswer ? 'picked' : ''}`}
+                  className={`choice ${revealed ? 'revealed' : ''} ${isPicked || isAnswer ? 'picked' : ''} ${isAnswer ? 'right' : revealed && isPicked ? 'wrong' : ''}`}
                   aria-pressed={isPicked}
                   disabled={revealed}
                   onClick={() => setPicked(i)}
-                  style={isAnswer ? { borderColor: 'var(--vfr)', boxShadow: 'inset 3px 0 0 var(--vfr)' } : revealed && isPicked ? { borderColor: 'var(--ifr)', boxShadow: 'inset 3px 0 0 var(--ifr)' } : undefined}
                 >
                   <span className="key">{KEYS[i]}</span>
                   <span>{o}</span>
@@ -133,7 +132,7 @@ export function Review() {
         </Card>
 
         <div className="stack">
-          <Card title={revealed ? 'Result' : 'Commit'}>
+          <Card title={revealed ? 'Result' : 'Your answer'} className="decide">
             {!revealed ? (
               <>
                 <div className="conf">
@@ -151,7 +150,7 @@ export function Review() {
                 <div className={`result ${correct ? '' : 'wrong'}`}>
                   <b>{correct ? 'Correct' : confidence >= 70 ? 'Missed, and you were sure' : 'Missed'}</b>
                   <span>{item.explanation}</span>
-                  <div className="refs" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <div className="refs">
                     <span className="chip acs">{item.acs}</span>
                     <span className="chip">{item.ref}</span>
                   </div>
@@ -172,8 +171,7 @@ export function EmptyGlyph() {
       <circle cx="48" cy="48" r="40" fill="var(--chart)" stroke="var(--rule)" />
       <circle cx="48" cy="48" r="26" fill="none" stroke="var(--classb)" strokeWidth="2" strokeDasharray="6 4" />
       <g transform="translate(48 48)">
-        <circle r="9" fill="none" stroke="var(--magenta)" strokeWidth="2" />
-        <rect x="-15" y="-2" width="30" height="4" fill="var(--magenta)" transform="rotate(-50)" />
+        <rect x="-4" y="-18" width="8" height="36" fill="var(--ink)" transform="rotate(-35)" />
       </g>
     </svg>
   );

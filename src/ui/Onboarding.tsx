@@ -3,47 +3,21 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { Airport } from '../data/airports';
-import { sampleC172K, type AircraftProfile } from '../data/aircraft';
+import { aircraftTemplates, blankAircraft, isConfigured, type AircraftProfile } from '../data/aircraft';
 import type { PilotProfile } from '../data/pilot';
 import { lookupAirport, manualAirport, normalizeIdent } from '../lib/airportLookup';
 import { fetchWeather, type WeatherBundle } from '../lib/weather';
 import type { RunwayEnd } from '../lib/wind';
-import { Card, Field, Notice, NumInput } from './common';
+import { Card, Field, Mark, Notice, NumInput } from './common';
 import { RawReport } from './MetarBlock';
 import { flightReviewDue, type OnboardingState } from './state';
 
 const STEPS = ['Welcome', 'Airport', 'Airplane', 'You', 'Done'];
 
-const blankAircraft: AircraftProfile = {
-  id: 'custom',
-  tailNumber: 'N',
-  type: '',
-  panel: [],
-  emptyWeightLb: 0,
-  emptyArmIn: 0,
-  maxGrossLb: 0,
-  usableFuelGal: 0,
-  demonstratedCrosswindKt: 0,
-  stations: [
-    { id: 'front', label: 'Pilot and front passenger', armIn: 0 },
-    { id: 'rear', label: 'Rear passengers', armIn: 0 },
-    { id: 'fuel', label: 'Fuel', armIn: 0 },
-    { id: 'bag1', label: 'Baggage', armIn: 0 },
-  ],
-  envelope: [
-    [35, 1500],
-    [35, 2000],
-    [40, 2300],
-    [47, 2300],
-    [47, 1500],
-  ],
-  sampleValues: true,
-};
-
 export function Onboarding({ state, setState, airport, setAirport, aircraft, setAircraft, pilot, setPilot, onDone }: {
   state: OnboardingState;
   setState: (s: OnboardingState) => void;
-  airport: Airport;
+  airport: Airport | null;
   setAirport: (a: Airport) => void;
   aircraft: AircraftProfile;
   setAircraft: (a: AircraftProfile) => void;
@@ -65,11 +39,7 @@ export function Onboarding({ state, setState, airport, setAirport, aircraft, set
     <div className="onboard">
       <div className="onboard-head">
         <div className="brand">
-          <svg viewBox="0 0 64 64" aria-hidden="true">
-            <rect width="64" height="64" fill="var(--ink)" />
-            <circle cx="32" cy="32" r="20" fill="none" stroke="var(--magenta)" strokeWidth="4" />
-            <rect x="29" y="8" width="6" height="48" fill="var(--paper)" transform="rotate(-40 32 32)" />
-          </svg>
+          <Mark />
           <span>Downwind</span>
           <small>Setup</small>
         </div>
@@ -92,7 +62,7 @@ export function Onboarding({ state, setState, airport, setAirport, aircraft, set
 
       <footer className="about">
         <span>Training aid. Not for navigation. Not a substitute for an official briefing or a CFI.</span>
-        <button type="button" className="linkish" onClick={finish}>Skip setup, use defaults</button>
+        <button type="button" className="linkish" onClick={finish}>Skip setup for now</button>
       </footer>
     </div>
   );
@@ -115,18 +85,18 @@ function Welcome({ onNext }: { onNext: () => void }) {
   return (
     <div className="onboard-col">
       <div>
-        <div className="eyebrow">Ground school for one pilot, one airplane, one airport</div>
         <h1 className="onboard-title">Downwind</h1>
+        <p className="onboard-sub">Ground school for one pilot, one airplane, one airport.</p>
       </div>
       <p className="lead-lg">
         Every session starts with a real decision about a real flight from your home field: live weather, your airplane's numbers, your personal minimums. You decide, then the app grades the call against the ACS and schedules what you missed.
       </p>
-      <div className="loop">
-        <div><span className="n">01</span><h3>Brief</h3><p>METAR, TAF, runway wind, density altitude, W&amp;B.</p></div>
-        <div><span className="n">02</span><h3>Decide</h3><p>Go, go with a plan, delay or cancel. Rate your confidence.</p></div>
-        <div><span className="n">03</span><h3>Debrief</h3><p>Grade, the findings that drove it, the references.</p></div>
-      </div>
-      <p className="muted" style={{ fontSize: '0.9rem' }}>Setup takes about a minute. Every step can be skipped and changed later.</p>
+      <ol className="loop">
+        <li><span className="n">1</span><h3>Brief</h3><p>METAR, TAF, runway wind, density altitude, weight and balance.</p></li>
+        <li><span className="n">2</span><h3>Decide</h3><p>Go, go with a plan, delay or cancel. Rate your confidence.</p></li>
+        <li><span className="n">3</span><h3>Debrief</h3><p>The grade, the findings that drove it, the references.</p></li>
+      </ol>
+      <p className="help">Setup takes about a minute. Every step can be skipped and changed later.</p>
       <StepNav onNext={onNext} nextLabel="Set up" />
     </div>
   );
@@ -136,10 +106,10 @@ function Welcome({ onNext }: { onNext: () => void }) {
 
 const AIRSPACE: Airport['airspace'][] = ['B', 'C', 'D', 'E', 'G'];
 
-function AirportStep({ airport, setAirport, pilot, setPilot, onBack, onNext }: { airport: Airport; setAirport: (a: Airport) => void; pilot: PilotProfile; setPilot: (p: PilotProfile) => void; onBack: () => void; onNext: () => void }) {
-  const [ident, setIdent] = useState(airport.icao);
-  const [draft, setDraft] = useState<Airport>(airport);
-  const [source, setSource] = useState<'bundled' | 'awc' | 'manual' | null>(airport.icao === 'KASH' ? 'bundled' : 'manual');
+function AirportStep({ airport, setAirport, pilot, setPilot, onBack, onNext }: { airport: Airport | null; setAirport: (a: Airport) => void; pilot: PilotProfile; setPilot: (p: PilotProfile) => void; onBack: () => void; onNext: () => void }) {
+  const [ident, setIdent] = useState(airport?.icao ?? '');
+  const [draft, setDraft] = useState<Airport>(airport ?? manualAirport(''));
+  const [source, setSource] = useState<'bundled' | 'awc' | 'manual' | 'saved' | null>(airport ? 'saved' : null);
   const [looking, setLooking] = useState(false);
   const [lookupFailed, setLookupFailed] = useState(false);
   const [wx, setWx] = useState<WeatherBundle | null>(null);
@@ -158,7 +128,7 @@ function AirportStep({ airport, setAirport, pilot, setPilot, onBack, onNext }: {
       .finally(() => { if (!ac.signal.aborted) setWxBusy(false); });
   };
   useEffect(() => {
-    previewWeather(airport);
+    if (airport) previewWeather(airport);
     return () => abort.current?.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -203,9 +173,8 @@ function AirportStep({ airport, setAirport, pilot, setPilot, onBack, onNext }: {
   return (
     <div className="onboard-col">
       <div>
-        <div className="eyebrow">Step 2 of 5</div>
         <h2 className="onboard-h2">Home airport</h2>
-        <p className="muted">Where the daily brief is built. Live METAR and TAF, runway winds and density altitude come from this field.</p>
+        <p className="muted">Where the daily brief is built. Live METAR and TAF, runway winds and density altitude all come from this field.</p>
       </div>
 
       <form
@@ -213,10 +182,10 @@ function AirportStep({ airport, setAirport, pilot, setPilot, onBack, onNext }: {
         onSubmit={(e) => { e.preventDefault(); void lookup(); }}
       >
         <Field label="Identifier" size="md">
-          <input value={ident} autoCapitalize="characters" autoCorrect="off" spellCheck={false} onChange={(e) => setIdent(e.target.value)} />
+          <input value={ident} placeholder="KJFK or 3B3" autoCapitalize="characters" autoCorrect="off" spellCheck={false} onChange={(e) => setIdent(e.target.value)} />
         </Field>
         <button type="submit" className="btn" disabled={looking || !ident.trim()}>{looking ? 'Looking up' : 'Look up'}</button>
-        <span className="muted mono" style={{ fontSize: '0.74rem', flexBasis: '100%' }}>ICAO or FAA identifier, e.g. KASH or ASH. Lookup uses aviationweather.gov; KASH ships with the app.</span>
+        <span className="help" style={{ flexBasis: '100%' }}>ICAO or FAA identifier. Lookup uses aviationweather.gov; if it can't be reached, enter the field by hand from the Chart Supplement.</span>
       </form>
 
       {lookupFailed && (
@@ -225,10 +194,9 @@ function AirportStep({ airport, setAirport, pilot, setPilot, onBack, onNext }: {
         </Notice>
       )}
 
-      <Card
-        title={source === 'bundled' ? 'Confirm airport' : source === 'awc' ? 'Confirm airport (from AWC)' : 'Enter airport'}
-        sub={draft.verify.length ? `Verify: ${draft.verify.join(', ')}` : undefined}
-        right={<span className="chip">{source === 'bundled' ? 'bundled data' : source === 'awc' ? 'aviationweather.gov' : 'manual entry'}</span>}
+      {source && <Card
+        title={source === 'manual' ? 'Enter the airport' : 'Confirm the airport'}
+        sub={source === 'bundled' ? 'Bundled with the app' : source === 'awc' ? 'From aviationweather.gov' : source === 'saved' ? 'Your saved airport' : 'Entered by hand'}
       >
         <div className="inputs">
           <Field label="ICAO" size="sm"><input value={draft.icao} onChange={(e) => upd({ icao: e.target.value.toUpperCase() })} /></Field>
@@ -261,26 +229,27 @@ function AirportStep({ airport, setAirport, pilot, setPilot, onBack, onNext }: {
             <button type="button" className="btn quiet" onClick={addRwy}>Add runway end</button>
           </div>
         </div>
+        {draft.verify.length > 0 && <p className="help">Still to check against the current Chart Supplement: {draft.verify.join(', ')}.</p>}
         <p className="teach">
           Why variation matters: the METAR wind is in degrees <b>true</b>, but runways are numbered <b>magnetic</b>. At {draft.icao || 'this field'} with {Math.abs(draft.magneticVariationDeg)}°{draft.magneticVariationDeg < 0 ? 'W' : 'E'} variation,
           a wind reported from 270° is really from {String((((270 - draft.magneticVariationDeg) % 360) + 360) % 360).padStart(3, '0')}° on the runway compass. The app does this conversion for you and shows both numbers.
         </p>
-      </Card>
+      </Card>}
 
-      <Card title="Weather preview" sub={wx ? (wx.source === 'live' ? 'Live' : 'Sample') : undefined} right={wx && <span className={`badge ${wx.metar.category ?? ''}`}>{wx.metar.category ?? '—'}</span>}>
-        {wxBusy && !wx && <p className="muted">Fetching the current METAR…</p>}
+      {source && <Card title="Weather preview" sub={wx ? (wx.source === 'live' ? 'Live report' : 'Sample report') : undefined} right={wx && <span className={`badge ${wx.metar.category ?? ''}`}>{wx.metar.category ?? '—'}</span>}>
+        {wxBusy && !wx && <p className="muted">Fetching the current METAR.</p>}
         {wx && (
           <>
             {wx.source === 'sample' && (
-              <Notice label="Sample">Could not reach the weather service{wx.error ? ` (${wx.error})` : ''}. Showing a stored KASH report so you can see what the brief looks like.</Notice>
+              <Notice label="Sample weather">Could not reach the weather service{wx.error ? ` (${wx.error})` : ''}. Showing practice weather so you can see what the brief looks like.</Notice>
             )}
             <RawReport raw={wx.metar.raw} label={`METAR ${wx.metar.station}`} />
           </>
         )}
         {!wxBusy && !wx && <p className="muted">No preview yet.</p>}
-      </Card>
+      </Card>}
 
-      <StepNav onBack={onBack} onNext={commit} onSkip={onNext} nextDisabled={!draft.icao.trim()} nextLabel="Save airport" />
+      <StepNav onBack={onBack} onNext={commit} onSkip={onNext} nextDisabled={!source || !draft.icao.trim()} nextLabel="Save airport" />
     </div>
   );
 }
@@ -289,8 +258,10 @@ function AirportStep({ airport, setAirport, pilot, setPilot, onBack, onNext }: {
 
 function AircraftStep({ aircraft, setAircraft, onBack, onNext }: { aircraft: AircraftProfile; setAircraft: (a: AircraftProfile) => void; onBack: () => void; onNext: () => void }) {
   const [draft, setDraft] = useState<AircraftProfile>(aircraft);
-  const [fromPoh, setFromPoh] = useState(!aircraft.sampleValues);
+  const [picked, setPicked] = useState<string | null>(isConfigured(aircraft) ? aircraft.id : null);
+  const [fromPoh, setFromPoh] = useState(isConfigured(aircraft) && !aircraft.sampleValues);
   const [chip, setChip] = useState('');
+  const isBlank = draft.id === 'custom';
   const upd = (patch: Partial<AircraftProfile>) => setDraft({ ...draft, ...patch });
 
   const addChip = () => {
@@ -301,26 +272,32 @@ function AircraftStep({ aircraft, setAircraft, onBack, onNext }: { aircraft: Air
   };
 
   const commit = () => {
-    setAircraft({ ...draft, sampleValues: !fromPoh });
+    setAircraft({ ...draft, sampleValues: !isBlank && !fromPoh });
     onNext();
   };
 
   return (
     <div className="onboard-col">
       <div>
-        <div className="eyebrow">Step 3 of 5</div>
         <h2 className="onboard-h2">Your airplane</h2>
         <p className="muted">Weight and balance, crosswind limits and performance all key off these. Copy them from your POH and the current weight and balance record, not from memory.</p>
       </div>
 
-      <div className="seg" role="group" aria-label="Start from">
-        <button type="button" aria-pressed={draft.id === 'c172k'} onClick={() => { setDraft({ ...sampleC172K, tailNumber: draft.tailNumber, panel: draft.panel }); setFromPoh(false); }}>C172K template</button>
-        <button type="button" aria-pressed={draft.id === 'custom'} onClick={() => { setDraft({ ...blankAircraft, tailNumber: draft.tailNumber, panel: draft.panel }); setFromPoh(false); }}>Blank</button>
+      <div className="field">
+        <span>Start from</span>
+        <div className="seg" role="group" aria-label="Start from">
+          {aircraftTemplates.map((t) => (
+            <button key={t.id} type="button" aria-pressed={picked === t.profile.id} onClick={() => { setDraft({ ...t.profile, tailNumber: draft.tailNumber, panel: draft.panel.length ? draft.panel : t.profile.panel }); setPicked(t.profile.id); setFromPoh(false); }}>
+              {t.label}
+            </button>
+          ))}
+          <button type="button" aria-pressed={picked === 'custom'} onClick={() => { setDraft({ ...blankAircraft, tailNumber: draft.tailNumber, panel: draft.panel }); setPicked('custom'); setFromPoh(false); }}>Start blank</button>
+        </div>
       </div>
 
       <Card title="Identity">
         <div className="inputs">
-          <Field label="Type" hint="make and model" size="md"><input value={draft.type} placeholder="Cessna 172K" onChange={(e) => upd({ type: e.target.value })} /></Field>
+          <Field label="Type" hint="make and model" size="md"><input value={draft.type} placeholder="Make and model" onChange={(e) => upd({ type: e.target.value })} /></Field>
           <Field label="Tail number" size="sm"><input value={draft.tailNumber} onChange={(e) => upd({ tailNumber: e.target.value.toUpperCase() })} /></Field>
         </div>
         <div>
@@ -333,7 +310,7 @@ function AircraftStep({ aircraft, setAircraft, onBack, onNext }: { aircraft: Air
               </span>
             ))}
             <form className="chip-add" onSubmit={(e) => { e.preventDefault(); addChip(); }}>
-              <input value={chip} placeholder="GI 275, GTN 650…" aria-label="Add avionics" onChange={(e) => setChip(e.target.value)} />
+              <input value={chip} placeholder="For example, a GPS or an autopilot" aria-label="Add avionics" onChange={(e) => setChip(e.target.value)} />
               <button type="submit" className="btn quiet" disabled={!chip.trim()}>Add</button>
             </form>
           </div>
@@ -346,21 +323,21 @@ function AircraftStep({ aircraft, setAircraft, onBack, onNext }: { aircraft: Air
           <Field label="Empty CG arm" hint="in aft of datum" size="sm"><NumInput value={draft.emptyArmIn} step={0.1} onChange={(n) => upd({ emptyArmIn: n })} /></Field>
           <Field label="Max gross" hint="lb" size="sm"><NumInput value={draft.maxGrossLb} step={1} onChange={(n) => upd({ maxGrossLb: n })} /></Field>
           <Field label="Usable fuel" hint="gal" size="sm"><NumInput value={draft.usableFuelGal} step={1} onChange={(n) => upd({ usableFuelGal: n })} /></Field>
-          <Field label="Demonstrated crosswind" hint="kt" size="sm"><NumInput value={draft.demonstratedCrosswindKt} step={1} onChange={(n) => upd({ demonstratedCrosswindKt: n })} /></Field>
+          <Field label="Demonstrated crosswind" hint="kt" size="md"><NumInput value={draft.demonstratedCrosswindKt} step={1} onChange={(n) => upd({ demonstratedCrosswindKt: n })} /></Field>
         </div>
-        <p className="muted" style={{ fontSize: '0.85rem' }}>Station arms and the CG envelope are edited on the Airplane screen, where you can see the polygon as you type.</p>
+        <p className="help">Station arms and the CG envelope are edited on the Airplane screen, where you can see the polygon as you type.</p>
         <label className="check">
           <input type="checkbox" checked={fromPoh} onChange={(e) => setFromPoh(e.target.checked)} />
           <span>These are my airplane's numbers, copied from the POH and current W&amp;B record.</span>
         </label>
-        {!fromPoh && (
+        {!fromPoh && !isBlank && (
           <Notice label="Sample numbers">
-            Fine for now. The app will keep saying so on every screen that uses them until you check the box above or save edits on the Airplane screen.
+            Fine for now. Every screen that uses them will say so until you check the box above or save edits on the Airplane screen.
           </Notice>
         )}
       </Card>
 
-      <StepNav onBack={onBack} onNext={commit} onSkip={onNext} nextLabel={fromPoh ? 'Save airplane' : 'Use sample numbers for now'} />
+      <StepNav onBack={onBack} onNext={commit} onSkip={onNext} nextDisabled={picked === null} nextLabel={fromPoh || isBlank ? 'Save airplane' : 'Use sample numbers for now'} />
     </div>
   );
 }
@@ -377,7 +354,6 @@ function PilotStep({ pilot, setPilot, onBack, onNext }: { pilot: PilotProfile; s
   return (
     <div className="onboard-col">
       <div>
-        <div className="eyebrow">Step 4 of 5</div>
         <h2 className="onboard-h2">You</h2>
         <p className="muted">Personal minimums are the line between a legal flight and one you're comfortable with. The brief grades against them, so set them honestly and change them on the ground, not on the ramp.</p>
       </div>
@@ -389,14 +365,14 @@ function PilotStep({ pilot, setPilot, onBack, onNext }: { pilot: PilotProfile; s
           </Field>
         </div>
         {due && (
-          <p className={overdue ? 'callout' : 'teach'} style={{ fontSize: '0.9rem' }}>
+          <p className={overdue ? 'callout' : 'teach'}>
             {overdue ? 'Flight review overdue. ' : 'Next flight review due by '}
             <b>{due.toLocaleDateString([], { year: 'numeric', month: 'long', day: 'numeric' })}</b>
             {overdue ? ` (was due ${due.toLocaleDateString([], { month: 'long', year: 'numeric' })}).` : ''} 14 CFR 61.56: 24 calendar months, so the whole final month counts.
           </p>
         )}
       </Card>
-      <Card title="Personal minimums" sub="Defaults are conservative for a VFR private pilot">
+      <Card title="Personal minimums" sub="The defaults are conservative for a VFR private pilot">
         <div className="inputs">
           <Field label="Ceiling" hint="ft AGL" size="sm"><NumInput value={mins.ceilingFt} step={100} min={0} onChange={(n) => setMin({ ceilingFt: n })} /></Field>
           <Field label="Visibility" hint="SM" size="sm"><NumInput value={mins.visibilitySm} step={1} min={0} onChange={(n) => setMin({ visibilitySm: n })} /></Field>
@@ -411,26 +387,25 @@ function PilotStep({ pilot, setPilot, onBack, onNext }: { pilot: PilotProfile; s
 
 /* ---------------- 5. Done ---------------- */
 
-function DoneStep({ airport, aircraft, pilot, onBack, onFinish }: { airport: Airport; aircraft: AircraftProfile; pilot: PilotProfile; onBack: () => void; onFinish: () => void }) {
+function DoneStep({ airport, aircraft, pilot, onBack, onFinish }: { airport: Airport | null; aircraft: AircraftProfile; pilot: PilotProfile; onBack: () => void; onFinish: () => void }) {
   return (
     <div className="onboard-col">
       <div>
-        <div className="eyebrow">Step 5 of 5</div>
         <h2 className="onboard-h2">Ready{pilot.name ? `, ${pilot.name}` : ''}</h2>
-        <p className="muted">Here's what the brief will use. Everything is editable from Settings and Airplane.</p>
+        <p className="muted">This is what the brief will use. Everything can be changed from Settings and Airplane.</p>
       </div>
       <Card>
         <dl className="kv">
-          <dt>Home airport</dt><dd>{airport.icao} · {airport.name}{airport.runways.length ? ` · rwy ${airport.runways.map((r) => r.id).join('/')}` : ''}</dd>
-          <dt>Airplane</dt><dd>{aircraft.tailNumber} · {aircraft.type || 'unnamed'}{aircraft.sampleValues ? ' · sample numbers' : ''}</dd>
-          <dt>Panel</dt><dd>{aircraft.panel.length ? aircraft.panel.join(', ') : '—'}</dd>
-          <dt>Minimums</dt><dd>{pilot.minimums.ceilingFt.toLocaleString()} ft · {pilot.minimums.visibilitySm} SM · {pilot.minimums.crosswindKt} kt xw · {pilot.minimums.gustSpreadKt} kt gust</dd>
+          <dt>Home airport</dt><dd>{airport ? <>{airport.icao}, {airport.name}{airport.runways.length ? `, runway ${airport.runways.map((r) => r.id).join('/')}` : ''}</> : 'Not set'}</dd>
+          <dt>Airplane</dt><dd>{isConfigured(aircraft) ? `${[aircraft.tailNumber, aircraft.type].filter(Boolean).join(', ') || 'Unnamed'}${aircraft.sampleValues ? ' (sample numbers)' : ''}` : 'Not set'}</dd>
+          <dt>Panel</dt><dd>{aircraft.panel.length ? aircraft.panel.join(', ') : 'None listed'}</dd>
+          <dt>Minimums</dt><dd>Ceiling {pilot.minimums.ceilingFt.toLocaleString()} ft, visibility {pilot.minimums.visibilitySm} SM, crosswind {pilot.minimums.crosswindKt} kt, gust spread {pilot.minimums.gustSpreadKt} kt</dd>
         </dl>
       </Card>
       {aircraft.sampleValues && (
-        <Notice label="Sample airplane">W&amp;B and crosswind results will be practice-only until you enter your POH numbers on the Airplane screen.</Notice>
+        <Notice label="Sample airplane">Weight and balance and crosswind results are practice only until you enter your POH numbers on the Airplane screen.</Notice>
       )}
-      <StepNav onBack={onBack} onNext={onFinish} nextLabel={`Open Today at ${airport.icao}`} />
+      <StepNav onBack={onBack} onNext={onFinish} nextLabel={airport ? `Open Today at ${airport.icao}` : 'Open Today'} />
     </div>
   );
 }

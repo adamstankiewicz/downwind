@@ -2,11 +2,11 @@
 // Profile edits are a draft until Save, which also clears the sample flag.
 
 import { useEffect, useState } from 'react';
-import { sampleC172K, type AircraftProfile } from '../data/aircraft';
+import { aircraftTemplates, isConfigured, type AircraftProfile } from '../data/aircraft';
 import { computeWb, FUEL_LB_PER_GAL, type Envelope } from '../lib/wb';
 import { Card, Field, Notice, NumInput, PageHead } from './common';
 import { CgChart } from './CgChart';
-import { FUEL_STATION_ID, loadItems, wbFor, type Loading } from './state';
+import { FUEL_STATION_ID, loadItems, templateLabel, wbFor, type Loading } from './state';
 
 export function Airplane({ aircraft, setAircraft, loading, setLoading }: {
   aircraft: AircraftProfile;
@@ -29,6 +29,8 @@ export function Airplane({ aircraft, setAircraft, loading, setLoading }: {
     draft.maxGrossLb,
   );
   const ok = wb.withinEnvelope && !wb.overGross && wb.stationsOverMax.length === 0;
+  const configured = isConfigured(draft);
+  const template = templateLabel(aircraft);
   const fuelLb = Math.round(loading.fuelGal * FUEL_LB_PER_GAL);
 
   const upd = (patch: Partial<AircraftProfile>) => setDraft({ ...draft, ...patch });
@@ -51,12 +53,16 @@ export function Airplane({ aircraft, setAircraft, loading, setLoading }: {
       <PageHead
         title="Airplane"
         lead="Your profile and today's loading. The go/no-go brief uses whatever is saved here."
-        meta={<><span>Profile</span><b>{aircraft.tailNumber} · {aircraft.type}</b></>}
+        meta={aircraft.tailNumber || aircraft.type ? <><b>{aircraft.tailNumber}</b>{aircraft.tailNumber && aircraft.type ? ', ' : ''}{aircraft.type}</> : undefined}
       />
 
-      {aircraft.sampleValues ? (
-        <Notice label="Sample values">
-          Every number on this page is a typical C172K figure for illustration. Replace them from your POH section 6 and your airplane's current weight and balance record, then save. Until then the brief treats W&B results as practice only.
+      {!isConfigured(aircraft) ? (
+        <Notice kind="info" label="No airplane yet">
+          Start from a template below or enter the numbers from your POH section 6 and current weight and balance record, then save. The brief skips weight and balance until then.
+        </Notice>
+      ) : aircraft.sampleValues ? (
+        <Notice label="Sample airplane">
+          Every number on this page is a sample from the {template ?? 'built-in'} template, for illustration. Replace them from your POH section 6 and your airplane's current weight and balance record, then save. Until then the brief treats weight and balance results as practice only.
         </Notice>
       ) : (
         <Notice kind="info" label="Your numbers">
@@ -70,7 +76,7 @@ export function Airplane({ aircraft, setAircraft, loading, setLoading }: {
             <div className="table-scroll">
               <table className="wb-table">
                 <thead>
-                  <tr><th>Station</th><th className="num">Arm (in)</th><th className="num">Load</th><th className="num">Weight (lb)</th><th className="num">Moment</th></tr>
+                  <tr><th>Station</th><th className="num">Arm, in</th><th className="num">Load</th><th className="num">Weight, lb</th><th className="num">Moment</th></tr>
                 </thead>
                 <tbody>
                   <tr>
@@ -88,7 +94,7 @@ export function Airplane({ aircraft, setAircraft, loading, setLoading }: {
                       <tr key={s.id}>
                         <td>
                           {s.label}
-                          {s.maxLb !== undefined && <span className="muted" style={{ fontSize: '0.78rem' }}> · max {s.maxLb} lb</span>}
+                          {s.maxLb !== undefined && <span className="muted small">, max {s.maxLb} lb</span>}
                         </td>
                         <td className="num">{s.armIn}</td>
                         <td className="num">
@@ -114,19 +120,21 @@ export function Airplane({ aircraft, setAircraft, loading, setLoading }: {
                 </tbody>
               </table>
             </div>
-            <div className="cg-stat">
+            {configured && <div className="cg-stat">
               <span className={`status ${ok ? 'ok' : 'bad'}`}>
                 {wb.overGross ? `Over gross by ${wb.totalLb - draft.maxGrossLb} lb` : !wb.withinEnvelope ? 'CG outside envelope' : wb.stationsOverMax.length ? 'Station over its limit' : 'In the envelope'}
               </span>
               <span>Useful load left <b>{(draft.maxGrossLb - wb.totalLb).toLocaleString()} lb</b></span>
-              <span>Zero fuel <b>{zeroFuel.totalLb.toLocaleString()} lb · {zeroFuel.cgIn} in</b></span>
-            </div>
+              <span>Zero fuel <b>{zeroFuel.totalLb.toLocaleString()} lb at {zeroFuel.cgIn} in</b></span>
+            </div>}
           </Card>
 
-          <Card title="CG envelope" sub={draft.sampleValues ? 'Sample envelope' : 'From your profile'}>
-            <CgChart envelope={draft.envelope} loaded={wb} zeroFuel={zeroFuel} maxGrossLb={draft.maxGrossLb} />
-            <p className="muted" style={{ fontSize: '0.85rem' }}>
-              Solid point is the loaded airplane; the hollow point is where it ends up with the tanks empty. Burning fuel moves the CG along the dashed line, so check both ends stay inside.
+          <Card title="CG envelope" sub={!configured ? 'Not drawn yet' : draft.sampleValues ? 'Sample envelope' : 'From your profile'}>
+            {configured ? <CgChart envelope={draft.envelope} loaded={wb} zeroFuel={zeroFuel} maxGrossLb={draft.maxGrossLb} /> : (
+              <p className="muted">The chart appears once the profile has an empty weight, a maximum gross weight and at least three envelope corners.</p>
+            )}
+            <p className="help">
+              The solid point is the loaded airplane; the hollow point is where it ends up with the tanks empty. Burning fuel moves the CG along the dashed line, so check both ends stay inside.
             </p>
           </Card>
         </div>
@@ -155,14 +163,14 @@ export function Airplane({ aircraft, setAircraft, loading, setLoading }: {
               <Field label="Empty CG arm" hint="in aft of datum" size="sm"><NumInput value={draft.emptyArmIn} step={0.1} onChange={(n) => upd({ emptyArmIn: n })} /></Field>
               <Field label="Max gross" hint="lb" size="sm"><NumInput value={draft.maxGrossLb} step={1} onChange={(n) => upd({ maxGrossLb: n })} /></Field>
               <Field label="Usable fuel" hint="gal" size="sm"><NumInput value={draft.usableFuelGal} step={1} onChange={(n) => upd({ usableFuelGal: n })} /></Field>
-              <Field label="Demonstrated crosswind" hint="kt, POH section 4" size="sm"><NumInput value={draft.demonstratedCrosswindKt} step={1} onChange={(n) => upd({ demonstratedCrosswindKt: n })} /></Field>
+              <Field label="Demonstrated crosswind" hint="kt, POH section 4" size="md"><NumInput value={draft.demonstratedCrosswindKt} step={1} onChange={(n) => upd({ demonstratedCrosswindKt: n })} /></Field>
             </div>
           </Card>
 
           <Card title="Loading stations" sub="Arms from POH section 6">
             <div className="table-scroll">
               <table className="wb-table">
-                <thead><tr><th>Label</th><th className="num">Arm (in)</th><th className="num">Max (lb)</th><th></th></tr></thead>
+                <thead><tr><th>Station</th><th className="num">Arm, in</th><th className="num">Max, lb</th><th></th></tr></thead>
                 <tbody>
                   {draft.stations.map((s, i) => (
                     <tr key={s.id}>
@@ -197,14 +205,14 @@ export function Airplane({ aircraft, setAircraft, loading, setLoading }: {
             </button>
           </Card>
 
-          <Card title="Envelope corners" sub="CG in, weight lb, in order around the polygon">
+          <Card title="Envelope corners" sub="In order around the polygon">
             <div className="table-scroll">
               <table className="wb-table">
-                <thead><tr><th>#</th><th className="num">CG (in)</th><th className="num">Weight (lb)</th><th></th></tr></thead>
+                <thead><tr><th>Corner</th><th className="num">CG, in</th><th className="num">Weight, lb</th><th></th></tr></thead>
                 <tbody>
                   {draft.envelope.map((p, i) => (
                     <tr key={i}>
-                      <td className="mono muted">{i + 1}</td>
+                      <td className="muted">{i + 1}</td>
                       <td className="num"><NumInput ariaLabel={`Corner ${i + 1} CG`} value={p[0]} step={0.1} onChange={(n) => updEnvelope(i, 0, n)} /></td>
                       <td className="num"><NumInput ariaLabel={`Corner ${i + 1} weight`} value={p[1]} step={10} onChange={(n) => updEnvelope(i, 1, n)} /></td>
                       <td>
@@ -219,7 +227,11 @@ export function Airplane({ aircraft, setAircraft, loading, setLoading }: {
             </div>
             <div className="btn-row">
               <button type="button" className="btn quiet" onClick={() => upd({ envelope: [...draft.envelope, [draft.envelope[draft.envelope.length - 1][0], draft.envelope[draft.envelope.length - 1][1]]] as Envelope })}>Add corner</button>
-              <button type="button" className="btn quiet" onClick={() => { setAircraft(sampleC172K); setSavedAt(null); }}>Reset to sample</button>
+              {aircraftTemplates.map((t) => (
+                <button key={t.id} type="button" className="btn quiet" onClick={() => { setAircraft({ ...t.profile, tailNumber: draft.tailNumber || t.profile.tailNumber, panel: draft.panel.length ? draft.panel : t.profile.panel }); setSavedAt(null); }}>
+                  Load the {t.label} template
+                </button>
+              ))}
             </div>
           </Card>
         </div>
