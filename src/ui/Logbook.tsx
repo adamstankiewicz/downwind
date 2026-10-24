@@ -40,7 +40,7 @@ export function Logbook({ progress, log, epoch, goReview, goCourse }: { progress
                 return (
                   <li key={id}>
                     <span className="z">{fmtDate(r.lastAt)}</span>
-                    <span className="what"><b>{id} {l?.title ?? 'Lesson'}</b><small>{r.attempts} attempt{r.attempts === 1 ? '' : 's'}, best {GRADE_LABEL[r.bestGrade].toLowerCase()}, {r.lcg}{r.confidentlyWrong ? ', confidently wrong last time' : ''}</small></span>
+                    <span className="what"><b><span className="lid">{id}</span> {l?.title ?? 'Lesson'}</b><small>{r.attempts} attempt{r.attempts === 1 ? '' : 's'}, best {GRADE_LABEL[r.bestGrade].toLowerCase()}, {r.lcg}{r.confidentlyWrong ? ', confidently wrong last time' : ''}</small></span>
                     <span className={`g ${r.lastGrade}`}>{GRADE_LABEL[r.lastGrade]}</span>
                   </li>
                 );

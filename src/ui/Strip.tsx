@@ -1,6 +1,6 @@
 // The strip: one sequence across the top of every screen. On the course home
 // it is the modules; inside a lesson, the steps of the flight; in the daily
-// flight, the lines of the sheet. The amber tick is always "now".
+// flight, the lines of the sheet. The magenta tick is always "now".
 
 export interface StripPoint {
   id: string;

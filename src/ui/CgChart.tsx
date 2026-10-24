@@ -36,14 +36,14 @@ export function CgChart({ envelope, loaded, zeroFuel, maxGrossLb }: { envelope: 
           <g key={`x${v}`}>
             <line x1={x(v)} y1={mt} x2={x(v)} y2={H - mb} stroke="var(--rule)" strokeWidth="1" />
             {(xTicks.length <= 14 || v % 2 === 0) && (
-              <text x={x(v)} y={H - mb + 16} textAnchor="middle" fontFamily="var(--body)" fontSize="10.5" fill="var(--muted)">{v}</text>
+              <text x={x(v)} y={H - mb + 16} textAnchor="middle" fontFamily="var(--label)" fontSize="10.5" fill="var(--muted)">{v}</text>
             )}
           </g>
         ))}
         {yTicks.map((v) => (
           <g key={`y${v}`}>
             <line x1={ml} y1={y(v)} x2={W - mr} y2={y(v)} stroke="var(--rule)" strokeWidth="1" />
-            <text x={ml - 8} y={y(v) + 3.5} textAnchor="end" fontFamily="var(--body)" fontSize="10.5" fill="var(--muted)">{v.toLocaleString()}</text>
+            <text x={ml - 8} y={y(v) + 3.5} textAnchor="end" fontFamily="var(--label)" fontSize="10.5" fill="var(--muted)">{v.toLocaleString()}</text>
           </g>
         ))}
         <line x1={ml} y1={y(maxGrossLb)} x2={W - mr} y2={y(maxGrossLb)} stroke="var(--ifr)" strokeWidth="1" strokeDasharray="4 3" />
@@ -58,8 +58,8 @@ export function CgChart({ envelope, loaded, zeroFuel, maxGrossLb }: { envelope: 
         <text x={x(loaded.cgIn) + 11} y={y(loaded.totalLb) - 8} fontFamily="var(--body)" fontSize="10.5" fontWeight="500" fill="var(--ink)">
           {loaded.totalLb.toLocaleString()} lb at {loaded.cgIn} in
         </text>
-        <text x={ml + (W - ml - mr) / 2} y={H - 6} textAnchor="middle" fontFamily="var(--body)" fontSize="11" fill="var(--muted)">CG arm, inches aft of datum</text>
-        <text x="12" y={mt + (H - mt - mb) / 2} textAnchor="middle" fontFamily="var(--body)" fontSize="11" fill="var(--muted)" transform={`rotate(-90 12 ${mt + (H - mt - mb) / 2})`}>Weight, lb</text>
+        <text x={ml + (W - ml - mr) / 2} y={H - 6} textAnchor="middle" fontFamily="var(--label)" fontSize="11" fill="var(--muted)">CG arm, inches aft of datum</text>
+        <text x="12" y={mt + (H - mt - mb) / 2} textAnchor="middle" fontFamily="var(--label)" fontSize="11" fill="var(--muted)" transform={`rotate(-90 12 ${mt + (H - mt - mb) / 2})`}>Weight, lb</text>
       </svg>
     </div>
   );

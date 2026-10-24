@@ -97,7 +97,7 @@ function NextLesson({ lesson, progress, airport, onStart, flown }: { lesson: Les
     <section className="next">
       <h2>Next lesson</h2>
       <p className="next-meta">Module {m.n}, {m.title}. Lesson {idx + 1} of {m.lessons.length}. {lesson.acs.join(', ')}.</p>
-      <h3 className="next-title">{lesson.id} {lesson.title}</h3>
+      <h3 className="next-title"><span className="lid">{lesson.id}</span> {lesson.title}</h3>
       <p className="voice">{intro}</p>
       <dl className="next-facts">
         <div><dt>About</dt><dd>{lesson.minutes} min</dd></div>

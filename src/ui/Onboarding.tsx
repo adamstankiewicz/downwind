@@ -85,7 +85,7 @@ function Welcome({ onNext }: { onNext: () => void }) {
   return (
     <div className="onboard-col">
       <div>
-        <h1 className="onboard-title">Downwind</h1>
+        <h1 className="onboard-title"><Mark />Downwind</h1>
         <p className="onboard-sub">A guided ground school for one pilot, one airplane, one airport.</p>
       </div>
       <p className="lead-lg">

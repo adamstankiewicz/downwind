@@ -47,7 +47,7 @@ export function WindDiagram({ airport, wind, rw }: { airport: Airport; wind: Win
       {(['N', 'E', 'S', 'W'] as const).map((l, i) => {
         const [x, y] = pt(i * 90, R + 12);
         return (
-          <text key={l} x={x} y={y + 3.5} textAnchor="middle" fontFamily="var(--body)" fontSize="9" fill="var(--muted)">
+          <text key={l} x={x} y={y + 3.5} textAnchor="middle" fontFamily="var(--label)" fontSize="9" fill="var(--muted)">
             {l}
           </text>
         );
@@ -60,7 +60,7 @@ export function WindDiagram({ airport, wind, rw }: { airport: Airport; wind: Win
         return (
           <g>
             <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="var(--classb)" strokeWidth="1.4" strokeDasharray="3 2" />
-            <text x={tx + 8} y={ty + 3} fontFamily="var(--body)" fontSize="8" fill="var(--classb)">True N</text>
+            <text x={tx + 8} y={ty + 3} fontFamily="var(--label)" fontSize="8" fill="var(--classb)">True N</text>
           </g>
         );
       })()}
@@ -73,7 +73,7 @@ export function WindDiagram({ airport, wind, rw }: { airport: Airport; wind: Win
         // The runway number sits at the threshold you land toward when flying its heading.
         const [x, y] = pt(e.headingMag + 180, half + 13);
         return (
-          <text key={e.id} x={x} y={y + 4} textAnchor="middle" fontFamily="var(--display)" fontWeight="700" fontSize="13" fill="var(--ink)">
+          <text key={e.id} x={x} y={y + 4} textAnchor="middle" fontFamily="var(--display)" fontWeight="600" fontSize="13" fill="var(--ink)">
             {e.id}
           </text>
         );
@@ -106,10 +106,10 @@ export function WindDiagram({ airport, wind, rw }: { airport: Airport; wind: Win
         </text>
       )}
       {/* axis labels */}
-      <text x="6" y="214" fontFamily="var(--body)" fontSize="8" fill="var(--muted)">
+      <text x="6" y="214" fontFamily="var(--label)" fontSize="8" fill="var(--muted)">
         Magnetic north up, variation {Math.abs(airport.magneticVariationDeg)}°{airport.magneticVariationDeg < 0 ? 'W' : 'E'}
       </text>
-      <text x="214" y="214" textAnchor="end" fontFamily="var(--body)" fontSize="8" fill="var(--muted)">
+      <text x="214" y="214" textAnchor="end" fontFamily="var(--label)" fontSize="8" fill="var(--muted)">
         {airport.icao}
       </text>
     </svg>

@@ -106,15 +106,18 @@ export function NumInput({ value, onChange, step = 1, min, max, ariaLabel, class
   );
 }
 
-/** The app mark: a runway seen from the pattern. */
+/** The app mark: the sectional chart's non-towered airport symbol, in chart
+ *  magenta, with the runway drawn in. Colors come from the theme tokens so it
+ *  sits on light and dark paper alike. */
 export function Mark() {
   return (
     <svg viewBox="0 0 64 64" aria-hidden="true">
-      <rect width="64" height="64" rx="8" fill="var(--ink)" />
-      <rect x="27" y="6" width="10" height="52" fill="var(--paper)" transform="rotate(-35 32 32)" />
-      <rect x="31" y="14" width="2" height="8" fill="var(--ink)" transform="rotate(-35 32 32)" />
-      <rect x="31" y="28" width="2" height="8" fill="var(--ink)" transform="rotate(-35 32 32)" />
-      <rect x="31" y="42" width="2" height="8" fill="var(--ink)" transform="rotate(-35 32 32)" />
+      <circle cx="32" cy="32" r="19" fill="none" stroke="var(--brand)" strokeWidth="3.2" />
+      <g stroke="var(--brand)" strokeWidth="2.2" strokeLinecap="round">
+        <path d="M32 4 V9" /><path d="M32 55 V60" /><path d="M4 32 H9" /><path d="M55 32 H60" />
+      </g>
+      <rect x="29" y="14" width="6" height="36" rx="1" fill="var(--ink)" transform="rotate(60 32 32)" />
+      <circle cx="32" cy="32" r="2.2" fill="var(--paper)" />
     </svg>
   );
 }

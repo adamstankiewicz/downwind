@@ -80,7 +80,7 @@ export function LessonPlayer({ lesson, ctx, progress, setProgress, onExit, onNex
       <div className="strip-head">
         <div className="strip-title">
           <div>
-            <h1>{lesson.id} {lesson.title}</h1>
+            <h1><span className="lid">{lesson.id}</span> {lesson.title}</h1>
             <span className="muted">Module {m.n}, {m.title}. Lesson {lessonNo} of {m.lessons.length}. {lesson.acs.join(', ')}.{ctx.practiceField ? ' Practice field, not a real airport.' : ''}</span>
           </div>
           <button type="button" className="btn quiet" onClick={onExit}>{result ? 'Back to course' : 'Leave lesson'}</button>
