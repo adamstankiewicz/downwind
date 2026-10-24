@@ -54,10 +54,10 @@ export function RawReport({ raw, label, ceilingToken }: { raw: string; label: st
 export function MetarLegend() {
   return (
     <div className="legend" aria-hidden="true">
-      <span><i style={{ background: 'var(--screen-wind)' }} />Wind, degrees true</span>
-      <span><i style={{ background: 'var(--screen-vis)' }} />Visibility</span>
-      <span><i style={{ background: 'var(--screen-cloud)' }} />Clouds, ft AGL</span>
-      <span><i style={{ background: 'var(--screen-hl)' }} />Temp, dew point, altimeter, weather</span>
+      <span><i style={{ background: 'var(--wx-wind)' }} />Wind, degrees true</span>
+      <span><i style={{ background: 'var(--wx-vis)' }} />Visibility</span>
+      <span><i style={{ background: 'var(--wx-cloud)' }} />Clouds, hundreds of ft AGL</span>
+      <span><i style={{ background: 'var(--wx-hl)', border: '1px solid var(--rule)' }} />Temperature, dew point, altimeter, weather</span>
     </div>
   );
 }

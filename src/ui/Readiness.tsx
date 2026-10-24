@@ -33,7 +33,7 @@ export function Readiness({ goReview }: { goReview: () => void }) {
       <PageHead
         title="Readiness"
         lead="Where you stand against the Private Pilot ACS, Area I. Recent answers weigh more than old ones."
-        meta={<><span>Standard</span><b>FAA-S-ACS-6C</b></>}
+        meta={<>Standard <b>FAA-S-ACS-6C</b></>}
       />
       {answered === 0 ? (
         <div className="empty">
@@ -54,7 +54,7 @@ export function Readiness({ goReview }: { goReview: () => void }) {
                   <div className="ready-row" key={acs}>
                     <div className="name">
                       <span>{TASK_NAMES[acs]}</span>
-                      <small>{acs} · {m ? `${m.answered} answered` : `${itemCounts.get(acs) ?? 0} item${(itemCounts.get(acs) ?? 0) === 1 ? '' : 's'}, none answered`}</small>
+                      <small>{acs}, {m ? `${m.answered} answered` : `${itemCounts.get(acs) ?? 0} item${(itemCounts.get(acs) ?? 0) === 1 ? '' : 's'}, none answered`}</small>
                     </div>
                     <div className="bar" role="img" aria-label={pct === null ? `${TASK_NAMES[acs]}: no data` : `${TASK_NAMES[acs]}: ${pct} percent`}>
                       <i className={cls} style={{ width: pct === null ? '0%' : `${pct}%` }} />
@@ -64,7 +64,7 @@ export function Readiness({ goReview }: { goReview: () => void }) {
                 );
               })}
             </div>
-            <p className="muted" style={{ fontSize: '0.82rem' }}>Green 80% and up, blue 60 to 79, amber below. Tasks without items (Operation of Systems) fill in with later content.</p>
+            <p className="help">Green is 80% and up, blue 60 to 79, amber below. Tasks without items yet (Operation of Systems) fill in with later content.</p>
           </Card>
           <div className="stack">
             <Card title="Calibration">
@@ -72,7 +72,7 @@ export function Readiness({ goReview }: { goReview: () => void }) {
                 <div className="stat"><span className="k">Weighted correct</span><span className="v">{Math.round(weighted * 100)}%</span></div>
                 <div className="stat"><span className="k">Confidently wrong</span><span className={`v ${cwRate > 0.2 ? 'warn' : ''}`}>{Math.round(cwRate * 100)}%</span></div>
               </div>
-              <p className="muted" style={{ fontSize: '0.9rem' }}>
+              <p className="help">
                 Confidently wrong is the share of missed answers given at 70% confidence or higher. A high number means you don't know what you don't know, which is the dangerous kind of gap. A low number with a low score just means you need more reps.
               </p>
             </Card>
@@ -80,11 +80,11 @@ export function Readiness({ goReview }: { goReview: () => void }) {
               {mastery.length === 0 ? (
                 <p className="muted">Nothing yet.</p>
               ) : (
-                <ul className="plain" style={{ display: 'grid', gap: 8, fontSize: '0.9rem' }}>
+                <ul className="plain weak">
                   {[...mastery].sort((a, b) => a.correctRate - b.correctRate).slice(0, 3).map((m) => (
-                    <li key={m.acs} style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                    <li key={m.acs}>
                       <span>{TASK_NAMES[m.acs] ?? m.acs} <span className="chip acs">{m.acs}</span></span>
-                      <span className="mono">{Math.round(m.correctRate * 100)}%</span>
+                      <b>{Math.round(m.correctRate * 100)}%</b>
                     </li>
                   ))}
                 </ul>

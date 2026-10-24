@@ -47,7 +47,7 @@ export function WindDiagram({ airport, wind, rw }: { airport: Airport; wind: Win
       {(['N', 'E', 'S', 'W'] as const).map((l, i) => {
         const [x, y] = pt(i * 90, R + 12);
         return (
-          <text key={l} x={x} y={y + 3.5} textAnchor="middle" fontFamily="var(--mono)" fontSize="9" fill="var(--muted)">
+          <text key={l} x={x} y={y + 3.5} textAnchor="middle" fontFamily="var(--body)" fontSize="9" fill="var(--muted)">
             {l}
           </text>
         );
@@ -60,7 +60,7 @@ export function WindDiagram({ airport, wind, rw }: { airport: Airport; wind: Win
         return (
           <g>
             <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="var(--classb)" strokeWidth="1.4" strokeDasharray="3 2" />
-            <text x={tx + 8} y={ty + 3} fontFamily="var(--mono)" fontSize="8" fill="var(--classb)">TN</text>
+            <text x={tx + 8} y={ty + 3} fontFamily="var(--body)" fontSize="8" fill="var(--classb)">True N</text>
           </g>
         );
       })()}
@@ -88,28 +88,28 @@ export function WindDiagram({ airport, wind, rw }: { airport: Airport; wind: Win
             const [px, py] = dir(windMag + 90);
             return (
               <>
-                <line x1={sx} y1={sy} x2={hx} y2={hy} stroke="var(--magenta)" strokeWidth="3" />
-                <polygon points={`${ex},${ey} ${hx + px * 5},${hy + py * 5} ${hx - px * 5},${hy - py * 5}`} fill="var(--magenta)" />
+                <line x1={sx} y1={sy} x2={hx} y2={hy} stroke="var(--wx-wind)" strokeWidth="3" />
+                <polygon points={`${ex},${ey} ${hx + px * 5},${hy + py * 5} ${hx - px * 5},${hy - py * 5}`} fill="var(--wx-wind)" />
               </>
             );
           })()}
           {wind?.gustKt && (() => {
             const [gx, gy] = pt(windMag, R - 4);
             const [g2x, g2y] = pt(windMag, R + 6);
-            return <line x1={gx} y1={gy} x2={g2x} y2={g2y} stroke="var(--magenta)" strokeWidth="3" strokeDasharray="2 2" />;
+            return <line x1={gx} y1={gy} x2={g2x} y2={g2y} stroke="var(--wx-wind)" strokeWidth="3" strokeDasharray="2 2" />;
           })()}
         </g>
       )}
       {windMag === null && (
-        <text x={C} y={C + 4} textAnchor="middle" fontFamily="var(--mono)" fontSize="10" fill="var(--paper)">
+        <text x={C} y={C + 4} textAnchor="middle" fontFamily="var(--body)" fontSize="10" fill="var(--paper)">
           {label}
         </text>
       )}
       {/* axis labels */}
-      <text x="6" y="214" fontFamily="var(--mono)" fontSize="8" fill="var(--muted)">
-        MAG N UP · VAR {Math.abs(airport.magneticVariationDeg)}°{airport.magneticVariationDeg < 0 ? 'W' : 'E'}
+      <text x="6" y="214" fontFamily="var(--body)" fontSize="8" fill="var(--muted)">
+        Magnetic north up, variation {Math.abs(airport.magneticVariationDeg)}°{airport.magneticVariationDeg < 0 ? 'W' : 'E'}
       </text>
-      <text x="214" y="214" textAnchor="end" fontFamily="var(--mono)" fontSize="8" fill="var(--muted)">
+      <text x="214" y="214" textAnchor="end" fontFamily="var(--body)" fontSize="8" fill="var(--muted)">
         {airport.icao}
       </text>
     </svg>

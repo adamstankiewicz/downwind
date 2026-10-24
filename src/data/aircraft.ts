@@ -20,6 +20,32 @@ export interface AircraftProfile {
   sampleValues: boolean;
 }
 
+/** A starting profile with nothing filled in, for any airplane. */
+export const blankAircraft: AircraftProfile = {
+  id: 'custom',
+  tailNumber: '',
+  type: '',
+  panel: [],
+  emptyWeightLb: 0,
+  emptyArmIn: 0,
+  maxGrossLb: 0,
+  usableFuelGal: 0,
+  demonstratedCrosswindKt: 0,
+  stations: [
+    { id: 'front', label: 'Pilot and front passenger', armIn: 0 },
+    { id: 'rear', label: 'Rear passengers', armIn: 0 },
+    { id: 'fuel', label: 'Fuel', armIn: 0 },
+    { id: 'bag1', label: 'Baggage', armIn: 0 },
+  ],
+  envelope: [],
+  sampleValues: false,
+};
+
+/** True once the profile has enough numbers to run weight and balance. */
+export function isConfigured(a: AircraftProfile): boolean {
+  return a.emptyWeightLb > 0 && a.maxGrossLb > 0 && a.envelope.length >= 3;
+}
+
 /**
  * A C172K-shaped starting point. These are typical 1970s Skyhawk values for
  * illustration only. Replace every number with your POH and your airplane's
@@ -27,7 +53,7 @@ export interface AircraftProfile {
  */
 export const sampleC172K: AircraftProfile = {
   id: 'c172k',
-  tailNumber: 'N____',
+  tailNumber: '',
   type: 'Cessna 172K',
   panel: ['GI 275-style attitude', 'GI 275-style HSI', 'GTN-style GPS/NAV/COM'],
   emptyWeightLb: 1430,
@@ -50,3 +76,17 @@ export const sampleC172K: AircraftProfile = {
   ],
   sampleValues: true,
 };
+
+export interface AircraftTemplate {
+  id: string;
+  label: string;
+  profile: AircraftProfile;
+}
+
+/**
+ * Starting points pilots can pick in onboarding. Every template is sample data
+ * until the pilot replaces it from their own POH. Add more types here.
+ */
+export const aircraftTemplates: AircraftTemplate[] = [
+  { id: 'c172-150hp', label: 'Cessna 172 (150 hp, 1968 to 1976)', profile: sampleC172K },
+];

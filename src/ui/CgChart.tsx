@@ -36,30 +36,30 @@ export function CgChart({ envelope, loaded, zeroFuel, maxGrossLb }: { envelope: 
           <g key={`x${v}`}>
             <line x1={x(v)} y1={mt} x2={x(v)} y2={H - mb} stroke="var(--rule)" strokeWidth="1" />
             {(xTicks.length <= 14 || v % 2 === 0) && (
-              <text x={x(v)} y={H - mb + 16} textAnchor="middle" fontFamily="var(--mono)" fontSize="10.5" fill="var(--muted)">{v}</text>
+              <text x={x(v)} y={H - mb + 16} textAnchor="middle" fontFamily="var(--body)" fontSize="10.5" fill="var(--muted)">{v}</text>
             )}
           </g>
         ))}
         {yTicks.map((v) => (
           <g key={`y${v}`}>
             <line x1={ml} y1={y(v)} x2={W - mr} y2={y(v)} stroke="var(--rule)" strokeWidth="1" />
-            <text x={ml - 8} y={y(v) + 3.5} textAnchor="end" fontFamily="var(--mono)" fontSize="10.5" fill="var(--muted)">{v.toLocaleString()}</text>
+            <text x={ml - 8} y={y(v) + 3.5} textAnchor="end" fontFamily="var(--body)" fontSize="10.5" fill="var(--muted)">{v.toLocaleString()}</text>
           </g>
         ))}
         <line x1={ml} y1={y(maxGrossLb)} x2={W - mr} y2={y(maxGrossLb)} stroke="var(--ifr)" strokeWidth="1" strokeDasharray="4 3" />
-        <text x={W - mr - 4} y={y(maxGrossLb) - 4} textAnchor="end" fontFamily="var(--mono)" fontSize="9.5" fill="var(--ifr)">MAX GROSS {maxGrossLb.toLocaleString()}</text>
+        <text x={W - mr - 4} y={y(maxGrossLb) - 4} textAnchor="end" fontFamily="var(--body)" fontSize="9.5" fill="var(--ifr)">Max gross {maxGrossLb.toLocaleString()}</text>
         <polygon points={poly} fill="var(--tint-b)" fillOpacity="0.9" stroke="var(--classb)" strokeWidth="2" strokeLinejoin="round" />
         {/* burn line */}
         <line x1={x(loaded.cgIn)} y1={y(loaded.totalLb)} x2={x(zeroFuel.cgIn)} y2={y(zeroFuel.totalLb)} stroke="var(--muted)" strokeWidth="1.5" strokeDasharray="3 3" />
         <circle cx={x(zeroFuel.cgIn)} cy={y(zeroFuel.totalLb)} r="5" fill="var(--panel)" stroke="var(--muted)" strokeWidth="1.5" />
-        <text x={x(zeroFuel.cgIn) + 9} y={y(zeroFuel.totalLb) + 4} fontFamily="var(--mono)" fontSize="9.5" fill="var(--muted)">ZERO FUEL</text>
+        <text x={x(zeroFuel.cgIn) + 9} y={y(zeroFuel.totalLb) + 4} fontFamily="var(--body)" fontSize="9.5" fill="var(--muted)">Zero fuel</text>
         {/* loaded point */}
         <circle cx={x(loaded.cgIn)} cy={y(loaded.totalLb)} r="7" fill={ok ? 'var(--vfr)' : 'var(--ifr)'} stroke="var(--panel)" strokeWidth="2" />
-        <text x={x(loaded.cgIn) + 11} y={y(loaded.totalLb) - 8} fontFamily="var(--mono)" fontSize="10.5" fontWeight="500" fill="var(--ink)">
-          {loaded.totalLb.toLocaleString()} lb · {loaded.cgIn} in
+        <text x={x(loaded.cgIn) + 11} y={y(loaded.totalLb) - 8} fontFamily="var(--body)" fontSize="10.5" fontWeight="500" fill="var(--ink)">
+          {loaded.totalLb.toLocaleString()} lb at {loaded.cgIn} in
         </text>
-        <text x={ml + (W - ml - mr) / 2} y={H - 6} textAnchor="middle" fontFamily="var(--display)" fontSize="11" letterSpacing="1" fill="var(--muted)">CG ARM, INCHES AFT OF DATUM</text>
-        <text x="12" y={mt + (H - mt - mb) / 2} textAnchor="middle" fontFamily="var(--display)" fontSize="11" letterSpacing="1" fill="var(--muted)" transform={`rotate(-90 12 ${mt + (H - mt - mb) / 2})`}>WEIGHT, LB</text>
+        <text x={ml + (W - ml - mr) / 2} y={H - 6} textAnchor="middle" fontFamily="var(--body)" fontSize="11" fill="var(--muted)">CG arm, inches aft of datum</text>
+        <text x="12" y={mt + (H - mt - mb) / 2} textAnchor="middle" fontFamily="var(--body)" fontSize="11" fill="var(--muted)" transform={`rotate(-90 12 ${mt + (H - mt - mb) / 2})`}>Weight, lb</text>
       </svg>
     </div>
   );

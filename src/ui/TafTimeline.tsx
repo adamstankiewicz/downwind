@@ -39,7 +39,7 @@ function windText(p: TafPeriod): string {
 export function TafTimeline({ taf, departure, tripHours }: { taf: Taf | null; departure: Date; tripHours: number }) {
   const narrow = useNarrow();
   if (!taf) {
-    return <p className="muted">No TAF available for KASH or a nearby station.</p>;
+    return <p className="muted">No TAF available for this field or a nearby station.</p>;
   }
   const pad = 1; // hours of context either side
   const h0 = -pad;
@@ -80,7 +80,7 @@ export function TafTimeline({ taf, departure, tripHours }: { taf: Taf | null; de
             <g key={`m${i}`}>
               <rect x={x(s.a)} y="14" width={w} height="26" fill={color(s.p)} opacity="0.9" />
               {w > 60 && (
-                <text x={x(s.a) + 6} y="31" fontFamily="var(--mono)" fontSize="11" fill="#fff" fontWeight="500">
+                <text x={x(s.a) + 6} y="31" fontFamily="var(--body)" fontSize="11" fill="#fff" fontWeight="600">
                   {s.p.category ?? '—'} {windText(s.p)}
                 </text>
               )}
@@ -94,7 +94,7 @@ export function TafTimeline({ taf, departure, tripHours }: { taf: Taf | null; de
             <g key={`t${i}`}>
               <rect x={x(s.a)} y="46" width={w} height="12" fill={color(s.p)} opacity="0.55" />
               {w > 70 && (
-                <text x={x(s.a) + 4} y="56" fontFamily="var(--mono)" fontSize="9" fill="var(--ink)">
+                <text x={x(s.a) + 4} y="56" fontFamily="var(--body)" fontSize="9" fill="var(--ink)">
                   {s.p.kind}{s.p.probability ? s.p.probability : ''} {s.p.category ?? ''}
                 </text>
               )}
@@ -106,21 +106,21 @@ export function TafTimeline({ taf, departure, tripHours }: { taf: Taf | null; de
         {ticks.map((h) => (
           <g key={h}>
             <line x1={x(h)} y1={H - 26} x2={x(h)} y2={H - 18} stroke="var(--ink)" />
-            <text x={x(h)} y={H - 6} textAnchor="middle" fontFamily="var(--mono)" fontSize="9.5" fill="var(--muted)">
-              {h === 0 ? 'DEP' : h === tripHours ? 'RTN' : `+${h}h`}
+            <text x={x(h)} y={H - 6} textAnchor="middle" fontFamily="var(--body)" fontSize="10" fill="var(--muted)">
+              {h === 0 ? 'Depart' : h === tripHours ? 'Return' : `+${h} h`}
             </text>
           </g>
         ))}
         {/* departure and return markers */}
-        <line x1={x(0)} y1="6" x2={x(0)} y2={H - 22} stroke="var(--magenta)" strokeWidth="1.5" />
-        <line x1={x(tripHours)} y1="6" x2={x(tripHours)} y2={H - 22} stroke="var(--magenta)" strokeWidth="1.5" strokeDasharray="4 3" />
+        <line x1={x(0)} y1="6" x2={x(0)} y2={H - 22} stroke="var(--ink)" strokeWidth="1.5" />
+        <line x1={x(tripHours)} y1="6" x2={x(tripHours)} y2={H - 22} stroke="var(--ink)" strokeWidth="1.5" strokeDasharray="4 3" />
       </svg>
       <div className="timeline-cap">
         <span>Depart {fmtLocal(departure)} local</span>
-        <span>Return {fmtLocal(ret)} local · {tripHours} h</span>
+        <span>Return {fmtLocal(ret)} local, {tripHours} h away</span>
       </div>
       {inWindow.length === 0 ? (
-        <p className="muted" style={{ fontSize: '0.85rem' }}>
+        <p className="help">
           This TAF ({taf.station}, valid {taf.validFrom ? `${String(taf.validFrom.day).padStart(2, '0')}${String(taf.validFrom.hour).padStart(2, '0')}` : '?'}/
           {taf.validTo ? `${String(taf.validTo.day).padStart(2, '0')}${String(taf.validTo.hour).padStart(2, '0')}Z` : '?'}) does not cover your window.
         </p>

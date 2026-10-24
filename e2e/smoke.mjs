@@ -55,7 +55,10 @@ async function run(viewport, live) {
     `${label} weather preview shows ${live ? 'live METAR' : 'sample label'}`);
   await noHScroll('airport step');
   await btn('Save airport').click();
-  check(await page.getByText(/C172K template/).isVisible(), `${label} reached aircraft step`);
+  const template = page.getByRole('button', { name: /Cessna 172 \(150 hp/ });
+  check(await template.isVisible(), `${label} reached aircraft step with a template to pick`);
+  check(await btn('Save airplane').isDisabled().catch(() => true), `${label} nothing preselected on the aircraft step`);
+  await template.click();
   await btn('Use sample numbers for now').click();
   await btn('Save').click();
   await page.getByRole('button', { name: new RegExp(`Open Today at ${icao}`) }).click();
@@ -65,7 +68,10 @@ async function run(viewport, live) {
   check(true, `${label} landed on Today at ${icao}`);
   check((await page.getByText(/Sample weather/i).count()) === (live ? 0 : 1), `${label} sample-weather notice ${live ? 'absent' : 'present'}`);
   check(await page.getByText(/Sample airplane/i).first().isVisible(), `${label} sample-airplane notice present`);
-  if (live) check(await page.getByText(/320°T becomes 335°M/).first().isVisible(), `${label} true-to-magnetic conversion uses KPSM variation`);
+  if (live) {
+    check(await page.getByText(/320°T becomes 335°M/).first().isVisible(), `${label} true-to-magnetic conversion uses KPSM variation`);
+    check(!/KASH|Nashua|Boire/.test(await page.locator('body').innerText()), `${label} no KASH text when the pilot chose KPSM`);
+  }
   await noHScroll('Today');
   check(await btn('Commit').isDisabled(), `${label} Commit disabled before a choice`);
   check((await page.getByText(/^(Best|Unsafe)$/).count()) === 0, `${label} grades hidden before commit`);
@@ -106,6 +112,33 @@ async function run(viewport, live) {
   await browser.close();
 }
 
+// A fresh install that skips setup must land on Today asking for a home airport.
+async function runSkip() {
+  const label = '[skip setup]';
+  const browser = await chromium.launch();
+  const context = await browser.newContext({ viewport: { width: 1180, height: 820 }, serviceWorkers: 'block' });
+  const page = await context.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource|net::ERR/.test(m.text())) errors.push(m.text()); });
+  await page.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
+  await page.route('**/api/awc/**', (r) => r.fulfill({ status: 500, body: 'down' }));
+  await page.goto(BASE);
+  await page.getByRole('button', { name: 'Skip setup for now', exact: true }).click();
+  await page.getByRole('heading', { name: 'Today', exact: true }).waitFor();
+  const body = await page.locator('main').innerText();
+  check(/home airport/i.test(body), `${label} Today asks for a home airport`);
+  check(!/KASH|Nashua|C172/.test(body), `${label} no bundled airport or airplane assumed`);
+  check(await page.getByRole('button', { name: 'Set home airport', exact: true }).isVisible(), `${label} offers to set the home airport`);
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('button', { name: /Airplane/ }).click();
+  check(await page.getByText(/No airplane yet/).first().isVisible(), `${label} Airplane screen shows the not-set-up state`);
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('button', { name: /Settings/ }).click();
+  check(await page.getByText(/No home airport yet/).first().isVisible(), `${label} Settings shows no home airport`);
+  check(errors.length === 0, `${label} no console or page errors${errors.length ? ': ' + errors.join(' | ') : ''}`);
+  await browser.close();
+}
+
+try { await runSkip(); } catch (e) { check(false, `[skip setup] crashed: ${e.message.split('\n')[0]}`); }
 for (const vp of [{ width: 1180, height: 820 }, { width: 390, height: 844 }]) {
   for (const live of [true, false]) {
     try { await run(vp, live); } catch (e) { check(false, `[${vp.width}px ${live ? 'live' : 'offline'}] crashed: ${e.message.split('\n')[0]}`); }

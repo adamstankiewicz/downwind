@@ -15,7 +15,9 @@ export interface Airport {
   verify: string[];
 }
 
-// Phase 0 ships KASH only. Phase 1 replaces this with NASR data for New England.
+// Airports bundled with the app so lookup works offline. This is not a
+// default home base: onboarding asks every pilot for theirs. Phase 1 replaces
+// this with NASR data.
 export const KASH: Airport = {
   icao: 'KASH',
   name: 'Boire Field',

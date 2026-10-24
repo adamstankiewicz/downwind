@@ -1,6 +1,6 @@
 import { parseMetar, type Metar } from './metar';
 import { parseTaf, type Taf } from './taf';
-import { sampleMetar, sampleTaf } from '../data/sampleWeather';
+import { sampleMetarFor, sampleTafFor } from '../data/sampleWeather';
 
 // Dev: Vite proxies /api/awc to aviationweather.gov/api/data.
 // Prod: the edge worker in /worker serves the same path.
@@ -55,10 +55,11 @@ export async function fetchWeather(station: string, tafStations: string[], signa
     return { metar: parseMetar(rawMetar), taf, source: 'live', fetchedAt: new Date() };
   } catch (e) {
     if ((e as Error).name === 'AbortError') throw e;
-    return sampleWeather((e as Error).message);
+    return sampleWeather(station, (e as Error).message);
   }
 }
 
-export function sampleWeather(error?: string): WeatherBundle {
-  return { metar: parseMetar(sampleMetar), taf: parseTaf(sampleTaf), source: 'sample', fetchedAt: new Date(), error };
+/** Practice weather for a station. Never a real report; always source 'sample'. */
+export function sampleWeather(station = '', error?: string): WeatherBundle {
+  return { metar: parseMetar(sampleMetarFor(station)), taf: parseTaf(sampleTafFor(station)), source: 'sample', fetchedAt: new Date(), error };
 }
