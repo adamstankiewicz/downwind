@@ -1,9 +1,9 @@
 // Course progress, lesson scoring and the instructor's fading. Pure functions
 // over plain data; the UI persists the result through lib/storage.
 
-import type { ChoiceId, Grade } from '../scenarios/goNoGo';
+import type { Grade } from '../scenarios/goNoGo';
 import { allLessons, modules } from './modules';
-import type { Blank, Coach, Lesson, Module, Step } from './types';
+import type { Blank, Coach, Lesson, Module, OptionId, Step } from './types';
 
 export const COURSE_KEY = 'downwind.course.v1';
 
@@ -24,7 +24,7 @@ export interface LessonRecord {
 export type CourseProgress = Record<string, LessonRecord>;
 
 export interface DecisionAnswer {
-  choice: ChoiceId;
+  choice: OptionId;
 }
 
 export interface LessonAnswers {
@@ -36,9 +36,9 @@ export interface LessonAnswers {
 export interface DecisionResult {
   stepId: string;
   title: string;
-  choice: ChoiceId;
+  choice: OptionId;
   grade: Grade;
-  best: ChoiceId[];
+  best: OptionId[];
 }
 
 export interface LessonResult {
@@ -99,7 +99,7 @@ export function scoreLesson(steps: Step[], answers: LessonAnswers): LessonResult
       const top = RANK.slice().reverse().find((g) => Object.values(s.grades).includes(g))!;
       decisions.push({
         stepId: s.id, title: s.title, choice: a.choice, grade: s.grades[a.choice],
-        best: (Object.keys(s.grades) as ChoiceId[]).filter((id) => s.grades[id] === top),
+        best: (Object.keys(s.grades) as OptionId[]).filter((id) => s.grades[id] === top),
       });
     }
   }

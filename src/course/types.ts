@@ -9,7 +9,7 @@
 import type { Airport } from '../data/airports';
 import type { AircraftProfile } from '../data/aircraft';
 import type { PersonalMinimums } from '../data/pilot';
-import type { Brief, ChoiceId, Grade } from '../scenarios/goNoGo';
+import type { Brief, Grade } from '../scenarios/goNoGo';
 import type { LatLon, NavLog } from '../lib/nav';
 import type { Performance } from '../lib/perf';
 
@@ -65,15 +65,22 @@ export interface Blank {
   explain: string;
 }
 
+/**
+ * A decision option id. Weather decisions use the go/no-go ids ('go',
+ * 'go-plan', 'delay', 'cancel'); other lessons name their own ('land-ahead',
+ * 'turn-back'). Grades always come from code, keyed by these ids.
+ */
+export type OptionId = string;
+
 export interface Option {
-  id: ChoiceId;
+  id: OptionId;
   label: string;
 }
 
 /** Shown only when an earlier decision went a certain way. */
 export interface Condition {
   step: string;
-  choices: ChoiceId[];
+  choices: OptionId[];
 }
 
 export type Step =
@@ -87,9 +94,9 @@ export type Step =
       situation: string;
       figure?: Figure;
       options: Option[];
-      grades: Record<ChoiceId, Grade>;
+      grades: Record<OptionId, Grade>;
       /** What happened next, for the option chosen. */
-      consequence: Record<ChoiceId, string>;
+      consequence: Record<OptionId, string>;
       /** The instructor's reasoning, shown in the debrief. */
       why: string;
       /** Engine brief behind the grades, when there is one. */
