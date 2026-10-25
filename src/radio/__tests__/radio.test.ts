@@ -234,3 +234,24 @@ describe('the way pilots really type', () => {
     expect(r.grade).toBe('marginal');
   });
 });
+
+describe('how a controller says it', async () => {
+  const { spoken, altitude } = await import('../speech');
+  it('says digits one at a time, letters phonetically and nine as niner', () => {
+    expect(spoken('Cessna 2XY, runway 24, contact Ground 121.8.')).toBe('Cessna two X-ray Yankee, runway two four, contact Ground one two one point eight.');
+    expect(spoken('hold short runway 06 at Bravo 1')).toBe('hold short runway zero six at Bravo one');
+    expect(spoken('November 52XY, 9 miles north')).toBe('November five two X-ray Yankee, niner miles north');
+  });
+  it('says altitudes in thousands and hundreds and drops the altimeter point', () => {
+    expect(altitude(6100)).toBe('six thousand one hundred');
+    expect(altitude(10500)).toBe('one zero thousand five hundred');
+    expect(spoken('Scattered clouds at 6,100. Altimeter 30.08.')).toBe('Scattered clouds at six thousand one hundred. Altimeter three zero zero eight.');
+  });
+  it('reads every flight without a bare number left in it', () => {
+    for (const m of MISSIONS) {
+      const f = buildRadioFlight(m.id, 7, owned, NOW);
+      const said = [f.atis.text, ...transmits(f).map((e) => e.atc ?? '')].map(spoken).join(' ');
+      expect(said).not.toMatch(/\d/);
+    }
+  });
+});
