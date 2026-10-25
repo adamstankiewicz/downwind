@@ -743,3 +743,72 @@ dl.kv dd { margin: 0; }
   .refv-blank { box-shadow: none; max-height: 46vh; padding: 28px 24px; }
   .refv-msg { padding: 0 16px; }
 }
+
+/* ---------- the practice sectional and the engine figures ----------
+   The chart is an SVG sized in device pixels (its viewBox follows the box),
+   so the font sizes inside it are the sizes they render at: none under 11px.
+   Blue is `sky`, the chart's magenta is `sock-ink`, towns are `taxi`, terrain
+   is ink laid on in thin bands. The perf table marks the four corners a hand
+   interpolation would use in `sock-tint`; nav log numbers are mono. */
+.sectional { width: 100%; min-width: 0; border-radius: var(--r); overflow: hidden; border: 1px solid var(--line); background: var(--panel); user-select: none; -webkit-user-select: none; }
+.sectional svg { display: block; width: 100%; height: auto; font-family: var(--label); font-stretch: 87.5%; letter-spacing: 0.01em; }
+.sectional svg text { font-variant-numeric: tabular-nums; }
+.sectional svg .mef { font-family: var(--display); font-stretch: 75%; font-weight: 800; letter-spacing: -0.02em; }
+.sectional.pickable svg { cursor: crosshair; touch-action: manipulation; }
+.fig-chart { min-width: 0; }
+.chart-tool { gap: 16px; }
+.chart-bar { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: end; }
+.chart-bar .field.sm { max-width: 190px; }
+.chart-panel { display: grid; gap: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 18px 20px 20px; min-width: 0; }
+.chart-controls { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: end; }
+.chart-controls .chip-add { align-items: stretch; }
+.chart-controls .chip-add select { flex: 1 1 auto; min-width: 0; }
+.chart-controls .chip-add .btn { flex: none; }
+.lookup { display: grid; gap: 12px; }
+.lookup-class { display: grid; gap: 4px; }
+.lookup-k { font-size: 13px; line-height: 16px; font-stretch: 87.5%; font-weight: 600; letter-spacing: 0.01em; color: var(--ink-2); }
+.lookup-class .runway { font-size: clamp(2.25rem, 5vw, 2.75rem); }
+.lookup-v { font-size: 0.95rem; max-width: 64ch; }
+.req-list { display: grid; gap: 6px; }
+.req-list li small { white-space: nowrap; }
+.route-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; counter-reset: wp; }
+.route-list li.chip-x { counter-increment: wp; }
+.route-list li.chip-x > span::before { content: counter(wp) " "; color: var(--ink-2); font-weight: 800; font-stretch: 75%; margin-right: 2px; }
+.cruise-alts { display: grid; gap: 8px; font-size: 0.95rem; }
+.alt-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.alt-chips .chip { font-family: var(--mono); font-weight: 400; }
+.alt-chips .chip.on { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
+/* nav log */
+.navlog { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+.navlog th, .navlog td { padding: 8px 8px; border-bottom: 1px solid var(--line-soft); text-align: left; vertical-align: baseline; }
+.navlog thead th { font-size: 13px; line-height: 16px; color: var(--ink-2); font-weight: 600; font-stretch: 87.5%; letter-spacing: 0.01em; white-space: nowrap; }
+.navlog tbody th { font-weight: 600; white-space: nowrap; }
+.navlog tbody th small { display: block; font-weight: 400; font-size: 0.8125rem; color: var(--ink-2); }
+.navlog .num { text-align: right; white-space: nowrap; }
+.navlog td.mono { font-size: 0.9rem; }
+.navlog tfoot td, .navlog tfoot th { border-bottom: 0; border-top: 2px solid var(--ink); font-weight: 700; }
+.navlog td .muted { font-weight: 400; }
+/* performance chart */
+.perf { display: grid; gap: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px 16px; min-width: 0; }
+.perf-head { display: flex; flex-wrap: wrap; gap: 2px 14px; align-items: baseline; }
+.perf-head b { font-weight: 700; }
+.perf-head .muted { font-size: 0.85rem; }
+.perf-table { border-collapse: collapse; font-family: var(--mono); font-size: 0.875rem; width: 100%; }
+.perf-table th, .perf-table td { padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--line-soft); white-space: nowrap; }
+.perf-table thead th { font-family: var(--label); font-stretch: 87.5%; font-weight: 600; font-size: 13px; color: var(--ink-2); border-bottom: 2px solid var(--line); }
+.perf-table thead th:first-child { text-align: left; }
+.perf-table tbody th { font-weight: 400; color: var(--ink-2); text-align: left; }
+.perf-table th.on { color: var(--sock-ink); font-weight: 700; }
+.perf-table td.corner { background: var(--sock-tint); color: var(--ink); font-weight: 700; }
+.perf-read { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; font-size: 0.95rem; }
+.perf-read .runway { font-size: 2rem; }
+.perf-read .runway small { font-size: 0.9rem; font-weight: 600; font-stretch: 87.5%; letter-spacing: 0; }
+.perf-off { flex-basis: 100%; color: var(--marginal); font-weight: 600; font-size: 0.9rem; }
+/* glide circle */
+.fig-glide svg { width: 100%; max-width: 440px; height: auto; display: block; font-family: var(--label); font-stretch: 87.5%; }
+@media (max-width: 559px) {
+  .chart-panel { padding: 14px 14px 16px; }
+  .navlog { font-size: 0.875rem; }
+  .navlog th, .navlog td { padding: 6px 5px; }
+  .perf-table th, .perf-table td { padding: 5px 6px; }
+}

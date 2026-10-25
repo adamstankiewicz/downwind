@@ -84,7 +84,7 @@ const box = (c: LatLon, dNs: number, dEw: number): LatLon[] => [
 export const practiceRegion: Region = {
   name: 'Practice sectional (not a real chart)',
   variationDeg: -14,
-  bounds: { north: 43.45, south: 42.15, east: -71.0, west: -73.25 },
+  bounds: { north: 43.45, south: 42.15, east: -71.0, west: -73.55 },
   airports: [
     { id: 'KXYZ', name: 'Practice field', pos: HOME, elevationFt: 600, towered: true, runwayFt: 5500, surface: 'paved', runways: ['06', '24'], freq: '125.10', freqKind: 'Tower', atis: '119.45', fuel: true, tpaMsl: 1600 },
     { id: 'KXBB', name: 'Bayport Intl', pos: XBB, elevationFt: 20, towered: true, runwayFt: 10000, surface: 'paved', runways: ['04L', '22R', '15', '33'], freq: '119.10', freqKind: 'Tower', atis: '135.00', fuel: true, tpaMsl: 1520 },

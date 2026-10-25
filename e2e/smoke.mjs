@@ -210,6 +210,30 @@ async function run(viewport, live) {
   await page.getByRole('group', { name: 'Options' }).getByRole('button').first().click();
   await btn('Reveal').click();
   check(await page.getByText(/14 CFR|PHAK|AIM/).first().isVisible(), `${label} review deck shows a reference after reveal`);
+
+  // Chart tool: the practice sectional, a route from the keyboard list, and an airspace lookup.
+  await page.getByRole('tab', { name: 'Chart' }).click();
+  const chartSvg = page.locator('.sectional svg');
+  await chartSvg.waitFor();
+  check((await chartSvg.count()) === 1 && /Practice sectional\. Not a real chart\./.test(await chartSvg.evaluate((el) => el.textContent)), `${label} chart tool renders the sectional and labels it practice`);
+  check(/KXYZ/.test(await chartSvg.evaluate((el) => el.textContent)) && /\[31\]/.test(await chartSvg.evaluate((el) => el.textContent)), `${label} chart shows KXYZ and its Class D ceiling`);
+  await page.getByRole('button', { name: 'Plan a route', exact: true }).click();
+  const waypoint = page.getByLabel('Waypoint to add');
+  await waypoint.selectOption('KXYZ');
+  await btn('Add').click();
+  await waypoint.selectOption('KXQC');
+  await btn('Add').click();
+  const navRow = page.locator('.navlog tbody tr').first();
+  check(/KXYZ to KXQC/.test(await navRow.innerText()) && /\b\d{3}\b/.test(await navRow.innerText()), `${label} nav log shows the KXYZ to KXQC leg with headings`);
+  check(/Legal VFR cruising altitudes/.test(await main()), `${label} route panel lists legal cruising altitudes`);
+  // A long leg carries "TC 340  25 nm"; at phone width the same leg is too short for the course and shows "25 nm".
+  check(/TC 340|25 nm/.test(await chartSvg.evaluate((el) => el.textContent)), `${label} chart draws the leg with its course or distance`);
+  await page.getByRole('button', { name: 'Look up a point', exact: true }).click();
+  await page.getByLabel('Your altitude, ft MSL').fill('2500');
+  await page.getByLabel('Choose a place on the chart').selectOption('KXYZ');
+  const lookup = await page.locator('.lookup').innerText();
+  check(/Class D/.test(lookup) && /Over Practice field at 2,500 ft/.test(lookup), `${label} lookup over KXYZ at 2,500 ft says Class D`);
+  check(/Two-way radio communication established with the tower/.test(lookup) && /3 SM/.test(lookup), `${label} lookup lists the Class D requirement and 3 SM`);
   await noHScroll('tools');
 
   // Pilot
