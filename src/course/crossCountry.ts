@@ -5,7 +5,9 @@
 // copy comes from the nav and performance engine, and every grade from
 // scenarios/crossCountry.ts.
 
-import { practiceRegion as R, chartAirport, maxElevationFigure } from '../chart/practiceRegion';
+import { practiceRegion as R, maxElevationFigure, type Region } from '../chart/practiceRegion';
+import { lakesRegion } from '../chart/lakesRegion';
+import type { RegionId } from '../chart/regions';
 import { climbRate, fuelPlan, tempAtAltitude, vfrReserveMin } from '../lib/perf';
 import { destination, distanceNm, navLog, trueCourse, vfrCruisingAltitudes, type NavLog } from '../lib/nav';
 import { norm } from '../lib/wind';
@@ -27,7 +29,7 @@ const mins = (n: number) => `${n} minute${n === 1 ? '' : 's'}`;
 const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '0');
 
 const VAR = R.variationDeg;
-const VAR_TEXT = `${Math.abs(VAR)}° ${VAR < 0 ? 'west' : 'east'}`;
+const varText = (v: number) => `${Math.abs(v)}° ${v < 0 ? 'west' : 'east'}`;
 /** Practice altimeter and surface temperature for the whole module. */
 const ALTIMETER = 29.92;
 const SURFACE_C = 18;
@@ -35,7 +37,8 @@ const SURFACE_C = 18;
 const HOME = 'KXYZ';
 const DEST = 'KXQA';
 const ROUTE = [HOME, 'harlow', 'long-lake', 'pinecrest', DEST];
-const point = (id: string) => navPoint(R, id);
+const point = (id: string, region: Region = R) => navPoint(region, id);
+const chartAirport = (id: string, region: Region = R) => region.airports.find((a) => a.id === id);
 /** How copy names a place: the practice field by what it is, everything else by its chart name. */
 const nameOf = (id: string) => (id === HOME ? 'the practice field' : point(id).name);
 const NameOf = (id: string) => nameOf(id).replace(/^the /, 'The ');
@@ -65,13 +68,13 @@ function chartLine(ctx: LessonContext): string {
     : 'This module flies on the practice sectional, a made-up chart, so the route is the same for everyone. Your own numbers fly it.';
 }
 
-function log(p: XcAirplane, wind: { dirTrue: number; speedKt: number }, route = ROUTE): NavLog {
-  return navLog(route.map(point), { tasKt: p.perf.cruise.tasKt, windFromTrue: wind.dirTrue, windKt: wind.speedKt, variationDeg: VAR, gph: p.perf.cruise.gph });
+function log(p: XcAirplane, wind: { dirTrue: number; speedKt: number }, route = ROUTE, region: Region = R): NavLog {
+  return navLog(route.map((id) => point(id, region)), { tasKt: p.perf.cruise.tasKt, windFromTrue: wind.dirTrue, windKt: wind.speedKt, variationDeg: region.variationDeg, gph: p.perf.cruise.gph });
 }
 
 /** Box around a route, a few miles wide, for the maximum elevation figure and the lowest ground. */
-function routeBox(route: string[]) {
-  const pts = route.map(point);
+function routeBox(route: string[], region: Region = R) {
+  const pts = route.map((id) => point(id, region));
   const pad = 0.08;
   return {
     sw: { lat: Math.min(...pts.map((p) => p.lat)) - pad, lon: Math.min(...pts.map((p) => p.lon)) - pad },
@@ -80,8 +83,8 @@ function routeBox(route: string[]) {
 }
 
 /** Lowest ground under the route en route, leaving out the climb and descent near each end. */
-function lowestGround(route: string[], endsNm = 5): number {
-  const pts = route.map(point);
+function lowestGround(route: string[], endsNm = 5, region: Region = R): number {
+  const pts = route.map((id) => point(id, region));
   const total = pts.slice(1).reduce((n, q, i) => n + distanceNm(pts[i], q), 0);
   let low = Infinity;
   let flown = 0;
@@ -90,7 +93,7 @@ function lowestGround(route: string[], endsNm = 5): number {
     const d = distanceNm(pts[i], pts[i + 1]);
     for (let k = 0; k <= 10; k++) {
       const at = flown + (d * k) / 10;
-      if (at >= endsNm && at <= total - endsNm) low = Math.min(low, R.groundFt(destination(pts[i], tc, (d * k) / 10)));
+      if (at >= endsNm && at <= total - endsNm) low = Math.min(low, region.groundFt(destination(pts[i], tc, (d * k) / 10)));
     }
     flown += d;
   }
@@ -104,19 +107,25 @@ export interface RoutePlan {
   climbMin: number;
 }
 
-export function routePlan(p: XcAirplane, route = ROUTE): RoutePlan {
-  const { sw, ne } = routeBox(route);
-  const mefFt = maxElevationFigure(R, sw, ne);
-  const still = log(p, { dirTrue: 0, speedKt: 0 }, route);
+export function routePlan(p: XcAirplane, route = ROUTE, region: Region = R): RoutePlan {
+  const { sw, ne } = routeBox(route, region);
+  const mefFt = maxElevationFigure(region, sw, ne);
+  const still = log(p, { dirTrue: 0, speedKt: 0 }, route, region);
   const westbound = still.legs.every((l) => l.magCourse >= 180);
   const cruiseFt = vfrCruisingAltitudes(westbound ? 270 : 90, mefFt + 1000, 17500)[0];
-  const field = chartAirport(route[0])!.elevationFt;
+  const field = chartAirport(route[0], region)!.elevationFt;
   const midFt = (field + cruiseFt) / 2;
   const fpm = climbRate(p.perf, midFt, tempAtAltitude(SURFACE_C, field, midFt)).value;
   return { mefFt, cruiseFt, climbMin: Math.ceil((cruiseFt - field) / Math.max(fpm, 100)) };
 }
 
 const option = (id: string, label: string): Option => ({ id, label });
+
+/** The nav log trip: the first chart out west to Quill Valley, or the lake country north into the mountains. */
+function navTrip(v: number): { region: Region; regionId: RegionId; home: string; dest: string; route: string[] } {
+  if (v === 2) return { region: lakesRegion, regionId: 'lakes', home: 'KWVA', dest: 'KWSL', route: ['KWVA', 'ashby', 'sable-lake', 'notch', 'KWSL'] };
+  return { region: R, regionId: 'practice', home: HOME, dest: DEST, route: ROUTE };
+}
 
 // ---------------------------------------------------------------- 5.1
 
@@ -126,16 +135,21 @@ const navLogLesson: Lesson = {
   summary: 'Measure a route on the chart, turn true courses into magnetic, work time and fuel for each leg, and plan the fuel for the trip home.',
   acs: ['PA.I.D'],
   refs: ['PHAK, flight planning', '14 CFR 91.159', '14 CFR 91.151'],
-  variants: 2,
+  variants: 3,
   build(ctx) {
     // The second situation: the destination's self-serve pump is out by NOTAM.
     const pumpOut = ctx.variant === 1;
+    // The third flies the second practice sectional, into the mountains to a field with no fuel.
+    const t = navTrip(ctx.variant ?? 0);
+    const G = t.region;
+    const VAR = G.variationDeg;
+    const VAR_TEXT = varText(VAR);
     const p = xcAirplane(ctx.aircraft);
-    const still = log(p, { dirTrue: 0, speedKt: 0 });
+    const still = log(p, { dirTrue: 0, speedKt: 0 }, t.route, G);
     const [l1, l2] = still.legs;
-    const plan = routePlan(p);
+    const plan = routePlan(p, t.route, G);
     const dep = wholeHourAfter(ctx.now, 1);
-    const dest = chartAirport(DEST)!;
+    const dest = chartAirport(t.dest, G)!;
     const gph = p.perf.cruise.gph;
     const tas = p.perf.cruise.tasKt;
 
@@ -154,7 +168,7 @@ const navLogLesson: Lesson = {
     const leftMin = Math.round(((tanks.marginGal + tanks.reserveGal - extraGal) / gph) * 60);
     const westbound = l2.magCourse >= 180;
     const hemisphere = westbound ? 'Even thousands plus 500' : 'Odd thousands plus 500';
-    const chart = { kind: 'chart' as const, route: ROUTE };
+    const chart = { kind: 'chart' as const, region: t.regionId, route: t.route };
 
     const fuelText = (g: Grade) =>
       g === 'unsafe' ? `Out and back on ${fmt(onBoard)} gallons lands you below the ${reserveMin} minute reserve. Not legal.`
@@ -163,16 +177,16 @@ const navLogLesson: Lesson = {
 
     return [
       {
-        kind: 'brief', id: 'b1', title: 'A trip to Quill Valley',
-        scene: `${chartLine(ctx)} You're taking ${p.name} from ${HOME} to ${dest.name} (${DEST}) and back, wheels up around ${local(dep)}.${sampleLine(p)}`,
+        kind: 'brief', id: 'b1', title: `A trip to ${dest.name}`,
+        scene: `${chartLine(ctx)} You're taking ${p.name} from ${t.home} to ${dest.name} (${t.dest}) and back, wheels up around ${local(dep)}.${sampleLine(p)}`,
         say: {
-          full: `A nav log is the flight flown once on paper. Draw the course line, pick **checkpoints** you will recognize from the air (here ${ROUTE.slice(1, -1).map(nameOf).join(', ')}), then for each leg write down the **true course** from the chart, turn it into a **magnetic course**, and work **distance**, **time** and **fuel**. This lesson does it in still air. The next lesson adds the wind.`,
+          full: `A nav log is the flight flown once on paper. Draw the course line, pick **checkpoints** you will recognize from the air (here ${t.route.slice(1, -1).map((id) => point(id, G).name).join(', ')}), then for each leg write down the **true course** from the chart, turn it into a **magnetic course**, and work **distance**, **time** and **fuel**. This lesson does it in still air. The next lesson adds the wind.`,
           short: 'True course, magnetic course, distance, time, fuel, leg by leg.',
         },
         figure: chart,
       },
       {
-        kind: 'example', id: 'e1', title: `Leg 1: ${HOME} to ${l1.to.name}`,
+        kind: 'example', id: 'e1', title: `Leg 1: ${t.home} to ${l1.to.name}`,
         say: {
           full: `The plotter gives the true course against a meridian. Variation on this chart is ${VAR_TEXT}, so magnetic is ${VAR < 0 ? '**more**' : '**less**'} than true: "east is least, west is best." Distance comes off the plotter's scale. With no wind, time is distance over true airspeed, and fuel is time times fuel flow.`,
           short: `Variation ${VAR_TEXT}. Time is distance over speed.`,

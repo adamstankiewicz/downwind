@@ -667,6 +667,12 @@ async function run(viewport, live) {
   const lookup = await page.locator('.lookup').innerText();
   check(/Class D/.test(lookup) && /Over Practice field at 2,500 ft/.test(lookup), `${label} lookup over KXYZ at 2,500 ft says Class D`);
   check(/Two-way radio communication established with the tower/.test(lookup) && /3 SM/.test(lookup), `${label} lookup lists the Class D requirement and 3 SM`);
+  // The second practice sectional, from the chart switcher.
+  await page.getByRole('button', { name: 'Chart 2, around KWVA', exact: true }).click();
+  const chart2 = await chartSvg.evaluate((el) => el.textContent);
+  check(/Practice sectional 2\. Not a real chart\./.test(chart2) && /KWVA/.test(chart2) && /\[28\]/.test(chart2) && /A-561/.test(chart2), `${label} chart tool switches to the lake country with KWVA, its Class D and the alert area`);
+  await noHScroll('tools, chart 2');
+  await page.getByRole('button', { name: 'Chart 1, around KXYZ', exact: true }).click();
   await noHScroll('tools');
 
   // Lesson 4.1, end to end: the practice sectional, a data block, and a cruising altitude.

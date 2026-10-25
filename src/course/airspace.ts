@@ -5,7 +5,9 @@
 // decision option is a plan (a path, altitudes and what the controller said),
 // and scenarios/airspacePlan.ts grades it against the airspace it crosses.
 
-import { maxElevationFigure, practiceRegion as R, withVolumes, type ChartAirport, type Checkpoint } from '../chart/practiceRegion';
+import { maxElevationFigure, practiceRegion as R, withVolumes, type ChartAirport, type Checkpoint, type Region } from '../chart/practiceRegion';
+import { lakesRegion } from '../chart/lakesRegion';
+import type { RegionId } from '../chart/regions';
 import { limitMsl, positionAt, type AirspaceClass, type Volume } from '../lib/airspace';
 import { destination, distanceNm, trueCourse, type LatLon } from '../lib/nav';
 import { trueToMagnetic } from '../lib/wind';
@@ -16,9 +18,9 @@ const fmt = (n: number) => Math.round(n).toLocaleString('en-US');
 const pad3 = (n: number) => String(Math.round(n) % 360 || 360).padStart(3, '0');
 const nm1 = (n: number) => (Math.round(n * 10) / 10).toLocaleString('en-US');
 
-const airport = (id: string): ChartAirport => R.airports.find((a) => a.id === id)!;
-const checkpoint = (id: string): Checkpoint => R.checkpoints.find((c) => c.id === id)!;
-const volume = (id: string): Volume => R.airspace.find((v) => v.id === id)!;
+const airport = (id: string, r: Region = R): ChartAirport => r.airports.find((a) => a.id === id)!;
+const checkpoint = (id: string, r: Region = R): Checkpoint => r.checkpoints.find((c) => c.id === id)!;
+const volume = (id: string, r: Region = R): Volume => r.airspace.find((v) => v.id === id)!;
 const ceilingMsl = (v: Volume) => limitMsl(v.ceiling, 0);
 const floorMsl = (v: Volume) => limitMsl(v.floor, 0);
 const radiusNm = (v: Volume) => (v.shape.kind === 'circle' ? v.shape.radiusNm : v.shape.kind === 'ring' ? v.shape.outerNm : 0);
@@ -51,9 +53,9 @@ interface PlanOption {
  * the consequence adds the rule that was broken, from the same check, so
  * the copy can't claim a different reason than the grade.
  */
-function planDecision(id: string, title: string, situation: string, figure: Figure, options: PlanOption[], active: string[], why: string, o: GradeOptions = {}, extra: Volume[] = [], keepOrder = false): Step {
+function planDecision(id: string, title: string, situation: string, figure: Figure, options: PlanOption[], active: string[], why: string, o: GradeOptions = {}, extra: Volume[] = [], keepOrder = false, region: Region = R): Step {
   const plans = options.map((x) => ({ ...x.plan, id: x.id }));
-  const { grades, checks } = gradePlans(withVolumes(R, extra), plans, active, o);
+  const { grades, checks } = gradePlans(withVolumes(region, extra), plans, active, o);
   const consequence: Record<string, string> = {};
   for (const x of options) {
     const c = checks[x.id];
@@ -69,8 +71,8 @@ function planDecision(id: string, title: string, situation: string, figure: Figu
 }
 
 /** Which class is overhead at a point and altitude on the practice chart. */
-function classAt(p: LatLon, altMsl: number, extra: Volume[] = []) {
-  const r = withVolumes(R, extra);
+function classAt(p: LatLon, altMsl: number, extra: Volume[] = [], region: Region = R) {
+  const r = withVolumes(region, extra);
   return positionAt(r.airspace, p, altMsl, r.groundFt(p), r.veils);
 }
 
@@ -78,50 +80,88 @@ const CLASS_CHOICES = ['Class B', 'Class C', 'Class D', 'Class E', 'Class G'];
 
 // ---------------------------------------------------------------- 4.1
 
+/** The places 4.1 reads and flies, on one of the practice sectionals. */
+interface ChartSet {
+  region: Region;
+  regionId: RegionId;
+  home: string;
+  /** The home field's Class D. */
+  homeD: string;
+  /** The small untowered field the pilot reads alone. */
+  small: string;
+  /** Another field, for a wrong frequency to choose. */
+  other: string;
+  /** The sightseeing destination, a checkpoint. */
+  sight: string;
+  homeward: boolean;
+  /** Highlighted on the trip chart: an obstacle near the course. */
+  hazard: string;
+  /** Altitudes offered for the trip; computed from the route when missing. */
+  alts?: number[];
+}
+
+/** Situations 0 to 2 fly the first chart, 3 and 4 the lake country. */
+function chartSet(v: number): ChartSet {
+  if (v >= 3) {
+    return { region: lakesRegion, regionId: 'lakes', home: 'KWVA', homeD: 'wva-d', small: 'KWFB', other: 'KWSL', sight: v === 3 ? 'sable-lake' : 'notch', homeward: v === 4, hazard: 'tower-2385' };
+  }
+  return { region: R, regionId: 'practice', home: 'KXYZ', homeD: 'xyz-d', small: '2X5', other: 'KXRB', sight: v === 2 ? 'harlow' : 'long-lake', homeward: v === 1, hazard: 'tower-1749', alts: [2500, 3500, 4500, 5500] };
+}
+
+const COMPASS = ['north', 'northeast', 'east', 'southeast', 'south', 'southwest', 'west', 'northwest'];
+const compass = (trueDeg: number) => COMPASS[Math.round(((trueDeg % 360) + 360) % 360 / 45) % 8];
+
 const chartAroundField: Lesson = {
   id: '4.1', module: 4, minutes: 15,
   title: 'Reading the chart around your field',
   summary: 'Decode an airport data block, the airspace drawn around it, and the maximum elevation figure, then pick a cruising altitude over rising ground.',
   acs: ['PA.I.D', 'PA.I.E'],
   refs: ['PHAK ch. 16', 'PHAK ch. 15', '14 CFR 91.159', '14 CFR 91.119'],
-  variants: 3,
+  variants: 5,
   build(ctx) {
-    const home = airport('KXYZ');
-    const mill = airport('2X5');
-    // The sightseeing trip: out to Long Lake, home from it, or the short hop to Harlow.
-    const v = ctx.variant ?? 0;
-    const lake = checkpoint(v === 2 ? 'harlow' : 'long-lake');
-    const homeward = v === 1;
+    const set = chartSet(ctx.variant ?? 0);
+    const G = set.region;
+    const home = airport(set.home, G);
+    const mill = airport(set.small, G);
+    // The sightseeing trip: out to a lake, home from it, or a short hop to a town.
+    const lake = checkpoint(set.sight, G);
+    const homeward = set.homeward;
     const from = homeward ? lake.pos : home.pos;
     const to = homeward ? home.pos : lake.pos;
-    const d = volume('xyz-d');
+    const d = volume(set.homeD, G);
     const dTop = ceilingMsl(d);
-    const millMef = maxElevationFigure(R, { lat: Math.floor(mill.pos.lat * 2) / 2, lon: Math.floor(mill.pos.lon * 2) / 2 }, { lat: Math.floor(mill.pos.lat * 2) / 2 + 0.5, lon: Math.floor(mill.pos.lon * 2) / 2 + 0.5 });
-    const overMill = classAt(mill.pos, 2500);
+    const millMef = maxElevationFigure(G, { lat: Math.floor(mill.pos.lat * 2) / 2, lon: Math.floor(mill.pos.lon * 2) / 2 }, { lat: Math.floor(mill.pos.lat * 2) / 2 + 0.5, lon: Math.floor(mill.pos.lon * 2) / 2 + 0.5 });
+    const overMillAlt = set.regionId === 'practice' ? 2500 : Math.ceil((mill.elevationFt + 1700) / 500) * 500;
+    const overMill = classAt(mill.pos, overMillAlt, [], G);
     const tc = Math.round(trueCourse(from, to));
-    const mc = Math.round(trueToMagnetic(tc, R.variationDeg));
+    const mc = Math.round(trueToMagnetic(tc, G.variationDeg));
+    const chart = (f: Omit<Extract<Figure, { kind: 'chart' }>, 'kind' | 'region'>): Figure => ({ kind: 'chart', region: set.regionId, ...f });
 
     // The highest maximum elevation figure the trip crosses.
-    const tripMef = Math.max(...samplePlan({ id: 'x', start: from, startAltMsl: 0, legs: [{ to, altMsl: 0 }], cleared: [], transponder: true }, R.variationDeg)
+    const tripMef = Math.max(...samplePlan({ id: 'x', start: from, startAltMsl: 0, legs: [{ to, altMsl: 0 }], cleared: [], transponder: true }, G.variationDeg)
       .map((s) => {
         const lat = Math.floor(s.pos.lat * 2) / 2;
         const lon = Math.floor(s.pos.lon * 2) / 2;
-        return maxElevationFigure(R, { lat, lon }, { lat: lat + 0.5, lon: lon + 0.5 });
+        return maxElevationFigure(G, { lat, lon }, { lat: lat + 0.5, lon: lon + 0.5 });
       }));
     const westbound = mc >= 180;
-    const alts = [2500, 3500, 4500, 5500];
-    const trip = (alt: number): Omit<Plan, 'id'> => ({ start: from, startAltMsl: alt, legs: [{ to, altMsl: alt }], cleared: ['xyz-d'], transponder: true });
+    // Four altitudes that bracket the answer: some too low for the ground, some the wrong way.
+    const lo = Math.floor((tripMef - 500) / 1000) * 1000 + 500;
+    const alts = set.alts ?? [lo, lo + 1000, lo + 2000, lo + 3000];
+    const trip = (alt: number): Omit<Plan, 'id'> => ({ start: from, startAltMsl: alt, legs: [{ to, altMsl: alt }], cleared: [set.homeD], transponder: true });
     const tripNm = Math.round(distanceNm(from, to));
+    const millDir = compass(trueCourse(home.pos, mill.pos));
+    const second = set.regionId === 'practice' ? '' : ' This time it is the second practice sectional, the lake country, with different shapes to read.';
 
     return [
       {
         kind: 'brief', id: 'b1', title: 'A chart is a list of facts',
-        scene: `Before a sightseeing trip you spread out the sectional around ${home.id}. This module flies a practice sectional, a made-up stretch of country, so the shapes are always the same.${yourField(ctx)}`,
+        scene: `Before a sightseeing trip you spread out the sectional around ${home.id}. This module flies a practice sectional, a made-up stretch of country, so the shapes are always the same.${second}${yourField(ctx)}`,
         say: {
           full: 'Every symbol on a sectional is a fact you would otherwise have to look up. The **color** of an airport says whether it has a tower: **blue** is towered, **magenta** is not. The **data block** beside it gives the frequency, elevation and longest runway. The line drawn around it is the airspace, with its **ceiling** printed in brackets. And in the middle of each half-degree square, between the lines of latitude and longitude, is the **maximum elevation figure**, the highest thing in that square plus a little extra. We will read the home field together.',
           short: 'Color says tower or not; the data block, the bracket and the big number in each square say the rest.',
         },
-        figure: { kind: 'chart', focus: { id: 'KXYZ', radiusNm: 9 }, highlight: ['KXYZ', 'xyz-d'] },
+        figure: chart({ focus: { id: set.home, radiusNm: 9 }, highlight: [set.home, set.homeD] }),
       },
       {
         kind: 'example', id: 'e1', title: `${home.id}, taken apart`,
@@ -129,7 +169,7 @@ const chartAroundField: Lesson = {
           full: `Blue, so it has a tower. The dashed blue circle is its **Class D**, ${nm1(radiusNm(d))} nm out, and the [${Math.round(dTop / 100)}] is its ceiling in hundreds of feet **above sea level**, not above the field. Subtract the field elevation to see how tall it really is.`,
           short: `[${Math.round(dTop / 100)}] is ${fmt(dTop)} MSL. Subtract the field.`,
         },
-        figure: { kind: 'chart', focus: { id: 'KXYZ', radiusNm: 7 }, highlight: ['KXYZ', 'xyz-d'] },
+        figure: chart({ focus: { id: set.home, radiusNm: 7 }, highlight: [set.home, set.homeD] }),
         work: [
           { label: 'Tower', value: home.freq, note: `ATIS ${home.atis}. ${d.note ?? ''}`.trim() },
           { label: 'Elevation', value: `${fmt(home.elevationFt)} ft`, note: 'Field elevation, MSL' },
@@ -141,42 +181,45 @@ const chartAroundField: Lesson = {
       },
       {
         kind: 'turn', id: 't1', title: 'Your turn',
-        prompt: `Now ${mill.name} (${mill.id}), ${Math.round(distanceNm(home.pos, mill.pos))} nm west. Read its data block and the square it sits in.`,
-        figure: { kind: 'chart', focus: { id: '2X5', radiusNm: 9 }, highlight: ['2X5'] },
+        prompt: `Now ${mill.name} (${mill.id}), ${Math.round(distanceNm(home.pos, mill.pos))} nm ${millDir}. Read its data block and the square it sits in.`,
+        figure: chart({ focus: { id: set.small, radiusNm: 9 }, highlight: [set.small] }),
         blanks: [
           { id: 'elev', label: 'Field elevation', unit: 'ft', answer: mill.elevationFt, tolerance: 0, explain: `${mill.name} is ${fmt(mill.elevationFt)} ft above sea level.` },
-          { id: 'freq', label: 'Frequency to use', answer: mill.freq, choices: [mill.freq, home.freq, airport('KXRB').freq],
+          { id: 'freq', label: 'Frequency to use', answer: mill.freq, choices: [mill.freq, home.freq, airport(set.other, G).freq],
             explain: `Magenta means no tower, so you self-announce on the CTAF, ${mill.freq}.` },
           { id: 'tpa', label: 'Pattern height above the field', unit: 'ft', answer: mill.tpaMsl - mill.elevationFt, tolerance: 0,
             explain: `Pattern altitude ${fmt(mill.tpaMsl)} MSL minus ${fmt(mill.elevationFt)}: ${fmt(mill.tpaMsl - mill.elevationFt)} ft.` },
           { id: 'mef', label: 'Maximum elevation figure in that square', unit: 'ft', answer: millMef, tolerance: 0,
             explain: `The big number in the square is ${Math.floor(millMef / 1000)} and the small one ${Math.round((millMef % 1000) / 100)}: ${fmt(millMef)} ft MSL. It covers the highest terrain or obstacle in the square, with a margin.` },
-          { id: 'cls', label: 'Over the field at 2,500 MSL you are in', answer: `Class ${overMill.cls}`, choices: CLASS_CHOICES,
-            explain: overMill.cls === 'G'
-              ? `Nothing is drawn around ${mill.id}, and 2,500 MSL is less than 1,200 ft above the ground there, so it is Class G.`
-              : `Nothing is drawn around ${mill.id}, but 2,500 MSL is more than 1,200 ft above the ground there, so it is Class ${overMill.cls}.` },
+          { id: 'cls', label: `Over the field at ${fmt(overMillAlt)} MSL you are in`, answer: `Class ${overMill.cls}`, choices: CLASS_CHOICES,
+            explain: overMill.volume
+              ? `${overMill.volume.name}: ${overMill.cls === 'E' ? 'the magenta vignette brings Class E down to 700 ft above the ground around the field' : 'drawn on the chart around the field'}, and ${fmt(overMillAlt)} MSL is ${fmt(overMillAlt - mill.elevationFt)} ft above it.`
+              : overMill.cls === 'G'
+                ? `Nothing is drawn around ${mill.id}, and ${fmt(overMillAlt)} MSL is less than 1,200 ft above the ground there, so it is Class G.`
+                : `Nothing is drawn around ${mill.id}, but ${fmt(overMillAlt)} MSL is more than 1,200 ft above the ground there, so it is Class ${overMill.cls}.` },
         ],
       },
       planDecision('d1', homeward ? `How high back to ${home.id}?` : `How high to ${lake.name}?`,
         `${homeward ? `Done circling ${lake.name}, you head home: ${home.id} is` : `${lake.name} is`} ${tripNm} nm away, true course ${pad3(tc)}, magnetic ${pad3(mc)}: ${westbound ? 'westbound' : 'eastbound'}. The squares you cross have maximum elevation figures up to ${fmt(tripMef)} ft.`,
-        { kind: 'chart', route: ['KXYZ', lake.id], highlight: ['KXYZ', lake.id, 'tower-1749'] },
+        chart({ route: [set.home, lake.id], highlight: [set.home, lake.id, set.hazard] }),
         alts.map((alt) => ({
           id: `alt-${alt}`,
           label: `${fmt(alt)} ft`,
           plan: trip(alt),
-          then: (c) => c.violations.some((v) => v.id === 'hemispheric')
-            ? `High enough, but ${fmt(alt)} is an ${westbound ? 'eastbound' : 'westbound'} altitude, and over most of this route you are more than 3,000 ft above the ground. Opposite-direction traffic is flying it.`
-            : c.mefMarginFt < 0
-              ? `Over the highest ground on the way you are ${fmt(-c.mefMarginFt)} ft below the highest figure on your route. Legal where the ground is low, with no margin for a tower you missed.`
+          then: (c) => c.mefMarginFt < 0
+            ? `Over the highest ground on the way you are ${fmt(-c.mefMarginFt)} ft below the highest figure on your route. ${c.violations.some((v) => v.id !== 'hemispheric') ? 'Too low for the ground you cross.' : 'Legal where the ground is low, with no margin for a tower you missed.'}`
+            : c.violations.some((v) => v.id === 'hemispheric')
+              ? `High enough, but ${fmt(alt)} is ${westbound ? 'an eastbound' : 'a westbound'} altitude, and over most of this route you are more than 3,000 ft above the ground. Opposite-direction traffic is flying it.`
               : c.mefMarginFt < 1000
                 ? `Clear of everything charted, but only ${fmt(c.mefMarginFt)} ft over the highest square.`
-                : `${fmt(c.mefMarginFt)} ft over the highest square, and a legal cruising altitude for a ${westbound ? 'westbound' : 'eastbound'} course.`,
+                : `${fmt(c.mefMarginFt)} ft over the highest square, and a legal cruising altitude for ${westbound ? 'a westbound' : 'an eastbound'} course.`,
         })),
         [],
         `Two checks pick the altitude. Stay at least 1,000 ft above the highest maximum elevation figure on the route, and once you are more than 3,000 ft above the ground, fly ${westbound ? 'even' : 'odd'} thousands plus 500 on a magnetic course of ${pad3(mc)} (91.159).`,
         { mef: true },
         [],
         true,
+        G,
       ),
     ];
   },
@@ -409,7 +452,7 @@ const classB: Lesson = {
     const ok = `${sign}, cleared into the Class Bravo airspace, maintain 3,500.`;
     const cruise = 3500;
     // Every Class B ring the path from the field to the plant crosses, outermost first.
-    const rings = ['xbb-b3', 'xbb-b2', 'xbb-b1'].map(volume);
+    const rings = ['xbb-b3', 'xbb-b2', 'xbb-b1'].map((id) => volume(id));
     const plantNm = distanceNm(plant.pos, bb.pos);
     const plantRing = rings.find((v) => v.shape.kind === 'ring' ? plantNm > v.shape.innerNm && plantNm <= v.shape.outerNm : plantNm <= radiusNm(v))!;
     const plantFloor = floorMsl(plantRing);

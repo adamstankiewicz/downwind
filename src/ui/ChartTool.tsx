@@ -5,7 +5,8 @@
 // your airplane's cruise numbers and today's wind.
 
 import { useMemo, useState } from 'react';
-import { practiceRegion as R } from '../chart/practiceRegion';
+import type { Region } from '../chart/practiceRegion';
+import { regionById, regions, type RegionId } from '../chart/regions';
 import type { AircraftProfile } from '../data/aircraft';
 import { positionAt, requirements, vfrMinimums, type AirspaceClass } from '../lib/airspace';
 import { isLegalVfrAltitude, navLog, vfrCruisingAltitudes, type LatLon, type NavPoint } from '../lib/nav';
@@ -20,12 +21,20 @@ const CLASS_NAME: Record<AirspaceClass, string> = { B: 'Bravo', C: 'Charlie', D:
 const fmt = (n: number) => n.toLocaleString('en-US');
 const pad3 = (n: number) => String(Math.round(n)).padStart(3, '0');
 
-const PLACES = [
+const placesOf = (R: Region) => [
   ...R.airports.map((a) => ({ id: a.id, label: `${a.id} ${a.name}`, pos: a.pos, name: a.name })),
   ...R.checkpoints.map((c) => ({ id: c.id, label: c.name, pos: c.pos, name: c.name })),
 ];
+/** How the chart switcher names each sectional, by its home field. */
+const CHART_LABEL: Record<RegionId, { short: string; sub: string }> = {
+  practice: { short: 'Chart 1, around KXYZ', sub: 'A made-up region around KXYZ. Nothing here is a real place.' },
+  lakes: { short: 'Chart 2, around KWVA', sub: 'Made-up lake country around KWVA, with mountains to the north. Nothing here is a real place.' },
+};
 
 export function ChartTool({ aircraft }: { aircraft: AircraftProfile }) {
+  const [regionId, setRegionId] = useState<RegionId>('practice');
+  const R = regionById(regionId);
+  const PLACES = useMemo(() => placesOf(R), [R]);
   const [mode, setMode] = useState<Mode>('point');
   const [altitude, setAltitude] = useState(3500);
   const [night, setNight] = useState(false);
@@ -73,9 +82,14 @@ export function ChartTool({ aircraft }: { aircraft: AircraftProfile }) {
     <section className="card chart-tool">
       <div className="card-head">
         <h2>Practice sectional</h2>
-        <span className="sub">A made-up region around KXYZ. Nothing here is a real place.</span>
+        <span className="sub">{CHART_LABEL[regionId].sub}</span>
       </div>
       <div className="chart-bar">
+        <div className="seg" role="group" aria-label="Which practice sectional">
+          {regions.map((r) => (
+            <button key={r.id} type="button" aria-pressed={regionId === r.id} onClick={() => { setRegionId(r.id as RegionId); setPoint(null); setRoute([]); }}>{CHART_LABEL[r.id as RegionId].short}</button>
+          ))}
+        </div>
         <div className="seg" role="group" aria-label="What to do on the chart">
           <button type="button" aria-pressed={mode === 'point'} onClick={() => setMode('point')}>Look up a point</button>
           <button type="button" aria-pressed={mode === 'route'} onClick={() => setMode('route')}>Plan a route</button>
@@ -96,6 +110,7 @@ export function ChartTool({ aircraft }: { aircraft: AircraftProfile }) {
           : 'Tap fields and checkpoints in order, or add them from the list, to build a route and read the nav log.'}
       </p>
       <SectionalChart
+        region={R}
         route={mode === 'route' ? route : undefined}
         point={mode === 'point' && point ? point.pos : undefined}
         onPick={onPick}

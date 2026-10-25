@@ -47,6 +47,8 @@ export interface Obstacle {
 }
 
 export interface Region {
+  /** Stable id a figure names the chart by. */
+  id: string;
   name: string;
   /** Degrees, positive east. */
   variationDeg: number;
@@ -83,20 +85,25 @@ function terrainFt(p: LatLon): number {
  * airport data blocks (a Class C shelf 1,200 ft above its field, a pattern
  * 1,000 ft above the runway).
  */
-function groundFt(p: LatLon): number {
-  let g = terrainFt(p);
-  for (const a of FIELDS) {
-    const d = distanceNm(p, a.pos);
-    if (d >= 3) continue;
-    const w = d <= 1 ? 1 : 1 - (d - 1) / 2;
-    g = g * (1 - w) + a.elevationFt * w;
-  }
-  return Math.round(g);
+export function levelledGround(terrain: (p: LatLon) => number, fields: ChartAirport[]) {
+  return (p: LatLon): number => {
+    let g = terrain(p);
+    for (const a of fields) {
+      const d = distanceNm(p, a.pos);
+      if (d >= 3) continue;
+      const w = d <= 1 ? 1 : 1 - (d - 1) / 2;
+      g = g * (1 - w) + a.elevationFt * w;
+    }
+    return Math.round(g);
+  };
 }
 
-const box = (c: LatLon, dNs: number, dEw: number): LatLon[] => [
-  at(0, dNs, at(270, dEw, c)), at(0, dNs, at(90, dEw, c)), at(180, dNs, at(90, dEw, c)), at(180, dNs, at(270, dEw, c)),
+/** A box of ±dNs by ±dEw nautical miles around a point, for special use areas. */
+export const boxAround = (c: LatLon, dNs: number, dEw: number): LatLon[] => [
+  destination(destination(c, 270, dEw), 0, dNs), destination(destination(c, 90, dEw), 0, dNs),
+  destination(destination(c, 90, dEw), 180, dNs), destination(destination(c, 270, dEw), 180, dNs),
 ];
+const box = boxAround;
 
 const FIELDS: ChartAirport[] = [
   { id: 'KXYZ', name: 'Practice field', pos: HOME, elevationFt: 600, towered: true, runwayFt: 5500, surface: 'paved', runways: ['06', '24'], freq: '125.10', freqKind: 'Tower', atis: '119.45', fuel: true, tpaMsl: 1600 },
@@ -108,6 +115,7 @@ const FIELDS: ChartAirport[] = [
 ];
 
 export const practiceRegion: Region = {
+  id: 'practice',
   name: 'Practice sectional (not a real chart)',
   variationDeg: -14,
   bounds: { north: 43.45, south: 42.15, east: -71.0, west: -73.55 },
@@ -138,7 +146,7 @@ export const practiceRegion: Region = {
     { id: 'tower-1749', pos: at(240, 26), mslFt: 1749, aglFt: 1150, lighted: true },
     { id: 'stack-1', pos: at(120, 14), mslFt: 980, aglFt: 610, lighted: true },
   ],
-  groundFt,
+  groundFt: levelledGround(terrainFt, FIELDS),
 };
 
 /** The region with volumes added for one lesson, such as a TFR from a NOTAM. */
