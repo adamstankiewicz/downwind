@@ -1,4 +1,5 @@
 import type { RunwayEnd } from '../lib/wind';
+import type { LatLon } from '../lib/nav';
 
 export interface Airport {
   icao: string;
@@ -11,6 +12,8 @@ export interface Airport {
   runways: RunwayEnd[];
   /** Stations to try for a TAF, in order. Not every field issues one. */
   tafStations: string[];
+  /** Where the field is, when lookup found it. Trip needs it; older saves may lack it. */
+  pos?: LatLon;
   /** Fields still to confirm against the current Chart Supplement / NASR. */
   verify: string[];
 }

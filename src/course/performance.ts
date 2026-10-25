@@ -19,6 +19,7 @@ import {
   airAt, capGrade, climbGainFt, fuelGrade, fuelToGross, landingFuel, lessonAirplane, loadingGrade, loadWb, reserveGrade, runwayGrade, tripFuel, zeroFuelWb,
   REAL_RESERVE_MIN, RUNWAY_MARGIN, type Air, type LessonAirplane, type Loading,
 } from './airplane';
+import { takeoffDials } from './dials';
 import { addHours, cloud, mainRunway, metarText, nextLocalHour, observedAt, windAcross } from './practice';
 import type { Figure, Lesson, LessonContext, Option, Step, WorkRow } from './types';
 
@@ -456,6 +457,14 @@ const shortStrip: Lesson = {
           { id: 'margin', label: 'Runway you want, with half again', unit: 'ft', answer: needed, tolerance: 60,
             explain: `${fmt(pm.over50Ft)} × ${RUNWAY_MARGIN} = about ${fmt(needed)} ft, against ${fmt(runway)} ft of grass.` },
         ],
+      },
+      {
+        kind: 'dials', id: 'w1', title: 'Turn the afternoon',
+        say: {
+          full: `Same strip, same airplane. Now turn the temperature and the wind and watch the takeoff distance follow them through the chart. Somewhere on the temperature dial is the warmest afternoon this strip still gives you half again. That number is worth more than the time on the clock. ${perfNote(ap)}`,
+          short: 'Find the warmest afternoon this strip still gives you half again.',
+        },
+        ...takeoffDials({ perf: p, fieldElevFt: elev, runwayFt: runway, surface: 'grass', sample: ap.samplePerf }, { oatC: pmT, headwindKt: STRIP_HEADWIND_KT }),
       },
       {
         kind: 'decide', id: 'd1', title: 'When do you leave?',

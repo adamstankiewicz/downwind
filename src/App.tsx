@@ -3,9 +3,11 @@ import { CourseHome } from './ui/CourseHome';
 import { LessonPlayer } from './ui/LessonPlayer';
 import { DailyFlight } from './ui/DailyFlight';
 import { Tools, type Tool } from './ui/Tools';
+import { Trip } from './ui/Trip';
 import { Logbook } from './ui/Logbook';
 import { Settings } from './ui/Settings';
 import { Onboarding } from './ui/Onboarding';
+import { RadioPractice } from './ui/RadioPractice';
 import { Icons, Mark } from './ui/common';
 import { useAircraft, useAirport, useCourse, useLoading, useLogbook, useOnboarding, usePilot, useTheme } from './ui/state';
 import { lessonById } from './course/modules';
@@ -13,11 +15,12 @@ import { lessonContext } from './course/practice';
 import type { Lesson } from './course/types';
 import { RefProvider } from './refs/RefViewer';
 
-type Rail = 'course' | 'tools' | 'logbook' | 'pilot';
-type Screen = { rail: Rail; view?: 'lesson' | 'daily'; lessonId?: string };
+type Rail = 'course' | 'trip' | 'tools' | 'logbook' | 'pilot';
+type Screen = { rail: Rail; view?: 'lesson' | 'daily' | 'radio'; lessonId?: string };
 
 const RAILS: { id: Rail; label: string; icon: React.ReactNode }[] = [
   { id: 'course', label: 'Course', icon: Icons.course },
+  { id: 'trip', label: 'Trip', icon: Icons.trip },
   { id: 'tools', label: 'Tools', icon: Icons.tools },
   { id: 'logbook', label: 'Logbook', icon: Icons.logbook },
   { id: 'pilot', label: 'Pilot', icon: Icons.pilot },
@@ -115,15 +118,22 @@ export function App() {
               onExit={() => go({ rail: 'course' })}
             />
           )}
-          {screen.rail === 'course' && !lesson && (screen.view !== 'daily' || !airport) && (
+          {screen.rail === 'course' && screen.view === 'radio' && (
+            <RadioPractice aircraft={aircraft} onExit={() => go({ rail: 'course' })} />
+          )}
+          {screen.rail === 'course' && !lesson && screen.view !== 'radio' && (screen.view !== 'daily' || !airport) && (
             <CourseHome
               progress={progress}
               airport={airport}
               hasAircraft={aircraft.id !== 'custom' || aircraft.emptyWeightLb > 0}
               onStart={startLesson}
               onDaily={() => go({ rail: 'course', view: 'daily' })}
+              onRadio={() => go({ rail: 'course', view: 'radio' })}
               onSetup={() => rerunSetup(1)}
             />
+          )}
+          {screen.rail === 'trip' && (
+            <Trip airport={airport} aircraft={aircraft} pilot={pilot} ctx={ctx} progress={progress} setProgress={setProgress} onSetup={() => rerunSetup(1)} />
           )}
           {screen.rail === 'tools' && (
             <Tools tool={tool} setTool={setTool} airport={airport} aircraft={aircraft} setAircraft={setAircraft} loading={loading} setLoading={setLoading} epoch={epoch} onSetup={() => rerunSetup(1)} ctx={ctx} />

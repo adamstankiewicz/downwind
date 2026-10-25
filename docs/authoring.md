@@ -24,6 +24,14 @@ in the pilot's words, minutes, ACS task codes, references, and
    (`land-ahead`, `turn-back`, `climb`, `divert`). Weather decisions use
    `go`, `go-plan`, `delay` and `cancel`.
 
+5. **dials** (optional): the lesson's conditions as controls. Build one with
+   a builder from `course/dials.ts` (`windDials`, `ceilingDials`,
+   `takeoffDials`) or write your own: `dials` to turn, `evaluate(values)`
+   that re-runs the engine and returns the figures, readouts, crossed lines
+   and live grades, and a `task` the pilot answers by setting the dials,
+   checked by the engine and scored like a blank. Lines are written once
+   and only interpolate engine values. See 2.2, 2.4 and 3.3.
+
 Lessons can branch with `showIf`. For example, the in-flight step in 2.5
 only shows if the pilot went.
 
@@ -62,13 +70,18 @@ only shows if the pilot went.
 | Weight and balance | `lib/wb.ts` |
 | Weather text and go/no-go grades | `lib/metar.ts`, `lib/taf.ts`, `scenarios/goNoGo.ts`, `course/practice.ts` |
 | The practice chart | `chart/practiceRegion.ts` |
+| Trip: candidate fields, round-trip plans, filters, ranking, the diversion | `scenarios/trip.ts`, live inputs in `lib/tripData.ts`, practice inputs in `course/tripPractice.ts` |
+| Sunrise and sunset, winds aloft text | `lib/sun.ts`, `lib/windsAloft.ts` |
 
 ## Figures
 
 Set these on a step's `figure`: `metar`, `taf`, `wind`, `chart` (the
 practice sectional with a route, highlights, a focus and an airplane
-marker), `perf` (a POH-style chart with the reading marked), `navlog` and
-`glide`.
+marker), `perf` (a POH-style chart with the reading marked), `navlog`,
+`glide`, `sky` (the field from the side: ceiling, pattern, legal and
+personal lines) and `tripMap` (a schematic plan view around home, never a
+chart). A dials step has no fixed figure; its `evaluate` returns
+the figures for the current setting.
 
 ## Finishing a module
 
@@ -81,3 +94,11 @@ marker), `perf` (a POH-style chart with the reading marked), `navlog` and
 - Extend `e2e/smoke.mjs` to fly the first lesson of the module end to end.
 - `npx tsc -b && npx vitest run && npm run build`, then the smoke test
   against `vite preview`. All must pass before opening a PR.
+
+## Language models
+
+Any feature that calls a model gets an eval suite in `evals/` before it
+ships (see `evals/README.md`), and the model sits behind the worker's
+`AskModel` interface (`worker/models/`), so a provider can change without
+touching the feature. The model never grades and never produces a number
+the engine could compute.

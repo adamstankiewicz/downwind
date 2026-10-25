@@ -11,25 +11,40 @@ import {
 } from '../course/progress';
 import { GRADE_LABEL, Voice } from './common';
 import { Figure } from './Figure';
+import { DialsView } from './Dials';
+import { initialValues } from '../course/dials';
 import { Strip, type StripPoint } from './Strip';
 import { Rich } from './text';
 import { RefChips } from '../refs/RefViewer';
 import { arrange, nextVariant, variantCount } from '../course/variant';
 import { lessonOutcomes } from '../review/lessonCards';
 import { enrollLesson } from '../review/scheduler';
+import { askContext } from '../ask/context';
+import { AskInstructor, type AskEntry } from './AskInstructor';
 
 const freshSeed = () => Math.floor(Math.random() * 2 ** 31);
 
 const KEYS = ['A', 'B', 'C', 'D'];
-const KIND_LABEL: Record<Step['kind'], string> = { brief: 'Brief', example: 'Worked example', turn: 'Your turn', decide: 'Decide' };
+const KIND_LABEL: Record<Step['kind'], string> = { brief: 'Brief', example: 'Worked example', turn: 'Your turn', dials: 'Dials', decide: 'Decide' };
 
-export function LessonPlayer({ lesson, ctx, progress, setProgress, onExit, onNext }: {
+/**
+ * A lesson outside the course, such as a planned trip: its own header line,
+ * its own place to keep the result, and no "next lesson".
+ */
+export interface Standalone {
+  line: string;
+  onResult: (r: LessonResult) => void;
+  exitLabel: string;
+}
+
+export function LessonPlayer({ lesson, ctx, progress, setProgress, onExit, onNext, standalone }: {
   lesson: Lesson;
   ctx: LessonContext;
   progress: CourseProgress;
   setProgress: (next: CourseProgress | ((p: CourseProgress) => CourseProgress)) => void;
   onExit: () => void;
   onNext: (l: Lesson) => void;
+  standalone?: Standalone;
 }) {
   const [attempt, setAttempt] = useState(0);
   // Built once per attempt so the practice weather holds still while the pilot
@@ -42,23 +57,32 @@ export function LessonPlayer({ lesson, ctx, progress, setProgress, onExit, onNex
   const [answers, setAnswers] = useState<LessonAnswers>(emptyAnswers);
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [committed, setCommitted] = useState<Record<string, boolean>>({});
+  // Questions asked of the instructor, by step; a new attempt starts clean.
+  const [asked, setAsked] = useState<Record<string, AskEntry[]>>({});
   const [idx, setIdx] = useState(0);
   const [result, setResult] = useState<LessonResult | null>(null);
   const level = useRef(coachLevel(progress, lesson)).current;
 
   const shown = visibleSteps(steps, answers);
   const step = shown[Math.min(idx, shown.length - 1)];
-  const m = modules.find((x) => x.n === lesson.module)!;
-  const lessonNo = m.lessons.findIndex((l) => l.id === lesson.id) + 1;
+  const m = modules.find((x) => x.n === lesson.module);
+  const lessonNo = m ? m.lessons.findIndex((l) => l.id === lesson.id) + 1 : 0;
 
-  const complete = (s: Step) => s.kind === 'brief' || s.kind === 'example' || (s.kind === 'turn' ? Boolean(checked[s.id]) : Boolean(committed[s.id]));
+  const complete = (s: Step) =>
+    s.kind === 'brief' || s.kind === 'example' ||
+    (s.kind === 'turn' ? Boolean(checked[s.id]) : s.kind === 'dials' ? !s.task || Boolean(answers.dialChecks?.[s.id]) : Boolean(committed[s.id]));
+  const dialValues = step.kind === 'dials' ? answers.dials?.[step.id] ?? initialValues(step) : null;
+  const dialState = useMemo(() => (step.kind === 'dials' && dialValues ? step.evaluate(dialValues) : null), [step, dialValues]);
   const last = idx >= shown.length - 1;
 
   const finish = () => {
     const r = scoreLesson(steps, answers);
     setResult(r);
-    setProgress((p) => recordLesson(p, lesson.id, r, new Date(), variant));
-    enrollLesson(lesson.id, lessonOutcomes(steps, answers));
+    if (standalone) standalone.onResult(r);
+    else {
+      setProgress((p) => recordLesson(p, lesson.id, r, new Date(), variant));
+      enrollLesson(lesson.id, lessonOutcomes(steps, answers));
+    }
     window.scrollTo({ top: 0 });
   };
   const again = () => {
@@ -66,6 +90,7 @@ export function LessonPlayer({ lesson, ctx, progress, setProgress, onExit, onNex
     setAnswers(emptyAnswers());
     setChecked({});
     setCommitted({});
+    setAsked({});
     setIdx(0);
     setResult(null);
     window.scrollTo({ top: 0 });
@@ -86,25 +111,41 @@ export function LessonPlayer({ lesson, ctx, progress, setProgress, onExit, onNex
     { id: 'debrief', label: 'Debrief', state: result ? 'now' : 'todo' },
   ];
 
+  // The figure in the drawer: this step's, or the last one still open.
+  const openFigure = dialState?.figures.find((f) => f.kind === 'metar') ?? dialState?.figures[0] ?? step.figure ?? shown.slice(0, idx + 1).filter((s) => s.figure).at(-1)?.figure;
+  const revealed = step.kind === 'turn' ? Boolean(checked[step.id]) : step.kind === 'decide' ? Boolean(committed[step.id]) : step.kind === 'dials' ? Boolean(answers.dialChecks?.[step.id]) : false;
+
   return (
     <>
       <div className="strip-head">
         <div className="strip-title">
           <div>
-            <h1><span className="lid">{lesson.id}</span> {lesson.title}</h1>
-            <span className="muted">Module {m.n}, {m.title}. Lesson {lessonNo} of {m.lessons.length}. {lesson.acs.join(', ')}.{variantCount(lesson) > 1 ? ` Situation ${variant + 1} of ${variantCount(lesson)}.` : ''}{ctx.practiceField ? ' Practice field, not a real airport.' : ''}</span>
+            <h1>{!standalone && <span className="lid">{lesson.id}</span>}{!standalone && ' '}{lesson.title}</h1>
+            <span className="muted">{standalone || !m ? standalone?.line ?? '' : `Module ${m.n}, ${m.title}. Lesson ${lessonNo} of ${m.lessons.length}.`} {lesson.acs.join(', ')}.{!standalone && variantCount(lesson) > 1 ? ` Situation ${variant + 1} of ${variantCount(lesson)}.` : ''}{ctx.practiceField && !standalone ? ' Practice field, not a real airport.' : ''}</span>
           </div>
-          <button type="button" className="btn quiet" onClick={onExit}>{result ? 'Back to course' : 'Leave lesson'}</button>
+          <button type="button" className="btn quiet" onClick={onExit}>{result ? standalone?.exitLabel ?? 'Back to course' : 'Leave lesson'}</button>
         </div>
         <Strip points={points} label="Steps of this lesson" />
       </div>
 
       {result ? (
-        <Debrief lesson={lesson} steps={shown} answers={answers} result={result} progress={progress} onAgain={again} onNext={onNext} onExit={onExit} />
+        <Debrief lesson={lesson} steps={shown} answers={answers} result={result} progress={progress} onAgain={again} onNext={onNext} onExit={onExit} exitLabel={standalone?.exitLabel} />
       ) : (
         <div className="lesson">
           <div className="scene">
-            <StepView
+            {step.kind === 'dials' && dialValues && dialState ? (
+              <DialsView
+                key={step.id}
+                step={step}
+                level={level}
+                values={dialValues}
+                state={dialState}
+                setValue={(id, v) => setAnswers((a) => ({ ...a, dials: { ...a.dials, [step.id]: { ...dialValues, [id]: v } } }))}
+                reset={() => setAnswers((a) => ({ ...a, dials: { ...a.dials, [step.id]: initialValues(step) } }))}
+                checked={answers.dialChecks?.[step.id] ?? null}
+                onCheck={() => setAnswers((a) => ({ ...a, dialChecks: { ...a.dialChecks, [step.id]: dialValues } }))}
+              />
+            ) : <StepView
               key={step.id}
               step={step}
               level={level}
@@ -114,6 +155,14 @@ export function LessonPlayer({ lesson, ctx, progress, setProgress, onExit, onNex
               onCheck={() => setChecked((c) => ({ ...c, [step.id]: true }))}
               committed={Boolean(committed[step.id])}
               onCommit={() => setCommitted((c) => ({ ...c, [step.id]: true }))}
+            />}
+            <AskInstructor
+              key={`ask-${step.id}`}
+              step={step}
+              context={askContext(lesson, step, ctx, answers, revealed, openFigure, steps)}
+              revealed={revealed}
+              thread={asked[step.id] ?? []}
+              onAnswer={(entry) => setAsked((a) => ({ ...a, [step.id]: [...(a[step.id] ?? []), entry] }))}
             />
             <div className="step-nav">
               {idx > 0 && <button type="button" className="btn quiet" onClick={() => go(idx - 1)}>Back</button>}
@@ -125,6 +174,9 @@ export function LessonPlayer({ lesson, ctx, progress, setProgress, onExit, onNex
           </div>
           <aside className="tool" aria-label="Figure for this step">
             {(() => {
+              if (dialState) {
+                return <>{dialState.figures.map((f, i) => <Figure key={`${f.kind}-${i}`} figure={f} practiceField={ctx.practiceField} />)}</>;
+              }
               // The drawer stays open: a step without its own figure keeps the last one.
               const prev = shown.slice(0, idx + 1).filter((s) => s.figure).at(-1);
               if (step.figure) return <Figure figure={step.figure} practiceField={ctx.practiceField} />;
@@ -215,6 +267,7 @@ export function StepView({ step, level, answers, setAnswers, checked, onCheck, c
       </section>
     );
   }
+  if (step.kind === 'dials') return null;
   const a = answers.decisions[step.id];
   const choice = a?.choice ?? null;
   const setChoice = (id: string) =>
@@ -251,7 +304,7 @@ export function StepView({ step, level, answers, setAnswers, checked, onCheck, c
   );
 }
 
-function Debrief({ lesson, steps, answers, result, progress, onAgain, onNext, onExit }: {
+function Debrief({ lesson, steps, answers, result, progress, onAgain, onNext, onExit, exitLabel }: {
   lesson: Lesson;
   steps: Step[];
   answers: LessonAnswers;
@@ -260,8 +313,10 @@ function Debrief({ lesson, steps, answers, result, progress, onAgain, onNext, on
   onAgain: () => void;
   onNext: (l: Lesson) => void;
   onExit: () => void;
+  /** Set for a standalone lesson: no next lesson, just this way out. */
+  exitLabel?: string;
 }) {
-  const next = nextLesson(progress);
+  const next = exitLabel ? null : nextLesson(progress);
   const decideSteps = steps.filter((s): s is Extract<Step, { kind: 'decide' }> => s.kind === 'decide');
   return (
     <div className="debrief-page">
@@ -309,6 +364,16 @@ function Debrief({ lesson, steps, answers, result, progress, onAgain, onNext, on
                 );
               }),
             )}
+            {steps.filter((s): s is Extract<Step, { kind: 'dials' }> => s.kind === 'dials' && Boolean(s.task)).map((s) => {
+              const set = answers.dialChecks?.[s.id];
+              const ok = set ? s.task!.check(set).right : false;
+              return (
+                <li key={`${s.id}-task`} className={ok ? 'right' : 'wrong'}>
+                  <span>{s.title}</span>
+                  <span className="mono">{set ? s.dials.map((d) => (d.format ? d.format(set[d.id]) : `${set[d.id]} ${d.unit}`)).join(', ') : 'not checked'}</span>
+                </li>
+              );
+            })}
           </ul>
         </section>
       )}
@@ -326,7 +391,7 @@ function Debrief({ lesson, steps, answers, result, progress, onAgain, onNext, on
         <span style={{ flex: 1 }} />
         {next && next.id !== lesson.id
           ? <button type="button" className="btn primary" onClick={() => onNext(next)}>Next lesson: {next.id} {next.title}</button>
-          : <button type="button" className="btn primary" onClick={onExit}>Back to course</button>}
+          : <button type="button" className="btn primary" onClick={onExit}>{exitLabel ?? 'Back to course'}</button>}
       </div>
     </div>
   );

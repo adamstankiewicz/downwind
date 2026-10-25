@@ -11,12 +11,13 @@ import { coachLevel, courseProgress, isDone, moduleProgress, nextLesson, toRefly
 import { GRADE_LABEL, Voice } from './common';
 import { Strip } from './Strip';
 
-export function CourseHome({ progress, airport, hasAircraft, onStart, onDaily, onSetup }: {
+export function CourseHome({ progress, airport, hasAircraft, onStart, onDaily, onRadio, onSetup }: {
   progress: CourseProgress;
   airport: Airport | null;
   hasAircraft: boolean;
   onStart: (lesson: Lesson) => void;
   onDaily: () => void;
+  onRadio: () => void;
   onSetup: () => void;
 }) {
   const next = nextLesson(progress);
@@ -56,6 +57,11 @@ export function CourseHome({ progress, airport, hasAircraft, onStart, onDaily, o
                   : 'Needs a home airport. Set one and the daily flight pulls its live weather.'}
               </span>
               <span className="t">{airport ? 'Daily' : 'Set up'}</span>
+            </button>
+            <button type="button" className="sess" onClick={onRadio}>
+              <b>Radio practice at the practice field</b>
+              <span className="d">Ground and Tower, typed: the ATIS, taxi, takeoff, the pattern and home again. Every flight is different, and every call is checked for who, where and what.</span>
+              <span className="t">Radio</span>
             </button>
             {refly.length > 0 && (
               <>

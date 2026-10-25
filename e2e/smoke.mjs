@@ -2,10 +2,12 @@
 //   npm run build && npx vite preview --port 4173 &
 //   node e2e/smoke.mjs [http://localhost:4173]
 // Weather and airport requests are stubbed, so it runs offline and exercises
-// both the live path and the practice-weather fallback. Covers onboarding,
+// both the live path and the practice-weather fallback. Ask the instructor is
+// stubbed too: on in the live runs, with no API key in the offline ones. Covers onboarding,
 // the course home, lessons 1.1 and 2.1 to 9.1 end to
-// end, the start of 2.2, the daily flight through filing, and every rail
-// screen, at desktop and phone widths.
+// end, 2.2 through its dials, the daily flight through filing, Trip and its
+// planning lesson, every rail screen, and a radio practice flight, at desktop
+// and phone widths.
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 
@@ -15,7 +17,20 @@ const { chromium } = createRequire(import.meta.url)('playwright');
 const BASE = process.argv[2] ?? 'http://localhost:4173';
 const METAR = 'METAR KPSM 241656Z 32008KT 10SM FEW045 16/02 A3008 RMK AO2';
 const TAF = 'TAF KPSM 241720Z 2418/2518 32010KT P6SM FEW050 FM250000 VRB03KT P6SM SKC';
-const AIRPORT = [{ icaoId: 'KPSM', name: 'PORTSMOUTH INTL AT PEASE', state: 'NH', elev: 30, magdec: '15W', runways: [{ id: '16/34', alignment: '160' }] }];
+const AIRPORT = [{ icaoId: 'KPSM', name: 'PORTSMOUTH INTL AT PEASE', state: 'NH', elev: 30, magdec: '15W', lat: 43.08, lon: -70.82, tower: 'T', runways: [{ id: '16/34', dimension: '11321x150', surface: 'A', alignment: '160' }] }];
+// Made-up fields around the home field for Trip: two that pass, one under the ceiling minimum, one with a short grass strip.
+const TRIP_FIELDS = [
+  { icaoId: 'KQAA', name: 'TESTVILLE/TESTVILLE MUNI', lat: 43.55, lon: -71.45, elev: 150, magdec: '15W', tower: null, runways: [{ id: '05/23', dimension: '4000x75', surface: 'A', alignment: 50 }], sky: 'FEW050' },
+  { icaoId: 'KQBB', name: 'SAMPLETON/SAMPLETON RGNL', lat: 42.6, lon: -71.6, elev: 90, magdec: '15W', tower: 'T', runways: [{ id: '14/32', dimension: '5000x100', surface: 'A', alignment: 140 }], sky: 'SCT060' },
+  { icaoId: 'KQCC', name: 'EXAMPLE/EXAMPLE FLD', lat: 43.0, lon: -71.9, elev: 200, magdec: '15W', tower: null, runways: [{ id: '18/36', dimension: '4500x75', surface: 'A', alignment: 180 }], sky: 'BKN015' },
+  { icaoId: 'KQDD', name: 'PLACEHOLDER/PLACEHOLDER STRIP', lat: 43.45, lon: -70.95, elev: 120, magdec: '15W', tower: null, runways: [{ id: '09/27', dimension: '1900x80', surface: 'T', alignment: 90 }], sky: 'CLR' },
+];
+const p2 = (n) => String(n).padStart(2, '0');
+/** A winds aloft bulletin valid three hours from now, so it covers the default departure. */
+function windsAloft() {
+  const v = new Date(Date.now() + 3 * 3_600_000);
+  return [`VALID ${p2(v.getUTCDate())}${p2(v.getUTCHours())}00Z   FOR USE 0000-2400Z. TEMPS NEG ABV 24000`, '', 'FT  3000    6000    9000', 'PSM 2715 2722+05 2830-01'].join('\n');
+}
 
 const HANDBOOK = readFileSync(new URL('./fixtures/handbook.pdf', import.meta.url));
 
@@ -36,17 +51,37 @@ async function open(viewport, live) {
   await page.route('**/api/awc/**', (r) => {
     if (!live) return r.fulfill({ status: 500, body: 'down' });
     const u = new URL(r.request().url());
+    const json = (v) => r.fulfill({ contentType: 'application/json', body: JSON.stringify(v) });
+    const area = u.searchParams.has('bbox');
+    if (u.pathname.endsWith('/metar') && area) {
+      return json([{ icaoId: 'KPSM', rawOb: METAR }, ...TRIP_FIELDS.map((f) => ({ icaoId: f.icaoId, rawOb: `METAR ${f.icaoId} 241656Z 30008KT 10SM ${f.sky} 15/03 A3008 RMK AO2` }))]);
+    }
+    if (u.pathname.endsWith('/taf') && area) return json([{ icaoId: 'KPSM', rawTAF: TAF }]);
+    if (u.pathname.endsWith('/stationinfo')) return json([{ icaoId: 'KPSM', lat: 43.08, lon: -70.82 }, ...TRIP_FIELDS.map((f) => ({ icaoId: f.icaoId, lat: f.lat, lon: f.lon }))]);
+    if (u.pathname.endsWith('/windtemp')) return r.fulfill({ body: windsAloft() });
     if (u.pathname.endsWith('/metar')) return r.fulfill({ body: METAR });
     if (u.pathname.endsWith('/taf')) return r.fulfill({ body: TAF });
-    if (u.pathname.endsWith('/airport')) return r.fulfill({ contentType: 'application/json', body: JSON.stringify(AIRPORT) });
+    if (u.pathname.endsWith('/airport')) {
+      const ids = (u.searchParams.get('ids') ?? '').split(',');
+      return json([...AIRPORT, ...TRIP_FIELDS].filter((a) => ids.includes(a.icaoId)));
+    }
     return r.fulfill({ status: 404, body: '' });
   });
-  return { browser, page, errors };
+  // Ask the instructor: the worker has a key in live runs and none offline.
+  const asks = [];
+  await page.route('**/api/ask', async (r) => {
+    if (r.request().method() === 'GET') return r.fulfill({ contentType: 'application/json', body: JSON.stringify({ available: live }) });
+    if (!live) return r.fulfill({ status: 503, contentType: 'application/json', body: '{}' });
+    asks.push(JSON.parse(r.request().postData() ?? '{}'));
+    await new Promise((done) => setTimeout(done, 150));
+    return r.fulfill({ contentType: 'application/json', body: JSON.stringify({ answer: 'Count back to the **third most recent** takeoff and landing.', refs: ['14 CFR 61.57(a)', 'Not a real source'] }) });
+  });
+  return { browser, page, errors, asks };
 }
 
 async function run(viewport, live) {
   const label = `[${viewport.width}px ${live ? 'live' : 'offline'}]`;
-  const { browser, page, errors } = await open(viewport, live);
+  const { browser, page, errors, asks } = await open(viewport, live);
   const noHScroll = async (where) => {
     const w = await page.evaluate(() => document.documentElement.scrollWidth);
     check(w <= viewport.width, `${label} no horizontal scroll on ${where} (${w}px)`);
@@ -95,6 +130,20 @@ async function run(viewport, live) {
   check((await page.locator('.records.logbook').count()) === 1 && /made-up logbook page/.test(await main()), `${label} 1.1 shows the logbook page, labeled made up`);
   await noHScroll('lesson 1.1 brief');
   check(/Situation 1 of \d/.test(await main()), `${label} first flight of 1.1 is its first situation`);
+  const askRegion = page.getByRole('region', { name: 'Ask the instructor' });
+  if (live) {
+    await btn('Ask the instructor').click();
+    await page.getByLabel('Your question').fill('Which landings count for this?');
+    await askRegion.getByRole('button', { name: 'Ask', exact: true }).click();
+    await askRegion.getByText(/third most recent/).waitFor();
+    const askText = await askRegion.innerText();
+    check(/61\.57/.test(askText) && !/Not a real source/.test(askText), `${label} 1.1 instructor answers with only refs that resolve`);
+    check(asks.length === 1 && asks[0].context?.lesson?.id === '1.1' && asks[0].question === 'Which landings count for this?', `${label} ask sends the lesson and the typed question`);
+    await noHScroll('lesson 1.1 ask');
+  } else {
+    await page.waitForTimeout(200);
+    check(await btn('Ask the instructor').count() === 0 && await askRegion.count() === 0, `${label} Ask the instructor hidden without a key`);
+  }
   await btn('Continue').click();
   await page.getByRole('heading', { name: 'Day currency, worked' }).waitFor();
   check(/Third most recent/.test(await main()), `${label} 1.1 worked example counts back to the third landing`);
@@ -108,6 +157,14 @@ async function run(viewport, live) {
   check((body.match(/Right\./g) ?? []).length === 3 && /40 minutes after sunset/.test(body), `${label} 1.1 turn checks all three answers right`);
   await btn('Continue').click();
   await page.getByRole('heading', { name: /^The plan for / }).waitFor();
+  if (live) {
+    await btn('Ask the instructor').click();
+    await page.getByLabel('Your question').fill('What should I weigh here?');
+    await page.getByLabel('Your question').press('Enter');
+    await page.getByRole('region', { name: 'Ask the instructor' }).getByText(/third most recent/).waitFor();
+    const before = JSON.stringify(asks.at(-1)?.context ?? {});
+    check(asks.length === 2 && asks[1].context?.step?.kind === 'decide' && !/"grade"|"bestCalls"|"consequence"/.test(before), `${label} ask before commit sends no grades or best call`);
+  }
   await page.getByRole('button', { name: /Leave 45 minutes earlier/ }).click();
   await btn('Commit').click();
   check(/Best call/.test(await main()) && /day currency covers it/i.test(await main()), `${label} 1.1 decision graded with its consequence`);
@@ -188,6 +245,40 @@ async function run(viewport, live) {
   check(/variation/i.test(await main()), `${label} lesson 2.2 starts with the two-norths brief`);
   await btn('Continue').click();
   check((await page.locator('svg[aria-label*="Runway"]').count()) > 0, `${label} 2.2 worked example shows the wind diagram`);
+
+  // Dials: through the turn, then turn the wind and watch the engine follow.
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'Your turn', exact: true }).waitFor();
+  for (const input of await page.locator('.blanks input').all()) await input.fill('1');
+  await btn('Check my numbers').click();
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'Turn the wind' }).waitFor();
+  check((await page.locator('input[type=range]').count()) === 3, `${label} 2.2 dials step shows wind direction, speed and gust dials`);
+  check(await btn('Continue').isDisabled(), `${label} dials step waits for the find-it check`);
+  check(/How the engine grades it right now/.test(await main()) && (await page.locator('.verdict .gradechip').count()) === 4, `${label} dials show live grades for the four choices`);
+  check((await page.locator('aside svg[aria-label*="Runway"]').count()) > 0 && /as you have turned it|written for this lesson/.test(await main()), `${label} dials step shows the live wind figure and report`);
+  const runwayBefore = await page.locator('.readouts > div').filter({ hasText: 'Best runway' }).locator('dd').innerText();
+  const dir = page.getByLabel(/Wind from, true/);
+  const dirStart = Number(await dir.inputValue());
+  await dir.focus();
+  for (let i = 0; i < 18; i++) await page.keyboard.press(dirStart > 180 ? 'ArrowLeft' : 'ArrowRight');
+  const runwayAfter = await page.locator('.readouts > div').filter({ hasText: 'Best runway' }).locator('dd').innerText();
+  body = await main();
+  check(runwayAfter !== runwayBefore && /favors runway/.test(body), `${label} turning the wind 180 degrees flips the runway and says so (${runwayBefore} to ${runwayAfter})`);
+  check(/as you have turned it/.test(body), `${label} turned report is labeled as turned`);
+  await btn("Back to the lesson's numbers").click();
+  check(Number(await dir.inputValue()) === dirStart, `${label} reset puts the dials back on the lesson's numbers`);
+  const gust = page.getByLabel(/Gusts to/);
+  await gust.focus();
+  await page.keyboard.press('Home');
+  check(/no gust/.test(await main()), `${label} gust dial at zero reads no gust`);
+  await btn('Check this setting').click();
+  body = await main();
+  check(/Right\.|Not quite\./.test(body) && /across/.test(body), `${label} the engine checks the dial setting and explains it`);
+  check(await btn('Continue').isEnabled(), `${label} dials step can continue after the check`);
+  await noHScroll('lesson 2.2 dials');
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: /Holding short of/ }).waitFor();
   await btn('Leave lesson').click();
   await page.getByRole('heading', { name: 'Ground school', exact: true }).waitFor();
   body = await main();
@@ -484,6 +575,49 @@ async function run(viewport, live) {
   check(/Ask your CFI/.test(body), `${label} summary says what to ask the CFI`);
   await noHScroll('logbook');
 
+  // Trip: recommendations from the home field, then the planning lesson end to end.
+  await rail('Trip').click();
+  await page.getByRole('heading', { name: /^Trips from/ }).waitFor();
+  await btn('Plan this trip').first().waitFor();
+  body = await main();
+  if (live) {
+    check(/Trips from KPSM/.test(body) && /KQAA/.test(body) && /KQBB/.test(body), `${label} trip ranks the live fields that pass`);
+    check(/Left out/.test(body) && /KQCC/.test(body) && /Ceiling under your minimum/.test(body) && /KQDD/.test(body) && /Runway under your minimum/.test(body), `${label} trip says what it left out and why`);
+  } else {
+    check(/Live weather unavailable/.test(body) && /Trips from KXYZ/.test(body), `${label} trip falls back to the practice chart when live data is down`);
+  }
+  check(/A training plan, not a briefing/.test(body) && /NOTAMs and TFRs/.test(body), `${label} trip says it is not a briefing`);
+  check((await page.locator('svg.tripmap').count()) === 1, `${label} trip draws the plan view`);
+  await noHScroll('trip');
+  await btn('Plan this trip').first().click();
+  await btn('Continue').waitFor();
+  check(/ to K\w+, \d+ nm/.test(await main()), `${label} trip lesson opens on the chosen route`);
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'The leg out' }).waitFor();
+  check(/Magnetic heading/.test(await main()) && (await page.locator('.navlog').count()) > 0, `${label} trip lesson works the leg out in a nav log`);
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'The leg home' }).waitFor();
+  for (const input of await page.locator('.blanks input').all()) await input.fill('1');
+  await btn('Check my numbers').click();
+  check(/Not quite/.test(await main()), `${label} trip lesson checks the leg home against the engine`);
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'Fuel and daylight' }).waitFor();
+  for (const input of await page.locator('.blanks input').all()) await input.fill('1');
+  await btn('Check my numbers').click();
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'The forecast moves' }).waitFor();
+  check(/amends/.test(await main()) && (await page.locator('svg.tripmap').count()) > 0, `${label} trip diversion shows the amended forecast and the map`);
+  await page.locator('button.choice', { hasText: 'Press on' }).click();
+  await btn('Commit').click();
+  check(/Marginal|Unsafe/.test(await page.locator('button.choice', { hasText: 'Press on' }).innerText()), `${label} pressing on under your minimum is not graded best`);
+  await noHScroll('trip diversion');
+  await btn('Debrief').click();
+  await page.getByRole('heading', { name: 'Debrief', exact: true }).waitFor();
+  const trips = await page.evaluate(() => JSON.parse(localStorage.getItem('downwind.trip.history.v1') ?? '[]'));
+  check(trips.length === 1, `${label} planned trip kept for variety`);
+  await page.getByRole('button', { name: 'Back to trips', exact: true }).first().click();
+  await page.getByRole('heading', { name: /^Trips from/ }).waitFor();
+
   // Tools
   await rail('Tools').click();
   check(await page.locator('svg').filter({ hasText: /lb|in/ }).first().isVisible(), `${label} airplane tool shows the CG chart`);
@@ -610,7 +744,93 @@ async function runSkip() {
   await browser.close();
 }
 
+// Radio practice, a whole flight: the ATIS copy pad, initial calls that leave
+// things out (so the controller's correction shows), readbacks that echo the
+// controller, the decisions, and the debrief. Flights are random, so the loop
+// reads each step from the page.
+async function runRadio(viewport) {
+  const label = `[radio ${viewport.width}px]`;
+  const { browser, page, errors } = await open(viewport, false);
+  const btn = (name) => page.getByRole('button', { name, exact: true });
+  const main = () => page.locator('main').innerText();
+  const noHScroll = async (where) => {
+    const w = await page.evaluate(() => document.documentElement.scrollWidth);
+    check(w <= viewport.width, `${label} no horizontal scroll on ${where} (${w}px)`);
+  };
+  await page.goto(BASE);
+  await btn('Skip setup for now').click();
+  await page.getByRole('heading', { name: 'Ground school', exact: true }).waitFor();
+  await page.getByRole('button', { name: /Radio practice at the practice field/ }).click();
+  await page.getByRole('heading', { name: 'Radio practice', exact: true }).waitFor();
+  let body = await main();
+  check(/not a real airport/i.test(body) && /52XY/.test(body), `${label} radio home says practice field and practice tail`);
+  check(!/KASH|Nashua|KPSM/.test(body), `${label} radio home assumes no real airport`);
+  check((await page.getByRole('button', { name: /microphone|speak|record/i }).count()) === 0, `${label} no microphone control`);
+  await noHScroll('radio home');
+  await page.getByRole('button', { name: /Pattern work/ }).first().click();
+
+  let fixes = 0;
+  let echoes = 0;
+  let echoClean = 0;
+  let steps = 0;
+  let noLeak = true;
+  for (; steps < 40; steps++) {
+    if (await page.getByRole('heading', { name: 'Debrief', exact: true }).isVisible()) break;
+    const call = page.getByLabel('Your call');
+    if (await btn('Check my copy').isVisible()) {
+      await page.getByLabel('Information', { exact: true }).fill('Delta');
+      await page.getByLabel('Wind', { exact: true }).fill('240 at 8');
+      await page.getByLabel('Altimeter', { exact: true }).fill('29.92');
+      await btn('24').click();
+      await btn('Check my copy').click();
+      if (steps === 0) await noHScroll('ATIS');
+    } else if (await call.isVisible()) {
+      noLeak &&= !(await page.locator('.gradechip').count());
+      const atc = page.locator('.tape > .xmit.atc .say').first();
+      if (await atc.count()) {
+        const said = (await atc.innerText()).replace(/^November 2XY,\s*/, '').replace(/\.$/, '');
+        await call.fill(`${said}, November 2XY`);
+        await btn('Transmit').click();
+        echoes++;
+        if (!(await call.isVisible())) echoClean++;
+      } else {
+        await call.fill('November 52XY');
+        await call.press('Enter');
+        if (await call.isVisible()) {
+          fixes++;
+          if (fixes === 1) await noHScroll('controller correction');
+          await call.fill('November 52XY');
+          await btn('Transmit').click();
+        }
+      }
+      check(await page.getByText('A good call').first().isVisible(), `${label} step ${steps}: a good call shown after transmitting`);
+    } else if (await btn('Commit').isVisible()) {
+      await page.locator('.choices .choice').first().click();
+      await btn('Commit').click();
+    }
+    const next = (await btn('Debrief').isVisible()) ? btn('Debrief') : btn('Continue');
+    await next.click();
+  }
+  check(steps > 8, `${label} a pattern flight has more than eight steps (${steps})`);
+  check(fixes > 0, `${label} an incomplete call gets the controller's correction (${fixes})`);
+  check(echoes > 3 && echoClean === echoes, `${label} reading back the controller's words is accepted every time (${echoClean} of ${echoes})`);
+  check(noLeak, `${label} no grade shown before a call is transmitted`);
+  await page.getByRole('heading', { name: 'Debrief', exact: true }).waitFor();
+  body = await main();
+  check(/AIM 4-3-18/.test(body) && /PA\.III\.A/.test(body), `${label} debrief cites the AIM and the ACS`);
+  const log = await page.evaluate(() => JSON.parse(localStorage.getItem('downwind.radio.v1') ?? '[]'));
+  check(log.length === 1 && log[0].mission === 'pattern', `${label} flight recorded in the radio log`);
+  await noHScroll('radio debrief');
+  await btn('New flight').click();
+  check(await btn('Check my copy').isVisible(), `${label} a new flight starts at the ATIS`);
+  check(errors.length === 0, `${label} no console or page errors${errors.length ? ': ' + errors.join(' | ') : ''}`);
+  await browser.close();
+}
+
 try { await runSkip(); } catch (e) { check(false, `[skip setup] crashed: ${e.message.split('\n')[0]}`); }
+for (const vp of [{ width: 1280, height: 860 }, { width: 390, height: 844 }]) {
+  try { await runRadio(vp); } catch (e) { check(false, `[radio ${vp.width}px] crashed: ${e.message.split('\n')[0]}`); }
+}
 for (const vp of [{ width: 1280, height: 860 }, { width: 390, height: 844 }]) {
   for (const live of [true, false]) {
     try { await run(vp, live); } catch (e) { check(false, `[${vp.width}px ${live ? 'live' : 'offline'}] crashed: ${e.message.split('\n')[0]}`); }

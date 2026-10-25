@@ -16,7 +16,9 @@ import { ProfileFigure } from './ProfileFigure';
 import { SectionalChart } from './SectionalChart';
 import { CarbIceFigure, ElectricalFigure, PanelFigure } from './SystemsFigures';
 import { TafTimeline } from './TafTimeline';
+import { TripMap } from './TripMap';
 import { WindDiagram } from './WindDiagram';
+import { SkyFigure } from './SkyFigure';
 
 const fmt = (n: number) => n.toLocaleString('en-US');
 const pad3 = (n: number) => String(Math.round(norm(n))).padStart(3, '0');
@@ -28,7 +30,7 @@ export function Figure({ figure, practiceField }: { figure: FigureModel; practic
     return (
       <figure className="fig">
         <RawReport raw={figure.raw} label={`${special ? 'SPECI' : 'METAR'} ${station}`} marks={figure.marks} />
-        <figcaption>Practice weather written for this lesson{practiceField ? ', at a practice field that is not a real airport' : ''}.{figure.marks?.length ? ' Underlined groups are the ones this step is about.' : ''}</figcaption>
+        <figcaption>{figure.turned ? 'Practice weather as you have turned it, written as a report' : 'Practice weather written for this lesson'}{practiceField ? ', at a practice field that is not a real airport' : ''}.{figure.marks?.length ? ' Underlined groups are the ones this step is about.' : ''}</figcaption>
       </figure>
     );
   }
@@ -93,6 +95,16 @@ export function Figure({ figure, practiceField }: { figure: FigureModel; practic
       </figure>
     );
   }
+  if (figure.kind === 'tripMap') {
+    return (
+      <figure className="fig">
+        <TripMap home={figure.home} points={figure.points} ringsNm={figure.ringsNm} route={figure.route} marker={figure.marker} label={`Plan view around ${figure.home.id}`} />
+        <figcaption>
+          Plan view from {figure.home.id}, true north up, to scale. Schematic: no terrain, airspace or obstacles, and not for navigation.{figure.practice ? ' Practice fields on a made-up chart.' : ' Plan the route on a current sectional.'}
+        </figcaption>
+      </figure>
+    );
+  }
   if (figure.kind === 'records') {
     return (
       <figure className="fig">
@@ -139,6 +151,18 @@ export function Figure({ figure, practiceField }: { figure: FigureModel; practic
         <figcaption>
           The loaded point is where the airplane sits now; the dashed line runs to the zero-fuel point, where the CG goes as fuel burns. Above the red line is over max gross.{' '}
           {figure.practice ? 'The practice trainer is a made-up airplane with sample numbers.' : figure.sample ? 'Sample numbers from the template. Use your own weight and balance record.' : 'From your airplane’s weight and balance record.'}
+        </figcaption>
+      </figure>
+    );
+  }
+  if (figure.kind === 'sky') {
+    return (
+      <figure className="fig">
+        <div className="fig-sky">
+          <SkyFigure ceilingFtAgl={figure.ceilingFtAgl} visibilitySm={figure.visibilitySm} patternFtAgl={figure.patternFtAgl} legalCeilingFt={figure.legalCeilingFt} personalCeilingFt={figure.personalCeilingFt} />
+        </div>
+        <figcaption>
+          {figure.airport.icao} from the side, heights above the field. The shaded band under the cloud is the 500 ft a pattern keeps clear of it{figure.legalCeilingFt !== null ? `; the legal line is the ${fmt(figure.legalCeilingFt)} ft surface-area minimum` : ''}, and yours is the ceiling you set. A sketch, not to horizontal scale.
         </figcaption>
       </figure>
     );

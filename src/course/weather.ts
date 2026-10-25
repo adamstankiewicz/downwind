@@ -10,6 +10,7 @@ import { trueToMagnetic, components, norm } from '../lib/wind';
 import {
   addHours, cloud, gustForCrosswind, nextLocalHour, mainRunway, metarText, observedAt, wholeHourAfter, windAcross, windGroup, zDayHour, zTime,
 } from './practice';
+import { ceilingDials, windDials } from './dials';
 import type { Lesson, LessonContext, Option, Step } from './types';
 
 const fmt = (n: number) => Math.round(n).toLocaleString('en-US');
@@ -263,6 +264,14 @@ const windOnRunway: Lesson = {
           { id: 'xwg', label: 'Crosswind, in gusts', unit: 'kt', answer: Math.round(gustX), tolerance: 2,
             explain: `The same angle at ${gust} knots is about ${Math.round(gustX)} knots across. Plan for the gust, not the average.` },
         ],
+      },
+      {
+        kind: 'dials', id: 'w1', title: 'Turn the wind',
+        say: {
+          full: `This is the same report, and now the wind is yours to turn. Swing the direction, raise the gusts, and watch three things: which runway the wind favors, where the crosswind crosses your ${ctx.minimums.crosswindKt} knot line, and how the call changes. Every number here is worked out the same way you just did by hand.`,
+          short: `Same report. Turn it and watch where your ${ctx.minimums.crosswindKt} knot line falls.`,
+        },
+        ...windDials(ctx, { dirTrue: windTrue, speedKt: steady, gustKt: gust }),
       },
       v === 1
         ? decision('d1', `Holding short of ${rw.runway.id}`,
@@ -551,6 +560,14 @@ const ceilings: Lesson = {
           { label: 'Yours', value: `${fmt(ctx.minimums.ceilingFt)} ft`, note: ceiling >= ctx.minimums.ceilingFt ? 'Met' : 'Not met' },
           { label: 'Today', value: `${fmt(ceiling)} ft` },
         ],
+      },
+      {
+        kind: 'dials', id: 'w1', title: 'Turn the sky',
+        say: {
+          full: `Now move the cloud. Bring the ceiling down and watch the three lines go by: your own ${fmt(ctx.minimums.ceilingFt)}, then about 1,500 where the pattern runs out of room${f.airspace === 'G' ? '' : ', then the legal 1,000, where the choice stops being yours'}. Take the visibility down too, and see which one decides first.`,
+          short: 'Bring the ceiling down and watch which line goes first.',
+        },
+        ...ceilingDials(ctx, { ceilingFt: ceiling, visSm: 8 }),
       },
       v === 1
         ? decision('d1', 'Pattern work or not?',

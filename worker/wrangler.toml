@@ -1,3 +1,10 @@
 name = "downwind-api"
 main = "index.ts"
 compatibility_date = "2025-06-01"
+
+# Ask the instructor: at most 6 questions a minute from one address.
+# The API key is a secret: `npx wrangler secret put ANTHROPIC_API_KEY`.
+[[ratelimits]]
+name = "ASK_LIMIT"
+namespace_id = "1001"
+simple = { limit = 6, period = 60 }

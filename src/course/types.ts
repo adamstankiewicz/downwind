@@ -9,7 +9,7 @@
 import type { Airport } from '../data/airports';
 import type { AircraftProfile } from '../data/aircraft';
 import type { PersonalMinimums } from '../data/pilot';
-import type { Brief, Grade } from '../scenarios/goNoGo';
+import type { Brief, Grade, Severity } from '../scenarios/goNoGo';
 import type { LatLon, NavLog } from '../lib/nav';
 import type { Performance } from '../lib/perf';
 import type { CarbIceRisk, InstrumentId, PowerSource } from '../lib/systems';
@@ -41,7 +41,7 @@ export interface Coach {
 }
 
 export type Figure =
-  | { kind: 'metar'; raw: string; /** Tokens to underline in the raw report. */ marks?: string[] }
+  | { kind: 'metar'; raw: string; /** Tokens to underline in the raw report. */ marks?: string[]; /** Set by dials: the report as the pilot has turned it. */ turned?: boolean }
   | { kind: 'taf'; raw: string; departure: Date; returnAt: Date }
   | { kind: 'wind'; airport: Airport; windMag: number; speedKt: number; gustKt: number | null; runwayId: string }
   /**
@@ -79,7 +79,27 @@ export type Figure =
    * in the airplane, maintenance entries or a squawk list. `focus` rows are the
    * ones the step is about. Cells are plain text; the caption says it is made up.
    */
-  | { kind: 'records'; variant: RecordsVariant; title: string; columns: RecordColumn[]; rows: RecordRow[]; caption: string };
+  | { kind: 'records'; variant: RecordsVariant; title: string; columns: RecordColumn[]; rows: RecordRow[]; caption: string }
+  /**
+   * The field from the side: the pattern at its height, the cloud base, the
+   * 500 ft the pattern keeps below it, and the legal and personal lines.
+   */
+  | { kind: 'sky'; airport: Airport; ceilingFtAgl: number | null; visibilitySm: number; patternFtAgl: number; legalCeilingFt: number | null; personalCeilingFt: number }
+  /**
+   * A schematic plan view around the pilot's home field for Trip: range
+   * rings, the fields in play and, for a diversion, the airplane. North up,
+   * drawn to scale, never a chart. `practice` says the fields are made up.
+   */
+  | { kind: 'tripMap'; practice: boolean; variationDeg: number; home: MapPoint; points: MapPoint[]; ringsNm: number[]; route?: [string, string]; marker?: LatLon };
+
+export interface MapPoint {
+  id: string;
+  label: string;
+  /** A short second line: distance, or why a field was left out. */
+  sub?: string;
+  pos: LatLon;
+  role: 'home' | 'pick' | 'filtered' | 'dest' | 'alternate';
+}
 
 export interface ElectricalLoad {
   id: string;
@@ -157,10 +177,73 @@ export interface Condition {
   choices: OptionId[];
 }
 
+/**
+ * A dial on a lesson figure. Turning it re-runs the engine (`evaluate` on the
+ * step), so every number, line and grade on screen follows it.
+ */
+export interface Dial {
+  id: string;
+  label: string;
+  unit: string;
+  min: number;
+  max: number;
+  step: number;
+  /** Where it starts: the lesson's own conditions. */
+  initial: number;
+  /** Lines drawn across the track: a legal limit, the airplane's, the pilot's own. */
+  marks?: DialMark[];
+  /** How the value reads; defaults to the number with its unit. */
+  format?: (value: number) => string;
+}
+
+export interface DialMark {
+  at: number;
+  label: string;
+  kind: 'legal' | 'airplane' | 'personal';
+}
+
+export type DialValues = Record<string, number>;
+
+export interface DialReadout {
+  id: string;
+  label: string;
+  value: string;
+  /** `over` when this number is past a line that matters. */
+  tone?: 'over' | 'near';
+}
+
+/** A line the dials have crossed, in the instructor's words. */
+export interface DialLine {
+  id: string;
+  severity: Severity;
+  title: string;
+  say: string;
+}
+
+export interface DialState {
+  /** The figure as the dials have set it. */
+  figures: Figure[];
+  readouts: DialReadout[];
+  /** Lines crossed at this setting, most serious first. Empty when nothing binds. */
+  lines: DialLine[];
+  /** What the instructor says when no line is crossed. */
+  clear: string;
+  /** How the engine grades each choice at this setting. */
+  verdict: { options: Option[]; grades: Record<OptionId, Grade> };
+}
+
+/** A question answered by setting the dials, checked by the engine. */
+export interface DialTask {
+  prompt: string;
+  check(values: DialValues): { right: boolean; explain: string };
+}
+
 export type Step =
   | { kind: 'brief'; id: string; title: string; scene?: string; say: Coach; figure?: Figure; showIf?: Condition }
   | { kind: 'example'; id: string; title: string; say: Coach; figure?: Figure; work: WorkRow[]; showIf?: Condition }
   | { kind: 'turn'; id: string; title: string; prompt: string; figure?: Figure; blanks: Blank[]; showIf?: Condition }
+  /** Dials on the figure: the pilot turns the conditions and the lesson recomputes live. */
+  | { kind: 'dials'; id: string; title: string; say: Coach; dials: Dial[]; evaluate(values: DialValues): DialState; task?: DialTask; figure?: undefined; showIf?: Condition }
   | {
       kind: 'decide';
       id: string;
