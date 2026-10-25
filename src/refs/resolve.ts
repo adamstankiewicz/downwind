@@ -59,6 +59,13 @@ const PASSAGES: Record<string, RefLink[]> = {
   'PHAK, wind triangle': [doc('PHAK, wind triangle', 'phak-16', PHAK_WIND_TRIANGLE)],
   'PHAK, flight diversion': [doc('PHAK, flight diversion', 'phak-16', PHAK_DIVERSION)],
   'PHAK, lost procedures': [doc('PHAK, lost procedures', 'phak-16', PHAK_LOST)],
+  'PHAK, hazardous attitudes': [doc('PHAK, hazardous attitudes', 'phak-2', ['Hazardous Attitudes and Antidotes', 'Hazardous Attitudes'])],
+  'PHAK, the PAVE checklist': [doc('PHAK, the PAVE checklist', 'phak-2', ['The PAVE Checklist', 'PAVE Checklist'])],
+  'PHAK, operational pitfalls': [doc('PHAK, operational pitfalls', 'phak-2', ['Operational Pitfalls'])],
+  'PHAK, hypoxia': [doc('PHAK, hypoxia', 'phak-17', ['Hypoxia'])],
+  'PHAK, fatigue': [doc('PHAK, fatigue', 'phak-17', ['Fatigue'])],
+  'PHAK, drugs': [doc('PHAK, drugs and dosing intervals', 'phak-17', ['maximal dosing', 'Drugs'])],
+  'PHAK, night vision': [doc('PHAK, night vision', 'phak-17', ['Night Vision'])],
 };
 
 /** Every handbook passage the course cites, for the live check against the FAA files. */
