@@ -40,12 +40,14 @@ export function shuffled<T>(items: readonly T[], seed: number): T[] {
 export const variantCount = (lesson: Lesson) => Math.max(1, lesson.variants ?? 1);
 
 /**
- * The situation for the next flight of a lesson: the first one not yet seen,
- * in an order shuffled per pilot by `seed`, then round again once all are seen.
+ * The situation for the next flight of a lesson. The first flight is always
+ * situation 0, the one the lesson's brief is written around; after that, the
+ * first one not yet seen, in an order shuffled by `seed`, then round again
+ * once all are seen.
  */
 export function nextVariant(lesson: Lesson, record: LessonRecord | undefined, seed: number): number {
   const n = variantCount(lesson);
-  if (n === 1) return 0;
+  if (n === 1 || !record?.seen?.length) return 0;
   const order = shuffled([...Array(n).keys()], hash(lesson.id) ^ seed);
   const seen = record?.seen ?? [];
   // Seen lists only grow, so count from the last full round.

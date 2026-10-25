@@ -94,6 +94,7 @@ async function run(viewport, live) {
   await page.getByRole('heading', { name: 'A friend wants to come along' }).waitFor();
   check((await page.locator('.records.logbook').count()) === 1 && /made-up logbook page/.test(await main()), `${label} 1.1 shows the logbook page, labeled made up`);
   await noHScroll('lesson 1.1 brief');
+  check(/Situation 1 of \d/.test(await main()), `${label} first flight of 1.1 is its first situation`);
   await btn('Continue').click();
   await page.getByRole('heading', { name: 'Day currency, worked' }).waitFor();
   check(/Third most recent/.test(await main()), `${label} 1.1 worked example counts back to the third landing`);

@@ -45,6 +45,7 @@ describe('seeded variety', () => {
     }
     expect(new Set(flown.slice(0, 4)).size).toBe(4);
     expect(new Set(flown.slice(4)).size).toBe(4);
+    expect(flown[0]).toBe(0);
     expect(nextVariant(fake(1), undefined, 99)).toBe(0);
   });
 
