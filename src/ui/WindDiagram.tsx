@@ -73,7 +73,7 @@ export function WindDiagram({ airport, wind, rw }: { airport: Airport; wind: Win
         // The runway number sits at the threshold you land toward when flying its heading.
         const [x, y] = pt(e.headingMag + 180, half + 13);
         return (
-          <text key={e.id} x={x} y={y + 4} textAnchor="middle" fontFamily="var(--display)" fontWeight="800" fontStretch="75%" fontSize="13" fill="var(--ink)">
+          <text key={e.id} x={x} y={y + 4} textAnchor="middle" fontFamily="var(--display)" fontWeight="800" fontStretch="75%" fontSize="13" fill={rw && e.id === rw.runway.id && ends.length > 1 ? 'var(--sock-ink)' : 'var(--ink)'}>
             {e.id}
           </text>
         );

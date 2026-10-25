@@ -24,6 +24,14 @@ in the pilot's words, minutes, ACS task codes, references, and
    (`land-ahead`, `turn-back`, `climb`, `divert`). Weather decisions use
    `go`, `go-plan`, `delay` and `cancel`.
 
+5. **dials** (optional): the lesson's conditions as controls. Build one with
+   a builder from `course/dials.ts` (`windDials`, `ceilingDials`,
+   `takeoffDials`) or write your own: `dials` to turn, `evaluate(values)`
+   that re-runs the engine and returns the figures, readouts, crossed lines
+   and live grades, and a `task` the pilot answers by setting the dials,
+   checked by the engine and scored like a blank. Lines are written once
+   and only interpolate engine values. See 2.2, 2.4 and 3.3.
+
 Lessons can branch with `showIf`. For example, the in-flight step in 2.5
 only shows if the pilot went.
 
@@ -67,8 +75,10 @@ only shows if the pilot went.
 
 Set these on a step's `figure`: `metar`, `taf`, `wind`, `chart` (the
 practice sectional with a route, highlights, a focus and an airplane
-marker), `perf` (a POH-style chart with the reading marked), `navlog` and
-`glide`.
+marker), `perf` (a POH-style chart with the reading marked), `navlog`,
+`glide` and `sky` (the field from the side: ceiling, pattern, legal and
+personal lines). A dials step has no fixed figure; its `evaluate` returns
+the figures for the current setting.
 
 ## Finishing a module
 
