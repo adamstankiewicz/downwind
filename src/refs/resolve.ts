@@ -22,6 +22,11 @@ const AFH_XW_TAKEOFF = ['Crosswind Takeoff'];
 const PHAK_DOCS = ['Aircraft Documents', 'Certificate of Aircraft Registration'];
 const PHAK_INSPECTIONS = ['Aircraft Inspections', 'Annual Inspection'];
 const PHAK_INOP = ['Operations With Inoperative Equipment', 'Inoperative Equipment'];
+const AWH_FB = ['Winds and Temperatures Aloft Forecast', 'Winds and Temperatures Aloft'];
+const PHAK_FLIGHT_PLANNING = ['Charting the Course', 'Flight Planning'];
+const PHAK_WIND_TRIANGLE = ['The Wind Triangle or Vector Analysis', 'Wind Triangle'];
+const PHAK_DIVERSION = ['Flight Diversion', 'Diversion'];
+const PHAK_LOST = ['Lost Procedures'];
 
 // Handbook passages, by the exact label used in content. A unit test checks
 // that every label in the course resolves, so a new label without an entry
@@ -49,6 +54,11 @@ const PASSAGES: Record<string, RefLink[]> = {
   'PHAK, blocked pitot-static system': [doc('PHAK, blocked pitot-static system', 'phak-8', ['Blockage of the Pitot-Static System'])],
   'PHAK, pilotage and dead reckoning': [doc('PHAK, pilotage', 'phak-16', ['Pilotage']), doc('PHAK, dead reckoning', 'phak-16', ['Dead Reckoning'])],
   'PHAK, GPS': [doc('PHAK, GPS', 'phak-16', ['Global Positioning System (GPS)'])],
+  'Aviation Weather Handbook, winds aloft': [doc('Aviation Weather Handbook, winds aloft', 'awh', AWH_FB)],
+  'PHAK, flight planning': [doc('PHAK, flight planning', 'phak-16', PHAK_FLIGHT_PLANNING)],
+  'PHAK, wind triangle': [doc('PHAK, wind triangle', 'phak-16', PHAK_WIND_TRIANGLE)],
+  'PHAK, flight diversion': [doc('PHAK, flight diversion', 'phak-16', PHAK_DIVERSION)],
+  'PHAK, lost procedures': [doc('PHAK, lost procedures', 'phak-16', PHAK_LOST)],
 };
 
 /** Every handbook passage the course cites, for the live check against the FAA files. */

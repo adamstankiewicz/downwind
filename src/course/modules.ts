@@ -6,6 +6,7 @@ import type { Lesson, Module } from './types';
 import { pilotAirplaneLessons } from './pilotAirplane';
 import { systemsLessons } from './systems';
 import { weatherLessons } from './weather';
+import { crossCountryLessons } from './crossCountry';
 
 export const modules: Module[] = [
   {
@@ -35,8 +36,8 @@ export const modules: Module[] = [
   {
     n: 5, title: 'Cross-country and diversion', acsAreas: ['I.D', 'VI'],
     summary: 'Plan a cross-country, fly it on the chart, and divert when the plan stops working.',
-    lessons: [],
-    outline: ['Building a nav log', 'Winds aloft and groundspeed', 'Checkpoints and pilotage', 'The diversion, done in the air', 'Lost procedures'],
+    lessons: crossCountryLessons,
+    outline: [],
   },
   {
     n: 6, title: 'Emergencies', acsAreas: ['IX'],
