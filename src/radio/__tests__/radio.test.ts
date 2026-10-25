@@ -255,3 +255,16 @@ describe('how a controller says it', async () => {
     }
   });
 });
+
+describe('radio prefs', () => {
+  it('defaults to Kokoro and hold to talk, and carries other v1 settings over', async () => {
+    const { save } = await import('../../lib/storage');
+    const { loadRadioPrefs } = await import('../voice');
+    save('downwind.radio.prefs.v1', { engine: 'device', speechInput: false, rate: 1.3, sound: true });
+    const p = loadRadioPrefs();
+    expect(p.engine).toBe('kokoro');
+    expect(p.speechInput).toBe(true);
+    expect(p.rate).toBe(1.3);
+    expect(p.sound).toBe(true);
+  });
+});

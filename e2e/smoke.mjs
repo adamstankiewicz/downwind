@@ -749,8 +749,9 @@ async function runSkip() {
 // controller, the decisions, and the debrief. Flights are random, so the loop
 // reads each step from the page. Then sound and listen first on a second
 // flight: the words hide behind "Show the words", the play controls exist, the
-// model downloads are offered and never started, and hold to talk stays away
-// until its model is ready. Headless Chromium has no voices, so speech is
+// speech models start downloading on their own when radio practice opens
+// (the model host is blocked here, so they fail and the device voice and
+// typing carry on), and hold to talk stays away until its model is ready. Headless Chromium has no voices, so speech is
 // only counted, never heard.
 async function runRadio(viewport) {
   const label = `[radio ${viewport.width}px]`;
@@ -768,6 +769,9 @@ async function runRadio(viewport) {
     const w = await page.evaluate(() => document.documentElement.scrollWidth);
     check(w <= viewport.width, `${label} no horizontal scroll on ${where} (${w}px)`);
   };
+  // Model downloads are counted and refused, so the run stays offline.
+  let modelFetches = 0;
+  await page.context().route(/huggingface\.co|hf\.co/, (r) => { modelFetches++; return r.abort(); });
   await page.goto(BASE);
   await btn('Skip setup for now').click();
   await page.getByRole('heading', { name: 'Ground school', exact: true }).waitFor();
@@ -846,15 +850,17 @@ async function runRadio(viewport) {
   check((await btn('Sound').getAttribute('aria-pressed')) === 'true', `${label} sound switch reports on`);
   await btn('Listen first').click();
   check((await btn('Listen first').getAttribute('aria-pressed')) === 'true', `${label} listen first switch reports on`);
-  check(await btn("Your device's voice").isVisible() && await btn('Kokoro (86 MB download, once)').isVisible(), `${label} both voices offered`);
-  await btn('Kokoro (86 MB download, once)').click();
-  check(await btn('Download Kokoro').isVisible(), `${label} Kokoro is a download the pilot starts`);
+  check(await btn("Your device's voice").isVisible() && (await btn('Kokoro').getAttribute('aria-pressed')) === 'true', `${label} Kokoro is the voice by default, device voice offered`);
+  check(modelFetches > 0, `${label} the voice model download starts when radio practice opens (${modelFetches} requests)`);
+  check((await btn('Download Kokoro').count()) === 0, `${label} no download button for Kokoro, it loads on its own`);
+  await page.getByText(/Kokoro could not load/).waitFor({ timeout: 15000 });
+  check(await btn('Try again').first().isVisible() && /device's voice reads instead/.test(await main()), `${label} a failed Kokoro download says the device voice reads instead`);
   await btn("Your device's voice").click();
-  await btn('Speak your calls').click();
-  check(await btn('Download Moonshine').isVisible(), `${label} Moonshine is a download the pilot starts`);
-  check(/runs on this device/.test(await main()), `${label} settings say models run on this device`);
+  check((await btn('Speak your calls').getAttribute('aria-pressed')) === 'true', `${label} speak your calls is on by default`);
+  check((await btn('Download Moonshine').count()) === 0, `${label} no download button for Moonshine, it loads on its own`);
+  check(/run on this device/.test(await main()), `${label} settings say models run on this device`);
   await btn('Sound settings').click();
-  check((await btn('Download Kokoro').count()) === 0, `${label} sound settings close`);
+  check((await btn('Listen first').count()) === 0, `${label} sound settings close`);
   check((await page.locator('.tape > .xmit.atc .say').count()) === 0 && await btn('Show the words').isVisible(), `${label} ATIS words hidden under listen first`);
   check(await btn('Play the ATIS').isVisible(), `${label} ATIS has a play control`);
   await btn('Play the ATIS').click();

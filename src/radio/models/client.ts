@@ -1,6 +1,8 @@
-// The two optional models, from the app's side: a download the pilot starts
-// on purpose, its progress, and calls into the workers. Nothing here loads
-// until it is asked for, and the app works the same without either model.
+// The two speech models, from the app's side: the download that starts when
+// radio practice opens, its progress, and calls into the workers. They are
+// cached for offline use after the first time. The app works the same without
+// either model: the device's voice reads until Kokoro is ready, and typing
+// never depends on Moonshine.
 
 import type { FromWorker, ModelId, ToWorker } from './protocol';
 
@@ -14,7 +16,7 @@ export const KOKORO_VOICES: { id: string; label: string }[] = [
   { id: 'bm_lewis', label: 'Lewis, British' },
 ];
 
-/** What each model costs to download, for the pilot to see before they agree. */
+/** What each model costs to download, shown while it comes down. */
 export const MODEL_INFO: Record<ModelId, { name: string; mb: number; what: string; repo: string }> = {
   kokoro: { name: 'Kokoro', mb: 86, what: 'A natural controller voice', repo: 'onnx-community/Kokoro-82M-v1.0-ONNX' },
   moonshine: { name: 'Moonshine', mb: 63, what: 'Speak your calls instead of typing', repo: 'onnx-community/moonshine-base-ONNX' },
@@ -79,6 +81,39 @@ export function loadModel(id: ModelId) {
   } catch (e) {
     set(id, { status: 'error', error: e instanceof Error ? e.message : String(e) });
   }
+}
+
+/**
+ * Whether to fetch the models without being asked: not when the browser says
+ * the pilot is saving data, and not on a device with very little memory.
+ * Either way the pilot can still start a download by hand.
+ */
+export function canAutoDownload(): boolean {
+  if (typeof Worker === 'undefined' || typeof WebAssembly === 'undefined') return false;
+  const nav = navigator as Navigator & { connection?: { saveData?: boolean }; deviceMemory?: number };
+  if (nav.connection?.saveData) return false;
+  if (nav.deviceMemory !== undefined && nav.deviceMemory < 2) return false;
+  return true;
+}
+
+/**
+ * Part of opening radio practice: load Kokoro, then Moonshine when the
+ * browser can record, one after the other so they don't fight for the
+ * connection. Models already in the cache load without a download. Safe to
+ * call again.
+ */
+export function autoLoadModels(withSpeechInput: boolean) {
+  if (!canAutoDownload()) return;
+  loadModel('kokoro');
+  if (!withSpeechInput || !canRecord()) return;
+  const next = () => {
+    const k = states.kokoro.status;
+    if (k === 'loading') return;
+    off();
+    loadModel('moonshine');
+  };
+  const off = subscribeModels(next);
+  next();
 }
 
 function call(id: ModelId, msg: ToWorker & { id: number }, transfer: Transferable[] = []): Promise<FromWorker> {
