@@ -9,6 +9,8 @@ export interface ReviewItem {
   answer: number;
   explanation: string;
   ref: string;
+  /** Options that would be unsafe to act on, so picking one counts as a serious miss. */
+  unsafeOptions?: number[];
 }
 
 export const reviewItems: ReviewItem[] = [
@@ -77,7 +79,7 @@ export const reviewItems: ReviewItem[] = [
     ref: '14 CFR 91.213(d)',
   },
   {
-    id: 'metar-ceiling', acs: 'PA.I.C',
+    id: 'metar-ceiling', acs: 'PA.I.C', unsafeOptions: [2, 3],
     prompt: 'In "SCT015 BKN028 OVC045", what is the ceiling?',
     options: ['1,500 ft', '2,800 ft', '4,500 ft', 'There is no ceiling'],
     answer: 1,
@@ -101,7 +103,7 @@ export const reviewItems: ReviewItem[] = [
     ref: 'AIM 7-1, Aviation Weather Handbook',
   },
   {
-    id: 'mvfr', acs: 'PA.I.C',
+    id: 'mvfr', acs: 'PA.I.C', unsafeOptions: [0],
     prompt: 'A ceiling of 2,500 ft with 7 SM visibility is which flight category?',
     options: ['VFR', 'MVFR', 'IFR', 'LIFR'],
     answer: 1,
@@ -117,7 +119,7 @@ export const reviewItems: ReviewItem[] = [
     ref: '14 CFR 91.103',
   },
   {
-    id: 'fuel-day', acs: 'PA.I.D',
+    id: 'fuel-day', acs: 'PA.I.D', unsafeOptions: [0],
     prompt: 'Minimum VFR fuel reserve during the day?',
     options: ['20 minutes', '30 minutes at normal cruise', '45 minutes at normal cruise', '1 hour'],
     answer: 1,
@@ -125,7 +127,7 @@ export const reviewItems: ReviewItem[] = [
     ref: '14 CFR 91.151',
   },
   {
-    id: 'vfr-e', acs: 'PA.I.E',
+    id: 'vfr-e', acs: 'PA.I.E', unsafeOptions: [0, 2],
     prompt: 'Basic VFR minimums in Class E below 10,000 ft MSL?',
     options: ['1 SM, clear of clouds', '3 SM, 500 below, 1,000 above, 2,000 horizontal', '3 SM, clear of clouds', '5 SM, 1,000 below, 1,000 above, 1 SM horizontal'],
     answer: 1,
@@ -133,7 +135,7 @@ export const reviewItems: ReviewItem[] = [
     ref: '14 CFR 91.155(a)',
   },
   {
-    id: 'vfr-b', acs: 'PA.I.E',
+    id: 'vfr-b', acs: 'PA.I.E', unsafeOptions: [2],
     prompt: 'Basic VFR minimums in Class B airspace?',
     options: ['3 SM, clear of clouds', '3 SM, 500/1,000/2,000', '1 SM, clear of clouds', '5 SM, clear of clouds'],
     answer: 0,
@@ -149,7 +151,7 @@ export const reviewItems: ReviewItem[] = [
     ref: '14 CFR 91.130, 91.215, 91.225',
   },
   {
-    id: 'class-b-entry', acs: 'PA.I.E',
+    id: 'class-b-entry', acs: 'PA.I.E', unsafeOptions: [0, 2, 3],
     prompt: 'Approach answers "N1234, standby." May you enter the Class B?',
     options: ['Yes, two-way communication is established', 'No, you need to hear "cleared into the Class Bravo"', 'Yes, if you are squawking 1200', 'Only below 3,000 ft'],
     answer: 1,
@@ -157,7 +159,7 @@ export const reviewItems: ReviewItem[] = [
     ref: '14 CFR 91.131',
   },
   {
-    id: 'class-d-entry', acs: 'PA.I.E',
+    id: 'class-d-entry', acs: 'PA.I.E', unsafeOptions: [0, 2, 3],
     prompt: 'The tower replies "Aircraft calling tower, standby." May you enter the Class D?',
     options: ['Yes', 'No, the controller didn\'t use your call sign', 'Yes, once you are within 2 miles', 'Only if the ATIS is current'],
     answer: 1,
@@ -189,7 +191,7 @@ export const reviewItems: ReviewItem[] = [
     ref: 'PHAK ch. 10',
   },
   {
-    id: 'alcohol', acs: 'PA.I.H',
+    id: 'alcohol', acs: 'PA.I.H', unsafeOptions: [1, 3],
     prompt: 'Alcohol rule for acting as a crewmember?',
     options: ['8 hours bottle to throttle and under 0.04 BAC', '12 hours and under 0.08 BAC', '24 hours', '8 hours only'],
     answer: 0,
@@ -197,7 +199,7 @@ export const reviewItems: ReviewItem[] = [
     ref: '14 CFR 91.17',
   },
   {
-    id: 'oxygen', acs: 'PA.I.H',
+    id: 'oxygen', acs: 'PA.I.H', unsafeOptions: [3],
     prompt: 'Above 12,500 ft MSL up to 14,000 ft, when must the required crew use oxygen?',
     options: ['Always', 'For any portion of the flight longer than 30 minutes at those altitudes', 'Only at night', 'Never in an unpressurized airplane'],
     answer: 1,
