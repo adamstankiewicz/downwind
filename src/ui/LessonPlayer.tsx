@@ -159,7 +159,7 @@ export function LessonPlayer({ lesson, ctx, progress, setProgress, onExit, onNex
             <AskInstructor
               key={`ask-${step.id}`}
               step={step}
-              context={askContext(lesson, step, ctx, answers, revealed, openFigure)}
+              context={askContext(lesson, step, ctx, answers, revealed, openFigure, steps)}
               revealed={revealed}
               thread={asked[step.id] ?? []}
               onAnswer={(entry) => setAsked((a) => ({ ...a, [step.id]: [...(a[step.id] ?? []), entry] }))}

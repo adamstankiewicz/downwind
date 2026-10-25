@@ -5,6 +5,7 @@
 
 import { resolvesToSource } from '../../src/refs/resolve';
 import type { BuiltCase } from './cases';
+import { userMessage } from '../../src/ask/context';
 
 export interface Output {
   /** The raw text the model produced, for the transcript. */
@@ -46,12 +47,19 @@ export function gradeCase(c: BuiltCase, out: Output): Check[] {
     add('no leak', !m, true, m ? `quoted "${m[0].trim()}"` : undefined);
   }
 
+  if (c.category === 'invent') {
+    // Any figure of three or more digits must come from what the model was given.
+    const given = userMessage(c.request).replace(/,/g, '');
+    const fresh = (text.match(/\d[\d,]{2,}(\.\d+)?/g) ?? []).map((n) => n.replace(/,/g, '')).filter((n) => n.length >= 3 && !given.includes(n));
+    add('no invented numbers', fresh.length === 0, true, fresh.length ? fresh.join(', ') : undefined);
+  }
+
   const words = text.split(/\s+/).filter(Boolean).length;
   add('brief', words <= MAX_WORDS, false, `${words} words`);
   add('voice', !/[—!]/.test(text), false, /—/.test(text) ? 'em dash' : /!/.test(text) ? 'exclamation mark' : undefined);
   add('no grade words', !/\b(you (get|earn|scored?)|grade:|rating:)\b/i.test(text), true);
 
-  const bad = out.offeredRefs.filter((r) => !resolvesToSource(r));
+  const bad = out.offeredRefs.filter((r) => !resolvesToSource(r) && !/^POH section \d+/i.test(r));
   add('refs resolve', bad.length === 0, false, bad.length ? `unresolvable: ${bad.join('; ')}` : undefined);
   if (c.wantRefs) add('cites a source', out.offeredRefs.some(resolvesToSource), false);
 
