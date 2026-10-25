@@ -8,6 +8,7 @@ import { modules } from '../../course/modules';
 import { resolvesToSource } from '../../refs/resolve';
 import { askContext, askRequest, citableRefs, parseReply, systemPrompt, userMessage, MAX_QUESTION } from '../context';
 import { handleAsk } from '../../../worker/ask';
+import { anthropicModel } from '../../../worker/models/anthropic';
 import type Anthropic from '@anthropic-ai/sdk';
 import { askInstructor, askedToday, DAILY_LIMIT } from '../client';
 import { afterEach, vi } from 'vitest';
@@ -92,19 +93,22 @@ describe('worker /api/ask', () => {
   const body = JSON.stringify(askRequest('Why does the gust matter?', [], askContext(lesson, lesson.build(ctx)[0], ctx, emptyAnswers(), false)));
   const post = (b = body) => new Request('https://w/api/ask', { method: 'POST', body: b, headers: { 'Content-Type': 'application/json' } });
   const reply = (text: string, stop: Anthropic.Message['stop_reason'] = 'end_turn') =>
-    ({ content: [{ type: 'text', text, citations: null }], stop_reason: stop } as unknown as Anthropic.Message);
+    ({ content: [{ type: 'text', text, citations: null }], stop_reason: stop, model: 'claude-haiku-5-5', usage: { input_tokens: 1, output_tokens: 1 } } as unknown as Anthropic.Message);
+  const claude = (fn: (p: Anthropic.MessageCreateParamsNonStreaming) => Promise<Anthropic.Message>) => anthropicModel('k', undefined, fn);
+  const key = { ANTHROPIC_API_KEY: 'k' };
 
   it('says it is off and refuses questions without a key', async () => {
     expect(await (await handleAsk(new Request('https://w/api/ask'), {})).json()).toEqual({ available: false });
     expect((await handleAsk(post(), {})).status).toBe(503);
+    expect(await (await handleAsk(new Request('https://w/api/ask'), key)).json()).toEqual({ available: true });
   });
 
   it('answers with a cached system prompt and filtered refs', async () => {
     let sent: Anthropic.MessageCreateParamsNonStreaming | null = null;
-    const res = await handleAsk(post(), { ANTHROPIC_API_KEY: 'k' }, async (p) => {
+    const res = await handleAsk(post(), key, claude(async (p) => {
       sent = p;
       return reply(JSON.stringify({ answer: 'Because the spread is what you fly in the flare.', refs: ['AIM 7-1', 'made up'] }));
-    });
+    }));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ answer: 'Because the spread is what you fly in the flare.', refs: ['AIM 7-1'] });
     const p = sent as unknown as Anthropic.MessageCreateParamsNonStreaming;
@@ -116,19 +120,18 @@ describe('worker /api/ask', () => {
   });
 
   it('limits bursts from one address when the rate limit is bound', async () => {
-    const key = { ANTHROPIC_API_KEY: 'k', ASK_LIMIT: { limit: async () => ({ success: false }) } };
-    expect((await handleAsk(post(), key, async () => { throw new Error('should not call'); })).status).toBe(429);
+    const env = { ...key, ASK_LIMIT: { limit: async () => ({ success: false }) } };
+    expect((await handleAsk(post(), env, claude(async () => { throw new Error('should not call'); }))).status).toBe(429);
   });
 
   it('rejects junk, long questions and refusals without crashing', async () => {
-    const key = { ANTHROPIC_API_KEY: 'k' };
-    const never = async () => { throw new Error('should not call'); };
+    const never = claude(async () => { throw new Error('should not call'); });
     expect((await handleAsk(post('not json'), key, never)).status).toBe(400);
     expect((await handleAsk(post(JSON.stringify({ question: 'x'.repeat(MAX_QUESTION + 1), context: {} })), key, never)).status).toBe(400);
-    const refused = await handleAsk(post(), key, async () => reply('', 'refusal'));
+    const refused = await handleAsk(post(), key, claude(async () => reply('', 'refusal')));
     expect(refused.status).toBe(200);
     expect((await refused.json() as { refs: string[] }).refs).toEqual([]);
-    expect((await handleAsk(post(), key, async () => reply('not json'))).status).toBe(502);
+    expect((await handleAsk(post(), key, claude(async () => reply('not json')))).status).toBe(502);
   });
 });
 

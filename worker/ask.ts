@@ -1,14 +1,18 @@
-// POST /api/ask: one question from a pilot in a lesson, answered by Claude.
+// POST /api/ask: one question from a pilot in a lesson, answered by a model
+// behind the AskModel interface (worker/models), Claude by default.
 // GET /api/ask says whether the feature is on. It is on only when the worker
 // has the ANTHROPIC_API_KEY secret; without it the app hides the feature.
+//
+// Every model must pass the eval suite (evals/ask) before it is configured here.
 //
 // Cost: the cheapest current model with thinking off; the system prompt is
 // the same on every request and cached; the lesson context is short; answers
 // are capped; identical questions on the same step are served from the edge
 // cache for a day; and an optional rate limit caps bursts per address.
 
-import Anthropic from '@anthropic-ai/sdk';
 import { MAX_FOLLOWUPS, MAX_QUESTION, REPLY_SCHEMA, parseReply, systemPrompt, userMessage, type AskRequest } from '../src/ask/context';
+import { anthropicModel } from './models/anthropic';
+import { ModelError, type AskModel } from './models/types';
 
 export interface AskEnv {
   ANTHROPIC_API_KEY?: string;
@@ -20,21 +24,25 @@ export interface AskEnv {
   ASK_LIMIT?: { limit(opts: { key: string }): Promise<{ success: boolean }> };
 }
 
-const MODEL = 'claude-haiku-5-5';
 const MAX_TOKENS = 400;
 const ANSWER_CACHE_SECONDS = 24 * 60 * 60;
 const MAX_BODY = 16_000;
+const UNAVAILABLE = 'Ask the instructor is not set up on this server.';
+const COULD_NOT = 'The instructor could not answer.';
 
-type Create = (params: Anthropic.MessageCreateParamsNonStreaming) => Promise<Anthropic.Message>;
+/** The model the worker is configured with, or null when it has none. */
+export function configuredModel(env: AskEnv): AskModel | null {
+  return env.ANTHROPIC_API_KEY ? anthropicModel(env.ANTHROPIC_API_KEY, env.ASK_MODEL || undefined) : null;
+}
 
-export async function handleAsk(request: Request, env: AskEnv, create?: Create): Promise<Response> {
+/** `model` is for tests and evals; production uses the configured one. */
+export async function handleAsk(request: Request, env: AskEnv, model: AskModel | null = configuredModel(env)): Promise<Response> {
   const origin = request.headers.get('Origin');
   const cors = corsHeaders(origin, env);
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
-  const on = Boolean(env.ANTHROPIC_API_KEY);
-  if (request.method === 'GET') return json({ available: on }, 200, cors);
+  if (request.method === 'GET') return json({ available: model !== null }, 200, cors);
   if (request.method !== 'POST') return json({ error: 'Use POST.' }, 405, cors);
-  if (!on) return json({ error: 'Ask the instructor is not set up on this server.' }, 503, cors);
+  if (!model) return json({ error: UNAVAILABLE }, 503, cors);
   if (origin && !allowed(origin, env)) return json({ error: 'Not allowed from this origin.' }, 403, cors);
 
   const text = await request.text();
@@ -42,9 +50,8 @@ export async function handleAsk(request: Request, env: AskEnv, create?: Create):
   const req = validRequest(text);
   if (!req) return json({ error: 'Not a question.' }, 400, cors);
 
-  const model = env.ASK_MODEL || MODEL;
   const cache = (globalThis as unknown as { caches?: { default: Cache } }).caches?.default;
-  const key = new Request(`https://ask.cache/${model}/${await sha256(JSON.stringify(req))}`);
+  const key = new Request(`https://ask.cache/${encodeURIComponent(model.id)}/${await sha256(JSON.stringify(req))}`);
   const hit = await cache?.match(key);
   if (hit) return withHeaders(hit, cors);
 
@@ -53,40 +60,28 @@ export async function handleAsk(request: Request, env: AskEnv, create?: Create):
     if (!(await env.ASK_LIMIT.limit({ key: who })).success) return json({ error: 'Busy. Try again in a minute.' }, 429, cors);
   }
 
-  const call = create ?? ((p) => new Anthropic({ apiKey: env.ANTHROPIC_API_KEY }).messages.create(p));
-  let message: Anthropic.Message;
+  let result;
   try {
-    message = await call({
-      model,
-      max_tokens: MAX_TOKENS,
-      // A short explanation from context does not need reasoning tokens.
-      thinking: { type: 'disabled' },
-      output_config: { effort: 'low', format: { type: 'json_schema', schema: REPLY_SCHEMA } },
-      system: [{ type: 'text', text: systemPrompt(), cache_control: { type: 'ephemeral' } }],
-      messages: [{ role: 'user', content: userMessage(req) }],
-    });
+    result = await model.complete({ system: systemPrompt(), user: userMessage(req), schema: REPLY_SCHEMA, maxTokens: MAX_TOKENS });
   } catch (e) {
-    if (e instanceof Anthropic.RateLimitError) return json({ error: 'Busy. Try again in a minute.' }, 429, cors);
-    if (e instanceof Anthropic.AuthenticationError) return json({ error: 'Ask the instructor is not set up on this server.' }, 503, cors);
-    return json({ error: 'The instructor could not answer.' }, 502, cors);
+    const reason = e instanceof ModelError ? e.reason : 'failed';
+    if (reason === 'busy') return json({ error: 'Busy. Try again in a minute.' }, 429, cors);
+    if (reason === 'auth') return json({ error: UNAVAILABLE }, 503, cors);
+    return json({ error: COULD_NOT }, 502, cors);
   }
-  if (message.stop_reason === 'refusal') {
+  if (result.kind === 'refused') {
     return json({ answer: 'I can only help with this lesson. Try asking about the step in front of you.', refs: [] }, 200, cors);
   }
-  const textBlock = message.content.find((b): b is Anthropic.TextBlock => b.type === 'text');
   let reply = null;
   try {
-    reply = parseReply(JSON.parse(textBlock?.text ?? ''));
+    reply = parseReply(JSON.parse(result.text));
   } catch {
     reply = null;
   }
-  if (!reply) return json({ error: 'The instructor could not answer.' }, 502, cors);
+  if (!reply) return json({ error: COULD_NOT }, 502, cors);
 
   const out = json(reply, 200, cors);
-  if (cache) {
-    const stored = json(reply, 200, { 'Cache-Control': `public, max-age=${ANSWER_CACHE_SECONDS}` });
-    await cache.put(key, stored);
-  }
+  if (cache) await cache.put(key, json(reply, 200, { 'Cache-Control': `public, max-age=${ANSWER_CACHE_SECONDS}` }));
   return out;
 }
 

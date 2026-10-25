@@ -94,3 +94,11 @@ the figures for the current setting.
 - Extend `e2e/smoke.mjs` to fly the first lesson of the module end to end.
 - `npx tsc -b && npx vitest run && npm run build`, then the smoke test
   against `vite preview`. All must pass before opening a PR.
+
+## Language models
+
+Any feature that calls a model gets an eval suite in `evals/` before it
+ships (see `evals/README.md`), and the model sits behind the worker's
+`AskModel` interface (`worker/models/`), so a provider can change without
+touching the feature. The model never grades and never produces a number
+the engine could compute.
