@@ -3,7 +3,7 @@
 
 import type { Grade } from '../scenarios/goNoGo';
 import { allLessons, modules } from './modules';
-import type { Blank, Coach, Lesson, Module, OptionId, Step } from './types';
+import type { Blank, Coach, DialValues, Lesson, Module, OptionId, Step } from './types';
 
 export const COURSE_KEY = 'downwind.course.v1';
 
@@ -33,6 +33,10 @@ export interface LessonAnswers {
   /** Typed or picked values by step id, then blank id. */
   blanks: Record<string, Record<string, string>>;
   decisions: Record<string, DecisionAnswer>;
+  /** Where the pilot has the dials now, by step id. */
+  dials?: Record<string, DialValues>;
+  /** The setting the pilot asked the engine to check, by step id. Scored like a blank. */
+  dialChecks?: Record<string, DialValues>;
 }
 
 export interface DecisionResult {
@@ -56,7 +60,7 @@ const worse = (a: Grade, b: Grade) => (RANK.indexOf(a) <= RANK.indexOf(b) ? a : 
 const better = (a: Grade, b: Grade) => (RANK.indexOf(a) >= RANK.indexOf(b) ? a : b);
 
 export function emptyAnswers(): LessonAnswers {
-  return { blanks: {}, decisions: {} };
+  return { blanks: {}, decisions: {}, dials: {}, dialChecks: {} };
 }
 
 /** Steps the pilot sees, given the decisions made so far. */
@@ -95,6 +99,10 @@ export function scoreLesson(steps: Step[], answers: LessonAnswers): LessonResult
         total++;
         if (checkBlank(b, answers.blanks[s.id]?.[b.id] ?? '')) right++;
       }
+    } else if (s.kind === 'dials' && s.task) {
+      total++;
+      const set = answers.dialChecks?.[s.id];
+      if (set && s.task.check(set).right) right++;
     } else if (s.kind === 'decide') {
       const a = answers.decisions[s.id];
       if (!a) continue;

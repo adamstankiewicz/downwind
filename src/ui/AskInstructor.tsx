@@ -40,6 +40,10 @@ export function starterQuestions(step: Step, revealed: boolean): string[] {
       return revealed
         ? ['Why is that the answer?', 'Where did my reasoning go wrong?', 'Is there a quicker way to work this out?']
         : ['How do I work this out?', 'Which rule applies here?', 'What am I likely to miss?'];
+    case 'dials':
+      return revealed
+        ? ['Why is that the answer?', 'What would change it in the airplane?', 'Which line matters most here?']
+        : ['What should I watch as I turn this?', 'Which line is the legal one?', 'Why does the angle matter so much?'];
     case 'decide':
       return revealed
         ? ['Why was that the best call?', 'What makes the other options worse?', 'What would change this decision?']

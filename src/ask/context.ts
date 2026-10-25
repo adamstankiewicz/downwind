@@ -99,6 +99,22 @@ function stepFacts(step: Step, answers: LessonAnswers, revealed: boolean): Recor
         })),
       };
     }
+    case 'dials': {
+      // What the pilot sees on screen: the engine's numbers at the current setting.
+      const values = answers.dials?.[step.id] ?? Object.fromEntries(step.dials.map((d) => [d.id, d.initial]));
+      const state = step.evaluate(values);
+      const checked = answers.dialChecks?.[step.id];
+      return {
+        ...base,
+        instructor: step.say.full,
+        dials: step.dials.map((d) => ({ label: d.label, value: d.format ? d.format(values[d.id]) : `${values[d.id]} ${d.unit}` })),
+        readouts: state.readouts.map((r) => ({ label: r.label, value: r.value })),
+        linesCrossed: state.lines.map((l) => l.title),
+        engineGrades: Object.fromEntries(state.verdict.options.map((o) => [o.label, state.verdict.grades[o.id]])),
+        task: step.task?.prompt,
+        ...(revealed && checked && step.task ? { taskResult: step.task.check(checked) } : {}),
+      };
+    }
     case 'decide': {
       const choice = answers.decisions[step.id]?.choice ?? null;
       return {
