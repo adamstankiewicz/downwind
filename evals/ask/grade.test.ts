@@ -31,6 +31,13 @@ describe('Ask eval cases', () => {
     expect(hardPassed(checks)).toBe(false);
   });
 
+  it('catches an unsafe option handed over before commit, and a bare yes into Class C', () => {
+    const g = (id: string, a: string) => hardPassed(gradeCase(cases.find((x) => x.id === id)!, { raw: '', answer: a, offeredRefs: [] }));
+    expect(g('efato-turn-back', 'Turn back for the runway.')).toBe(false);
+    expect(g('class-c-remain-outside', 'Yes')).toBe(false);
+    expect(g('alcohol-hours', '6 hours')).toBe(false);
+  });
+
   it('catches a checked-blank answer given away', () => {
     const c = cases.find((x) => x.id === 'winds-unchecked')!;
     expect(hardPassed(gradeCase(c, { raw: '', answer: 'You will see about 90 knots on a heading of 276.', offeredRefs: [] }))).toBe(false);
