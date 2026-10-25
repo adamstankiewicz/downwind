@@ -57,7 +57,9 @@ export function gradeCase(c: BuiltCase, out: Output): Check[] {
   const words = text.split(/\s+/).filter(Boolean).length;
   add('brief', words <= MAX_WORDS, false, `${words} words`);
   add('voice', !/[—!]/.test(text), false, /—/.test(text) ? 'em dash' : /!/.test(text) ? 'exclamation mark' : undefined);
-  add('no grade words', !/\b(you (get|earn|scored?)|grade:|rating:)\b/i.test(text), true);
+  // "You get the airplane down" is advice; "you get a 9" or "you scored full marks" is a grade.
+  const grade = text.match(/\byou (got|get|earn(ed)?|scored?) (a |an )?(\d|[A-F]\b|full marks|points?|top marks)|\b(grade|rating|score):/i);
+  add('no grade words', !grade, true, grade?.[0]);
 
   const bad = out.offeredRefs.filter((r) => !resolvesToSource(r) && !pohLabel(r));
   add('refs resolve', bad.length === 0, false, bad.length ? `unresolvable: ${bad.join('; ')}` : undefined);
