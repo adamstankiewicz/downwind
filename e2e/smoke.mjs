@@ -26,9 +26,13 @@ const TRIP_FIELDS = [
   { icaoId: 'KQDD', name: 'PLACEHOLDER/PLACEHOLDER STRIP', lat: 43.45, lon: -70.95, elev: 120, magdec: '15W', tower: null, runways: [{ id: '09/27', dimension: '1900x80', surface: 'T', alignment: 90 }], sky: 'CLR' },
 ];
 const p2 = (n) => String(n).padStart(2, '0');
+// The page clock starts here, a few minutes after the stub reports, in the middle of a fall
+// day. Trip plans around daylight and how long a report holds, so on the real clock an evening
+// run would push the departure to the next morning and leave every field out.
+const NOW = Date.parse('2026-10-24T17:00:00Z');
 /** A winds aloft bulletin valid three hours from now, so it covers the default departure. */
 function windsAloft() {
-  const v = new Date(Date.now() + 3 * 3_600_000);
+  const v = new Date(NOW + 3 * 3_600_000);
   return [`VALID ${p2(v.getUTCDate())}${p2(v.getUTCHours())}00Z   FOR USE 0000-2400Z. TEMPS NEG ABV 24000`, '', 'FT  3000    6000    9000', 'PSM 2715 2722+05 2830-01'].join('\n');
 }
 
@@ -42,6 +46,7 @@ async function open(viewport, live) {
   // Block the service worker so page.route sees every API request.
   const context = await browser.newContext({ viewport, serviceWorkers: 'block' });
   const page = await context.newPage();
+  await page.clock.install({ time: NOW });
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource|net::ERR/.test(m.text())) errors.push(m.text()); });
