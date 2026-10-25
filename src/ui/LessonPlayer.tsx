@@ -141,7 +141,7 @@ function StepView({ step, level, answers, setAnswers, checked, onCheck, committe
     return (
       <section className="step">
         <h2>{step.title}</h2>
-        {step.scene && <p className="situ">{step.scene}</p>}
+        {step.scene && <p className="situ"><Rich text={step.scene} /></p>}
         <Voice><Rich text={step.say[level]} /></Voice>
       </section>
     );

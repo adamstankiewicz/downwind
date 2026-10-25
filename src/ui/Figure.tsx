@@ -116,12 +116,28 @@ export function Figure({ figure, practiceField }: { figure: FigureModel; practic
   if (figure.kind === 'panel') return <PanelFigure figure={figure} />;
   if (figure.kind === 'carbIce') return <CarbIceFigure figure={figure} />;
   if (figure.kind === 'wb') {
-    const ok = figure.loaded.withinEnvelope && !figure.loaded.overGross;
+    const { loaded, maxGrossLb } = figure;
+    const ok = loaded.withinEnvelope && !loaded.overGross;
+    const diff = maxGrossLb - loaded.totalLb;
+    const state = loaded.overGross ? `${fmt(-diff)} lb over max gross`
+      : !loaded.withinEnvelope ? 'CG outside the envelope'
+      : diff === 0 ? 'Inside the envelope, right at max gross' : `Inside the envelope, ${fmt(diff)} lb under max gross`;
     return (
       <figure className="fig">
-        <CgChart envelope={figure.envelope} loaded={figure.loaded} zeroFuel={figure.zeroFuel} maxGrossLb={figure.maxGrossLb} />
+        <div className="fig-wb">
+          <div className="perf-head">
+            <b>Weight and balance</b>
+            <span className="muted">Weight up, CG arm across; the blue is the envelope</span>
+          </div>
+          <CgChart envelope={figure.envelope} loaded={loaded} zeroFuel={figure.zeroFuel} maxGrossLb={maxGrossLb} />
+          <div className="perf-read">
+            <b className="runway">{fmt(loaded.totalLb)} <small>lb</small></b>
+            <span>CG {loaded.cgIn} in</span>
+            <span className={`status ${ok ? 'ok' : 'bad'}`}>{state}</span>
+          </div>
+        </div>
         <figcaption>
-          CG envelope with this loading: {fmt(figure.loaded.totalLb)} lb at {figure.loaded.cgIn} in, {ok ? 'inside the limits' : figure.loaded.overGross ? 'over max gross' : 'outside the envelope'}. The dashed line runs to the zero-fuel point, where the CG goes as fuel burns.{' '}
+          The loaded point is where the airplane sits now; the dashed line runs to the zero-fuel point, where the CG goes as fuel burns. Above the red line is over max gross.{' '}
           {figure.practice ? 'The practice trainer is a made-up airplane with sample numbers.' : figure.sample ? 'Sample numbers from the template. Use your own weight and balance record.' : 'From your airplane’s weight and balance record.'}
         </figcaption>
       </figure>

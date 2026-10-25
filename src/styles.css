@@ -544,7 +544,7 @@ details:not(.module details) summary { cursor: pointer; font-size: 0.9rem; color
 .rm { background: none; border: 1.5px solid var(--line); color: var(--ink-2); min-width: 44px; min-height: 44px; border-radius: var(--r-full); }
 .rm:hover { border-color: var(--ink); color: var(--ink); }
 .table-scroll { overflow-x: auto; }
-.cg-chart svg { width: 100%; height: auto; display: block; }
+.cg-chart svg { width: 100%; height: auto; display: block; font-family: var(--label); font-stretch: 87.5%; }
 .cg-stat { display: flex; gap: 12px 24px; flex-wrap: wrap; align-items: center; font-size: 0.95rem; }
 .cg-stat b { font-weight: 700; }
 .status { font-weight: 700; font-size: 0.95rem; }
@@ -863,12 +863,18 @@ dl.kv dd { margin: 0; }
 .perf-read .runway { font-size: 2rem; }
 .perf-read .runway small { font-size: 0.9rem; font-weight: 600; font-stretch: 87.5%; letter-spacing: 0; }
 .perf-off { flex-basis: 100%; color: var(--marginal); font-weight: 600; font-size: 0.9rem; }
+/* weight and balance: the same panel, head and readout as the performance chart, around the CG envelope */
+.fig-wb { display: grid; gap: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px 16px; min-width: 0; }
+.fig-wb .perf-read .status { flex-basis: 100%; }
 /* glide circle */
 .fig-glide svg { width: 100%; max-width: 440px; height: auto; display: block; font-family: var(--label); font-stretch: 87.5%; }
 @media (max-width: 559px) {
   .chart-panel { padding: 14px 14px 16px; }
-  .navlog { font-size: 0.875rem; }
-  .navlog th, .navlog td { padding: 6px 5px; }
+  /* nine columns at phone width: tighter cells and a leg name that wraps, so minutes and gallons stay in view */
+  .navlog { font-size: 0.8125rem; }
+  .navlog th, .navlog td { padding: 6px 4px; }
+  .navlog tbody th { white-space: normal; }
+  .navlog td.mono { font-size: 0.8125rem; }
   .perf-table th, .perf-table td { padding: 5px 6px; }
 }
 
