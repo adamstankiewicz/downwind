@@ -76,7 +76,15 @@ describe.each(allLessons.map((l) => [l.id, l] as const))('lesson %s situations',
       for (let v = 0; v < variantCount(lesson); v++) {
         const steps = lesson.build({ ...ctx, variant: v });
         for (const id of reviewable) expect(steps.some((s) => s.id === id), `${lesson.id} v${v} ${id}`).toBe(true);
+        const text = JSON.stringify(steps);
+        expect(text, `${lesson.id} v${v}`).not.toMatch(/NaN|undefined|Invalid Date|—/);
         for (const s of steps) {
+          if (s.kind === 'turn') {
+            for (const b of s.blanks) {
+              if (typeof b.answer === 'number') expect(Number.isFinite(b.answer), `${lesson.id} v${v} ${b.id}`).toBe(true);
+              else expect(b.choices, `${lesson.id} v${v} ${b.id}`).toContain(b.answer);
+            }
+          }
           if (s.kind !== 'decide') continue;
           expect(Object.values(s.grades), `${lesson.id} v${v} ${s.id}`).toContain('best');
           for (const o of s.options) {

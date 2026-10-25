@@ -183,3 +183,20 @@ describe('daily sheet', () => {
     expect(by.ceiling.findings.map((f) => f.id)).toContain('ceiling-personal');
   });
 });
+
+describe('module 2 situations', () => {
+  const ctx = contexts[1][1];
+  const g = (id: string, variant: number, step = 'd1') => decide(weatherLessons.find((l) => l.id === id)!.build({ ...ctx, variant }), step).grades;
+  it('changes the right call with the weather', () => {
+    expect(g('2.1', 0).go).toBe('best');
+    expect(g('2.1', 1)).toMatchObject({ go: 'unsafe', cancel: 'best' });
+    expect(g('2.1', 2)).toMatchObject({ go: 'unsafe', cancel: 'best' });
+    expect(g('2.2', 1)).toMatchObject({ go: 'best' });
+    expect(g('2.2', 2)).toMatchObject({ go: 'unsafe', cancel: 'best' });
+    expect(g('2.3', 1)).toMatchObject({ 'go-plan': 'best' });
+    expect(g('2.3', 2)).toMatchObject({ go: 'best' });
+    expect(g('2.4', 1)).toMatchObject({ go: 'best' });
+    expect(g('2.4', 2)).toMatchObject({ go: 'unsafe', 'go-plan': 'unsafe', cancel: 'best' });
+    expect(g('2.5', 1, 'd2')).toMatchObject({ far: 'best', 'go-plan': 'marginal' });
+  });
+});

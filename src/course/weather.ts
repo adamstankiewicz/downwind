@@ -64,16 +64,26 @@ const readMetar: Lesson = {
   summary: 'Decode a routine report group by group, find the ceiling, and name the flight category.',
   acs: ['PA.I.C'],
   refs: ['Aviation Weather Handbook (FAA-H-8083-28), METAR', 'AIM 7-1, meteorology'],
+  variants: 3,
   build(ctx) {
+    // 0: a good day. 1: a ceiling a few hundred feet under the pilot's own
+    // minimum. 2: a high ceiling and haze under the visibility minimum.
+    const v = ctx.variant ?? 0;
     const f = ctx.airport;
     const rwy = mainRunway(f);
     const obs = observedAt(ctx.now);
     const dep = wholeHourAfter(ctx.now, 1);
-    const ceiling = round100(Math.max(ctx.minimums.ceilingFt + 2000, 4500));
+    const mins = ctx.minimums;
+    const ceiling = v === 1
+      ? round100(Math.max(mins.ceilingFt - 700, 1200))
+      : round100(Math.max(mins.ceilingFt + 2000, 4500));
+    const visSm = v === 2 ? Math.max(Math.min(mins.visibilitySm - 1, 4), 3) : v === 1 ? 7 : 10;
+    const few = v === 1 ? round100(ceiling - 500) : 2500;
+    const [tempC, dewC] = v === 2 ? [27, 19] : [18, 9];
     const windTrue = windAcross(f, rwy.headingMag, 20);
     const raw = metarText({
-      station: f.icao, at: obs, wind: { dirTrue: windTrue, speedKt: 8 }, vis: '10SM',
-      sky: [cloud('FEW', 2500), cloud('BKN', ceiling)], tempC: 18, dewC: 9, altimeter: 30.05,
+      station: f.icao, at: obs, wind: { dirTrue: windTrue, speedKt: 8 }, vis: `${visSm}SM`, weather: v === 2 ? ['HZ'] : undefined,
+      sky: [cloud('FEW', few), cloud('BKN', ceiling)], tempC, dewC, altimeter: 30.05,
     });
     const metar = parseMetar(raw);
     const brief = buildBrief({ airport: f, aircraft: ctx.aircraft, wb: null, minimums: ctx.minimums, metar, taf: null, departure: dep, tripHours: 2 });
@@ -99,9 +109,10 @@ const readMetar: Lesson = {
           { label: 'Where', value: f.icao, note: ctx.practiceField ? 'Practice field, not a real station' : f.name },
           { label: 'When', value: `${zTime(obs)}`, note: `Day ${obs.getUTCDate()}, ${hhmmZ(obs)}, which is ${local(obs)} local` },
           { label: 'Wind', value: windGroup({ dirTrue: windTrue, speedKt: 8 }), note: `From ${deg(windTrue)}° true at 8 knots` },
-          { label: 'Visibility', value: '10SM', note: '10 statute miles' },
-          { label: 'Sky', value: `${cloud('FEW', 2500)} ${cloud('BKN', ceiling)}`, note: `A few clouds at 2,500, broken at ${fmt(ceiling)}. Heights are above the field.` },
-          { label: 'Temperature', value: '18/09', note: '18°C, dew point 9°C: a 9 degree spread' },
+          { label: 'Visibility', value: `${visSm}SM`, note: `${visSm} statute miles` },
+          ...(v === 2 ? [{ label: 'Weather', value: 'HZ', note: 'Haze. Worst looking into a low sun.' }] : []),
+          { label: 'Sky', value: `${cloud('FEW', few)} ${cloud('BKN', ceiling)}`, note: `A few clouds at ${fmt(few)}, broken at ${fmt(ceiling)}. Heights are above the field.` },
+          { label: 'Temperature', value: `${tempC}/${String(dewC).padStart(2, '0')}`, note: `${tempC}°C, dew point ${dewC}°C: a ${tempC - dewC} degree spread` },
           { label: 'Altimeter', value: 'A3005', note: '30.05 inches. Set it before takeoff.' },
         ],
       },
@@ -112,29 +123,59 @@ const readMetar: Lesson = {
         blanks: [
           { id: 'ceiling', label: 'Ceiling', unit: 'ft AGL', answer: ceiling, tolerance: 0,
             explain: `The ceiling is the lowest **broken** or **overcast** layer, or vertical visibility. FEW and SCT don't count, so it is the BKN layer at ${fmt(ceiling)} feet.` },
-          { id: 'vis', label: 'Visibility', unit: 'SM', answer: 10, tolerance: 0, explain: '10SM is ten statute miles.' },
-          { id: 'cat', label: 'Flight category', answer: 'VFR', choices: ['VFR', 'MVFR', 'IFR', 'LIFR'],
-            explain: 'VFR is a ceiling above 3,000 feet and visibility above 5 miles. MVFR is 1,000 to 3,000 feet or 3 to 5 miles.' },
+          { id: 'vis', label: 'Visibility', unit: 'SM', answer: visSm, tolerance: 0, explain: `${visSm}SM is ${visSm} statute miles.${v === 2 ? ' HZ after it is haze, the reason for it.' : ''}` },
+          { id: 'cat', label: 'Flight category', answer: metar.category ?? 'VFR', choices: ['VFR', 'MVFR', 'IFR', 'LIFR'],
+            explain: `VFR is a ceiling above 3,000 feet and visibility above 5 miles. MVFR is 1,000 to 3,000 feet or 3 to 5 miles. The lower of the two sets it${metar.category === 'MVFR' ? `: here, the ${v === 2 ? 'visibility' : 'ceiling'}` : ''}.` },
         ],
       },
-      decision('d1', 'Do you drive out?',
-        `Your minimums are a ${fmt(ctx.minimums.ceilingFt)} foot ceiling and ${ctx.minimums.visibilitySm} miles. The report is twenty minutes old.`,
-        brief,
-        {
-          go: 'Drive out and start the preflight.',
-          'go-plan': 'Drive out, and check the next report before engine start.',
-          delay: 'Wait at home for the next hourly report.',
-          cancel: 'Cancel. Something about it feels off.',
-        },
-        { go: 'best', 'go-plan': 'acceptable' },
-        {
-          go: `You're at the airplane by ${local(addHours(ctx.now, 0.5))}. The new report an hour later reads almost the same. A good day.`,
-          'go-plan': 'Also fine. Checking again before engine start is a good habit, though nothing on this report needed it.',
-          delay: 'You lose an hour for a report that reads the same. Nothing wrong with caution, but this one was clear.',
-          cancel: 'Nothing on this report argues against the flight. Canceling without a reason you can name makes it harder to trust your own reasons later.',
-        },
-        'Every group is well inside your minimums.',
-      ),
+      v === 0
+        ? decision('d1', 'Do you drive out?',
+          `Your minimums are a ${fmt(mins.ceilingFt)} foot ceiling and ${mins.visibilitySm} miles. The report is twenty minutes old.`,
+          brief,
+          {
+            go: 'Drive out and start the preflight.',
+            'go-plan': 'Drive out, and check the next report before engine start.',
+            delay: 'Wait at home for the next hourly report.',
+            cancel: 'Cancel. Something about it feels off.',
+          },
+          { go: 'best', 'go-plan': 'acceptable' },
+          {
+            go: `You're at the airplane by ${local(addHours(ctx.now, 0.5))}. The new report an hour later reads almost the same. A good day.`,
+            'go-plan': 'Also fine. Checking again before engine start is a good habit, though nothing on this report needed it.',
+            delay: 'You lose an hour for a report that reads the same. Nothing wrong with caution, but this one was clear.',
+            cancel: 'Nothing on this report argues against the flight. Canceling without a reason you can name makes it harder to trust your own reasons later.',
+          },
+          'Every group is well inside your minimums.',
+        )
+        : decision('d1', 'Do you drive out?',
+          v === 1
+            ? `Your minimums are a ${fmt(mins.ceilingFt)} foot ceiling and ${mins.visibilitySm} miles. It looks fine from the window, and the report is twenty minutes old. No TAF covers the field.`
+            : `Your minimums are a ${fmt(mins.ceilingFt)} foot ceiling and ${mins.visibilitySm} miles. Late afternoon, warm and sticky, with the sun getting low in the west. No TAF covers the field.`,
+          brief,
+          {
+            go: 'Drive out and start the preflight.',
+            'go-plan': v === 1 ? 'Drive out. It is legal VFR, and you can stay close to the field.' : 'Drive out. Haze always looks worse from the ground.',
+            delay: 'Wait at home for the next hourly report.',
+            cancel: 'Not today.',
+          },
+          { go: 'unsafe', 'go-plan': 'marginal', delay: 'acceptable', cancel: 'best' },
+          v === 1
+            ? {
+              go: `You preflight under a ${fmt(ceiling)} foot ceiling, ${fmt(mins.ceilingFt - ceiling)} feet under the minimum you set on a calm day for exactly this morning. Minimums only work if you don't renegotiate them at the airplane.`,
+              'go-plan': `Legal, and still under your own ${fmt(mins.ceilingFt)} foot line. "Staying close" is how the minimum gets moved a few hundred feet at a time.`,
+              delay: 'Reasonable if you have a reason to expect it to lift. With no forecast, check the trend on the last few reports before you wait.',
+              cancel: 'The clean call. You wrote the minimum down so you would not have to argue with yourself this morning.',
+            }
+            : {
+              go: `${visSm} miles in haze is under your ${mins.visibilitySm} mile minimum, and flying west into a low sun it will feel like half that. Haze also hides other airplanes until they are close.`,
+              'go-plan': `Sometimes it does, and sometimes it is worse aloft, especially into the sun. The report says ${visSm} miles, under your minimum.`,
+              delay: 'Haze rarely clears before evening, and the sun is only getting lower. Waiting probably ends in the same place.',
+              cancel: 'The clean call. A high ceiling does not make up for a visibility under your minimum.',
+            },
+          v === 1
+            ? `The ceiling is ${fmt(ceiling)} feet: legal VFR, and under your ${fmt(mins.ceilingFt)} foot minimum.`
+            : `The ceiling is high, but ${visSm} miles in haze is under your ${mins.visibilitySm} mile minimum, and flying into a low sun makes it worse.`,
+        ),
     ];
   },
 };
@@ -147,7 +188,12 @@ const windOnRunway: Lesson = {
   summary: 'Turn a true wind into a magnetic one, find the crosswind on your runway, and hold it against your minimum.',
   acs: ['PA.I.C', 'PA.IV.B'],
   refs: ['Pilot\'s Handbook of Aeronautical Knowledge (FAA-H-8083-25), crosswind components', 'Airplane Flying Handbook (FAA-H-8083-3), crosswind approach and landing'],
+  variants: 3,
   build(ctx) {
+    // 0: the gust crosswind is just over the pilot's minimum. 1: a brisk
+    // crosswind that stays inside it. 2: nearly down the runway, with a gust
+    // spread over the pilot's limit.
+    const v = ctx.variant ?? 0;
     const f = ctx.airport;
     const rwy = mainRunway(f);
     const vari = f.magneticVariationDeg;
@@ -160,12 +206,14 @@ const windOnRunway: Lesson = {
     const exMag = trueToMagnetic(exTrue, vari);
     const ex = components(exMag, 10, rwy.headingMag);
 
-    // The lesson's wind: about 40° off, gusting just over the pilot's minimum.
-    const windTrue = windAcross(f, rwy.headingMag, 40);
+    // The lesson's wind: about 40° off, gusting just over the pilot's minimum
+    // (or just under it, or nearly straight down the runway).
+    const offset = v === 2 ? 15 : 40;
+    const windTrue = windAcross(f, rwy.headingMag, offset);
     const windMag = trueToMagnetic(windTrue, vari);
-    const angle = components(windMag, 10, rwy.headingMag).angleDeg || 40;
-    const gust = gustForCrosswind(ctx.minimums, angle, 2);
-    const steady = Math.max(gust - 8, 5);
+    const angle = components(windMag, 10, rwy.headingMag).angleDeg || offset;
+    const gust = v === 2 ? 12 + ctx.minimums.gustSpreadKt + 4 : gustForCrosswind(ctx.minimums, angle, v === 1 ? -3 : 2);
+    const steady = v === 2 ? 12 : Math.max(gust - (v === 1 ? 6 : 8), 5);
     const raw = metarText({
       station: f.icao, at: obs, wind: { dirTrue: windTrue, speedKt: steady, gustKt: gust }, vis: '10SM',
       sky: [cloud('SCT', round100(Math.max(ctx.minimums.ceilingFt + 1500, 4500)))], tempC: 16, dewC: 6, altimeter: 29.98,
@@ -216,24 +264,62 @@ const windOnRunway: Lesson = {
             explain: `The same angle at ${gust} knots is about ${Math.round(gustX)} knots across. Plan for the gust, not the average.` },
         ],
       },
-      decision('d1', `Holding short of ${rw.runway.id}`,
-        `Run-up done. Crosswind about ${Math.round(steadyX)} knots, ${Math.round(gustX)} in the gusts. Your personal minimum is ${ctx.minimums.crosswindKt} knots${demo > 0 ? `, and the airplane's demonstrated crosswind is ${demo}` : ''}.`,
-        brief,
-        {
-          go: 'Go. It is legal, and the airplane can handle it.',
-          'go-plan': 'Go, but abort the takeoff if it gets squirrelly, and plan a full-stop landing.',
-          delay: 'Taxi back and wait an hour to see if it settles.',
-          cancel: 'Taxi back and put the airplane away.',
-        },
-        { go: 'unsafe', 'go-plan': 'marginal' },
-        {
-          go: `The takeoff is fine. The landing is not: a ${Math.round(gustX)} knot gust arrives in the flare, you run out of aileron, and you go around twice before getting it down long and fast. Nothing broken, but you flew past a line you drew for yourself.`,
-          'go-plan': 'An abort point is good thinking, but the hard part is the landing, and you have committed to that the moment you lift off.',
-          delay: 'Reasonable. Without a forecast you are guessing whether it settles, so check it against a TAF before you wait. That is the next lesson.',
-          cancel: 'The clean call. Your minimum did its job: it made the decision before the wind could.',
-        },
-        `The gust crosswind is over your ${ctx.minimums.crosswindKt} knot minimum.`,
-      ),
+      v === 1
+        ? decision('d1', `Holding short of ${rw.runway.id}`,
+          `Run-up done. Crosswind about ${Math.round(steadyX)} knots, ${Math.round(gustX)} in the gusts. Your personal minimum is ${ctx.minimums.crosswindKt} knots${demo > 0 ? `, and the airplane's demonstrated crosswind is ${demo}` : ''}. It feels windier than you're used to.`,
+          brief,
+          {
+            go: 'Go. Fly the crosswind technique, and add half the gust factor on final.',
+            'go-plan': 'Go, but only for one lap, then decide.',
+            delay: 'Taxi back and wait an hour to see if it settles.',
+            cancel: 'Taxi back. It feels like too much.',
+          },
+          { go: 'best', 'go-plan': 'acceptable' },
+          {
+            go: `Aileron into the wind on the roll, a firm lift-off, and on final half the ${gust - steady} knot gust factor added to your approach speed. The landing takes work and it is yours. This is the wind your minimum was set to include.`,
+            'go-plan': 'Fine, and it costs nothing. One lap told you what the numbers already did: it is inside your minimum.',
+            delay: 'You lose an hour on a wind that was inside the line you drew. Days like this, flown carefully, are how a minimum gets raised over time.',
+            cancel: `Feelings count, and they are worth writing down afterwards. But ${Math.round(gustX)} knots is inside your ${ctx.minimums.crosswindKt} knot minimum, and practice in this wind is what keeps you able to handle it.`,
+          },
+          `The gust crosswind, about ${Math.round(gustX)} knots, is inside your ${ctx.minimums.crosswindKt} knot minimum, and the gust spread of ${gust - steady} is inside your ${ctx.minimums.gustSpreadKt}. Fly it with technique: crosswind controls, and half the gust factor added on final.`,
+        )
+        : v === 2
+          ? decision('d1', `Holding short of ${rw.runway.id}`,
+            `Run-up done. The wind is nearly down the runway: crosswind only about ${Math.round(gustX)} knots even in the gusts. It is ${steady} knots, gusting ${gust}. Your gust spread limit is ${ctx.minimums.gustSpreadKt} knots.`,
+            brief,
+            {
+              go: 'Go. There is hardly any crosswind.',
+              'go-plan': 'Go, and add the whole gust factor to the approach speed.',
+              delay: 'Taxi back and wait an hour to see if it settles.',
+              cancel: 'Taxi back and put the airplane away.',
+            },
+            { go: 'unsafe', 'go-plan': 'marginal' },
+            {
+              go: `The crosswind is easy. The gusts are not: a ${gust - steady} knot swing in airspeed in the flare, and the airplane balloons, then drops. Gust spread is its own limit for exactly this reason.`,
+              'go-plan': `Extra speed helps with gusts, and the whole gust factor on top of ${steady} knots means a fast, long landing. The limit was ${ctx.minimums.gustSpreadKt} knots, and this is ${gust - steady}.`,
+              delay: 'Reasonable. Gusty winds often ease toward evening, though without a forecast you are guessing.',
+              cancel: 'The clean call. A wind down the runway can still be past your limit when it will not hold still.',
+            },
+            `The crosswind is small, but the gusts swing ${gust - steady} knots, over your ${ctx.minimums.gustSpreadKt} knot gust spread limit.`,
+          )
+          : decision('d1', `Holding short of ${rw.runway.id}`,
+            `Run-up done. Crosswind about ${Math.round(steadyX)} knots, ${Math.round(gustX)} in the gusts. Your personal minimum is ${ctx.minimums.crosswindKt} knots${demo > 0 ? `, and the airplane's demonstrated crosswind is ${demo}` : ''}.`,
+            brief,
+            {
+              go: 'Go. It is legal, and the airplane can handle it.',
+              'go-plan': 'Go, but abort the takeoff if it gets squirrelly, and plan a full-stop landing.',
+              delay: 'Taxi back and wait an hour to see if it settles.',
+              cancel: 'Taxi back and put the airplane away.',
+            },
+            { go: 'unsafe', 'go-plan': 'marginal' },
+            {
+              go: `The takeoff is fine. The landing is not: a ${Math.round(gustX)} knot gust arrives in the flare, you run out of aileron, and you go around twice before getting it down long and fast. Nothing broken, but you flew past a line you drew for yourself.`,
+              'go-plan': 'An abort point is good thinking, but the hard part is the landing, and you have committed to that the moment you lift off.',
+              delay: 'Reasonable. Without a forecast you are guessing whether it settles, so check it against a TAF before you wait. That is the next lesson.',
+              cancel: 'The clean call. Your minimum did its job: it made the decision before the wind could.',
+            },
+            `The gust crosswind is over your ${ctx.minimums.crosswindKt} knot minimum.`,
+          ),
     ];
   },
 };
@@ -246,41 +332,62 @@ const tafReturn: Lesson = {
   summary: 'Read the forecast against your own departure and return, not the clock, and spot when waiting is the better trip.',
   acs: ['PA.I.C'],
   refs: ['Aviation Weather Handbook (FAA-H-8083-28), TAF', '14 CFR 91.103, preflight action'],
+  variants: 3,
   build(ctx) {
+    // 0: gusty now, calm after you'd be back. 1: fine now, lowering before
+    // you'd be back. 2: fine now, a wind shift during the flight that stays
+    // inside every limit.
+    const v = ctx.variant ?? 0;
     const f = ctx.airport;
     const rwy = mainRunway(f);
+    const mins = ctx.minimums;
     const obs = observedAt(ctx.now);
     const dep = wholeHourAfter(ctx.now, 1);
     const ret = addHours(dep, 2);
-    const fm = addHours(dep, 4);
+    const fm = addHours(dep, v === 0 ? 4 : 1);
     const validFrom = wholeHourAfter(addHours(obs, -1), 1);
-
-    const windTrue = windAcross(f, rwy.headingMag, 50);
-    const angle = 50;
-    const gust = gustForCrosswind(ctx.minimums, angle, 3);
-    const steady = Math.max(gust - 8, 5);
-    const calmTrue = windAcross(f, rwy.headingMag, 10);
-    const ceiling = round100(Math.max(ctx.minimums.ceilingFt + 1500, 4500));
+    const ceiling = round100(Math.max(mins.ceilingFt + 1500, 4500));
     const fmGroup = `FM${zDayHour(fm)}00`;
 
+    // The opening forecast and the FM group, as TAF text and a plain reading.
+    const gusty = { dirTrue: windAcross(f, rwy.headingMag, 50), speedKt: 0, gustKt: gustForCrosswind(mins, 50, 3) };
+    gusty.speedKt = Math.max(gusty.gustKt - 8, 5);
+    const calm = { dirTrue: windAcross(f, rwy.headingMag, 10), speedKt: 7 };
+    const lowBase = round100(Math.max(mins.ceilingFt - 800, 1500));
+    const shifted = { dirTrue: windAcross(f, rwy.headingMag, 150), speedKt: 9 };
+    const opening = v === 0
+      ? { wind: gusty, sky: cloud('SCT', ceiling), vis: 'P6SM', note: `Gusts to ${gusty.gustKt}, good visibility` }
+      : { wind: { dirTrue: windAcross(f, rwy.headingMag, 20), speedKt: 8 }, sky: cloud('SCT', ceiling), vis: 'P6SM', note: 'Light wind, scattered clouds, good visibility' };
+    const change = v === 0
+      ? { wind: calm, rest: 'P6SM SKC', note: `From ${hhmmZ(fm)}: light wind, nearly down the runway` }
+      : v === 1
+        ? { wind: { dirTrue: windAcross(f, rwy.headingMag, 30), speedKt: 10 }, rest: `5SM -RA ${cloud('BKN', lowBase)}`, note: `From ${hhmmZ(fm)}: light rain, 5 miles, broken at ${fmt(lowBase)}` }
+        : { wind: shifted, rest: `P6SM ${cloud('SCT', ceiling)}`, note: `From ${hhmmZ(fm)}: the wind swings round, still light, still good visibility` };
+    const openingText = `${windGroup(opening.wind)} ${opening.vis} ${opening.sky}`;
+    const changeText = `${windGroup(change.wind)} ${change.rest}`;
+
     const rawMetar = metarText({
-      station: f.icao, at: obs, wind: { dirTrue: windTrue, speedKt: steady, gustKt: gust }, vis: '10SM',
-      sky: [cloud('SCT', ceiling)], tempC: 14, dewC: 3, altimeter: 30.01,
+      station: f.icao, at: obs, wind: opening.wind, vis: '10SM',
+      sky: [opening.sky.startsWith('SCT') ? cloud('SCT', ceiling) : opening.sky], tempC: 14, dewC: v === 1 ? 8 : 3, altimeter: 30.01,
     });
     const rawTaf = [
       'TAF', f.icao, zTime(addHours(validFrom, -0.67)), `${zDayHour(validFrom)}/${zDayHour(addHours(validFrom, 24))}`,
-      windGroup({ dirTrue: windTrue, speedKt: steady, gustKt: gust }), 'P6SM', cloud('SCT', ceiling),
-      fmGroup, windGroup({ dirTrue: calmTrue, speedKt: 7 }), 'P6SM', 'SKC',
+      openingText, fmGroup, changeText,
     ].join(' ');
     const metar = parseMetar(rawMetar);
     const taf = parseTaf(rawTaf);
-    const brief = buildBrief({ airport: f, aircraft: ctx.aircraft, wb: null, minimums: ctx.minimums, metar, taf, departure: dep, tripHours: 2 });
+    const brief = buildBrief({ airport: f, aircraft: ctx.aircraft, wb: null, minimums: mins, metar, taf, departure: dep, tripHours: 2 });
     const figure = { kind: 'taf' as const, raw: rawTaf, departure: dep, returnAt: ret };
+    const returnGroup = ret.getTime() >= fm.getTime() ? fmGroup : 'Opening forecast';
+    const returnGust = returnGroup === fmGroup ? ('gustKt' in change.wind ? (change.wind as { gustKt?: number }).gustKt ?? 0 : 0) : ('gustKt' in opening.wind ? opening.wind.gustKt ?? 0 : 0);
+    const shiftedRunway = v === 2 ? runwayWind(f, { dirTrue: shifted.dirTrue, speedKt: shifted.speedKt, gustKt: null, variable: false } as Parameters<typeof runwayWind>[1]) : null;
+    // Leaving now rather than at the planned time, back a quarter hour before the change.
+    const back = addHours(fm, -0.25);
 
     return [
       {
         kind: 'brief', id: 'b1', title: 'Now and later',
-        scene: `A two-hour flight: off at ${hhmmZ(dep)}, back by ${hhmmZ(ret)}. The wind is up again.${ctx.practiceField ? '' : ` For this lesson, assume ${f.icao} issues its own TAF. Many fields don't, and you read the nearest one instead.`}`,
+        scene: `A two-hour flight: off at ${hhmmZ(dep)}, back by ${hhmmZ(ret)}. ${v === 0 ? 'The wind is up again.' : 'It is a pleasant afternoon at the field.'}${ctx.practiceField ? '' : ` For this lesson, assume ${f.icao} issues its own TAF. Many fields don't, and you read the nearest one instead.`}`,
         say: {
           full: 'The METAR says what the field is doing **now**. A flight needs to know what it will be doing when you come back, and that is the TAF. It opens with a valid period, then the opening forecast, then **change groups**. **FM** means "from this time on, replace everything above with this." Read every group against **your** departure and return times, not against the clock on the wall.',
           short: 'Read each group against your own departure and return.',
@@ -290,47 +397,90 @@ const tafReturn: Lesson = {
       {
         kind: 'example', id: 'e1', title: 'Laying it against the flight',
         say: {
-          full: `Validity first: day ${validFrom.getUTCDate()} at ${String(validFrom.getUTCHours()).padStart(2, '0')}Z for 24 hours. The opening forecast holds until ${fmGroup}, which is ${hhmmZ(fm)}. Your flight sits entirely in front of it. The calmer wind is real, but it arrives two hours after you are back.`,
+          full: `Validity first: day ${validFrom.getUTCDate()} at ${String(validFrom.getUTCHours()).padStart(2, '0')}Z for 24 hours. The opening forecast holds until ${fmGroup}, which is ${hhmmZ(fm)}. ${v === 0
+            ? 'Your flight sits entirely in front of it. The calmer wind is real, but it arrives two hours after you are back.'
+            : `Your flight starts in the opening forecast and ends in the ${fmGroup} group. The departure looks after itself; the return is what you are planning for.`}`,
           short: `${fmGroup} is ${hhmmZ(fm)}. Where does your flight sit?`,
         },
         figure,
         work: [
           { label: 'Valid', value: `${zDayHour(validFrom)}/${zDayHour(addHours(validFrom, 24))}`, note: `From day ${validFrom.getUTCDate()} at ${String(validFrom.getUTCHours()).padStart(2, '0')}Z, for 24 hours` },
-          { label: 'Opening', value: `${windGroup({ dirTrue: windTrue, speedKt: steady, gustKt: gust })} P6SM ${cloud('SCT', ceiling)}`, note: `Gusts to ${gust}, good visibility` },
-          { label: fmGroup, value: `${windGroup({ dirTrue: calmTrue, speedKt: 7 })} P6SM SKC`, note: `From ${hhmmZ(fm)}: light wind, nearly down the runway` },
-          { label: 'Your flight', value: `${hhmmZ(dep)} to ${hhmmZ(ret)}`, note: 'Entirely in the opening forecast' },
+          { label: 'Opening', value: openingText, note: opening.note },
+          { label: fmGroup, value: changeText, note: change.note },
+          { label: 'Your flight', value: `${hhmmZ(dep)} to ${hhmmZ(ret)}`, note: v === 0 ? 'Entirely in the opening forecast' : `Lands ${Math.round((ret.getTime() - fm.getTime()) / 60_000)} minutes into ${fmGroup}` },
         ],
       },
       {
         kind: 'turn', id: 't1', title: 'Your turn',
-        prompt: 'Which part of the TAF covers your return, what gusts does it forecast, and at what hour does the wind ease?',
+        prompt: v === 0
+          ? 'Which part of the TAF covers your return, what gusts does it forecast, and at what hour does the wind ease?'
+          : 'Which part of the TAF covers your return, what gusts does it forecast then, and at what hour does the change start?',
         figure,
         blanks: [
-          { id: 'group', label: 'Group covering your return', answer: 'Opening forecast', choices: ['Opening forecast', fmGroup],
-            explain: `You're back at ${hhmmZ(ret)}; ${fmGroup} doesn't start until ${hhmmZ(fm)}.` },
-          { id: 'gust', label: 'Gusts at your return', unit: 'kt', answer: gust, tolerance: 0, explain: `The opening forecast has gusts to ${gust}.` },
-          { id: 'ease', label: 'Wind eases at', unit: 'Z (hour)', answer: fm.getUTCHours(), tolerance: 0,
+          { id: 'group', label: 'Group covering your return', answer: returnGroup, choices: ['Opening forecast', fmGroup],
+            explain: returnGroup === fmGroup ? `You're back at ${hhmmZ(ret)}, after ${fmGroup} starts at ${hhmmZ(fm)}.` : `You're back at ${hhmmZ(ret)}; ${fmGroup} doesn't start until ${hhmmZ(fm)}.` },
+          { id: 'gust', label: 'Gusts at your return', unit: 'kt', answer: returnGust, tolerance: 0,
+            explain: returnGust ? `The opening forecast has gusts to ${returnGust}.` : `No G in the wind group: no gusts forecast. Write 0.` },
+          { id: 'ease', label: v === 0 ? 'Wind eases at' : 'Change starts at', unit: 'Z (hour)', answer: fm.getUTCHours(), tolerance: 0,
             explain: `${fmGroup}: day ${fm.getUTCDate()}, ${String(fm.getUTCHours()).padStart(2, '0')}00Z.` },
         ],
       },
-      decision('d1', 'Now, or after the change?',
-        `It is ${hhmmZ(addHours(dep, -0.5))}. The gusts are over your ${ctx.minimums.crosswindKt} knot crosswind minimum now, and the TAF has them until ${hhmmZ(fm)}.`,
-        brief,
-        {
-          go: 'Go now. The TAF says it gets better anyway.',
-          'go-plan': 'Go now, and come back early if it is bad.',
-          delay: `Move the flight to after ${hhmmZ(fm)}.`,
-          cancel: 'Cancel for today.',
-        },
-        { go: 'unsafe', 'go-plan': 'marginal', delay: 'best' },
-        {
-          go: 'This is the most common way a TAF gets misread: an improvement after you land used as the reason to go before it. You fly the whole trip in the gusts.',
-          'go-plan': 'Coming back early still means landing in the opening forecast. The early return buys nothing.',
-          delay: `You take off at ${hhmmZ(addHours(fm, 0.5))} into a light wind nearly down the runway. Same trip, much more margin.`,
-          cancel: 'Safe, but the forecast handed you a better slot later the same day.',
-        },
-        'The improvement is the argument for waiting, not for going.',
-      ),
+      v === 1
+        ? decision('d1', 'The return, not the departure',
+          `It is ${hhmmZ(addHours(dep, -0.5))}, and it is lovely out. The TAF lowers to ${fmt(lowBase)} broken in rain from ${hhmmZ(fm)}, under your ${fmt(mins.ceilingFt)} foot minimum, an hour before you planned to be back.`,
+          brief,
+          {
+            go: 'Go as planned. It is beautiful now.',
+            'go-plan': `Leave now instead, fly a shorter loop, and be on the ground by ${hhmmZ(back)}.`,
+            delay: 'Wait for the next TAF.',
+            cancel: 'Cancel for today.',
+          },
+          { go: 'acceptable', 'go-plan': 'best' },
+          {
+            go: `The first hour is lovely. The last half hour is in rain under a ${fmt(lowBase)} foot ceiling, below the minimum you set, getting home to a field you can no longer see from ten miles out.`,
+            'go-plan': `You fly the good part of the afternoon and you're tied down by ${hhmmZ(back)}, watching the rain arrive from the FBO. The forecast told you when the window closed, and you planned around it.`,
+            delay: 'The next TAF is a few hours away, and the good weather is now. Waiting spends the window.',
+            cancel: 'Safe, and the forecast gave you a good window before the change.',
+          },
+          'A forecast that gets worse during the trip is planned around: fit the flight into the window, with margin before the change.',
+        )
+        : v === 2
+          ? decision('d1', 'A wind shift in the forecast',
+            `It is ${hhmmZ(addHours(dep, -0.5))}. The TAF swings the wind round to ${deg(shifted.dirTrue)} true at ${shifted.speedKt} knots from ${hhmmZ(fm)}, still light, still VFR. You'll come back to ${shiftedRunway ? `runway ${shiftedRunway.runway.id}, not the one you leave from` : 'the other end of the runway'}.`,
+            brief,
+            {
+              go: `Go as planned, and expect runway ${shiftedRunway?.runway.id ?? 'the other way'} on the way home.`,
+              'go-plan': 'Go, and come back early before the shift.',
+              delay: 'Wait until after the shift and take off into the new wind.',
+              cancel: 'Cancel. The forecast is changing.',
+            },
+            { go: 'best' },
+            {
+              go: `You plan the pattern entry for runway ${shiftedRunway?.runway.id ?? 'the other way'} before you leave, listen to the weather on the way back, and join for it. A wind shift is a runway change, not a reason to stay home.`,
+              'go-plan': 'Fine, but it shortens the flight for a change that stays inside every limit you have.',
+              delay: 'You lose an hour for nothing. Both winds are light and within your limits.',
+              cancel: 'A changing forecast is not the same as a worse one. This one stays light and VFR all afternoon.',
+            },
+            'Every group in the TAF is inside your minimums. The only thing the change asks of you is to expect the other runway on the way home.',
+          )
+          : decision('d1', 'Now, or after the change?',
+            `It is ${hhmmZ(addHours(dep, -0.5))}. The gusts are over your ${mins.crosswindKt} knot crosswind minimum now, and the TAF has them until ${hhmmZ(fm)}.`,
+            brief,
+            {
+              go: 'Go now. The TAF says it gets better anyway.',
+              'go-plan': 'Go now, and come back early if it is bad.',
+              delay: `Move the flight to after ${hhmmZ(fm)}.`,
+              cancel: 'Cancel for today.',
+            },
+            { go: 'unsafe', 'go-plan': 'marginal', delay: 'best' },
+            {
+              go: 'This is the most common way a TAF gets misread: an improvement after you land used as the reason to go before it. You fly the whole trip in the gusts.',
+              'go-plan': 'Coming back early still means landing in the opening forecast. The early return buys nothing.',
+              delay: `You take off at ${hhmmZ(addHours(fm, 0.5))} into a light wind nearly down the runway. Same trip, much more margin.`,
+              cancel: 'Safe, but the forecast handed you a better slot later the same day.',
+            },
+            'The improvement is the argument for waiting, not for going.',
+          ),
     ];
   },
 };
@@ -342,16 +492,23 @@ const ceilings: Lesson = {
   title: 'Ceilings: legal, personal, and the pattern',
   summary: 'Separate the legal VFR minimum from the ceiling you need for a normal pattern, and from the one you set for yourself.',
   acs: ['PA.I.C', 'PA.I.E'],
-  refs: ['14 CFR 91.155, basic VFR weather minimums', 'Risk Management Handbook (FAA-H-8083-2), personal minimums'],
+  refs: ['14 CFR 91.155, basic VFR weather minimums', '14 CFR 91.157, special VFR', 'Risk Management Handbook (FAA-H-8083-2), personal minimums'],
+  variants: 3,
   build(ctx) {
+    // 0: legal, and under the pilot's minimum. 1: above it, a fine pattern
+    // day. 2: under the legal minimum, with special VFR on offer.
+    const v = ctx.variant ?? 0;
     const f = ctx.airport;
     const rwy = mainRunway(f);
     const obs = observedAt(ctx.now);
     const dep = wholeHourAfter(ctx.now, 1);
-    const ceiling = Math.max(1100, round100(ctx.minimums.ceilingFt - 700));
+    const ceiling = v === 1
+      ? round100(Math.max(ctx.minimums.ceilingFt + 400, 2000))
+      : v === 2 ? 900 : Math.max(1100, round100(ctx.minimums.ceilingFt - 700));
+    const visSm = v === 2 ? 4 : 8;
     const raw = metarText({
-      station: f.icao, at: obs, wind: { dirTrue: windAcross(f, rwy.headingMag, 10), speedKt: 6 }, vis: '8SM',
-      sky: [cloud('BKN', ceiling), cloud('OVC', ceiling + 1500)], tempC: 12, dewC: 6, altimeter: 30.12,
+      station: f.icao, at: obs, wind: { dirTrue: windAcross(f, rwy.headingMag, 10), speedKt: 6 }, vis: `${visSm}SM`, weather: v === 2 ? ['BR'] : undefined,
+      sky: v === 2 ? [cloud('OVC', ceiling)] : [cloud('BKN', ceiling), cloud('OVC', ceiling + 1500)], tempC: 12, dewC: v === 2 ? 10 : 6, altimeter: 30.12,
     });
     const metar = parseMetar(raw);
     const brief = buildBrief({ airport: f, aircraft: ctx.aircraft, wb: null, minimums: ctx.minimums, metar, taf: null, departure: dep, tripHours: 1 });
@@ -361,7 +518,9 @@ const ceilings: Lesson = {
     return [
       {
         kind: 'brief', id: 'b1', title: 'Three numbers',
-        scene: `Low and grey this morning. You only want to fly the pattern at ${fieldName(ctx)}.`,
+        scene: v === 1
+          ? `Grey but bright this morning. You only want to fly the pattern at ${fieldName(ctx)}.`
+          : `Low and grey this morning. You only want to fly the pattern at ${fieldName(ctx)}.`,
         say: {
           full: `There are three different ceilings in your head. The **legal** one: to take off or land VFR in a surface area you need a 1,000 foot ceiling and 3 miles (91.155(c) and (d)). The **practical** one: a pattern at 1,000 feet above the field, with the 500 feet of clearance below cloud that Class D and E require, needs about 1,500 feet. And **yours**: you set ${fmt(ctx.minimums.ceilingFt)} on a calm day for reasons you'll want to remember on a day like this.`,
           short: 'Legal 1,000. A normal pattern about 1,500. Yours is the one that binds.',
@@ -373,7 +532,7 @@ const ceilings: Lesson = {
         prompt: 'What is the ceiling, what is the legal minimum ceiling in a surface area, and what ceiling gives a 1,000 foot pattern 500 feet below the clouds?',
         figure,
         blanks: [
-          { id: 'ceiling', label: 'Ceiling', unit: 'ft AGL', answer: ceiling, tolerance: 0, explain: `The lowest broken layer: ${fmt(ceiling)} feet.` },
+          { id: 'ceiling', label: 'Ceiling', unit: 'ft AGL', answer: ceiling, tolerance: 0, explain: `The lowest ${v === 2 ? 'overcast' : 'broken'} layer: ${fmt(ceiling)} feet.` },
           { id: 'legal', label: 'Legal VFR ceiling, surface area', unit: 'ft', answer: 1000, tolerance: 0,
             explain: '91.155(c): no VFR takeoff, landing or pattern under a ceiling below 1,000 feet in a surface area, without special VFR.' },
           { id: 'pattern', label: 'Ceiling for a 1,000 ft pattern', unit: 'ft', answer: 1500, tolerance: 0,
@@ -393,24 +552,68 @@ const ceilings: Lesson = {
           { label: 'Today', value: `${fmt(ceiling)} ft` },
         ],
       },
-      decision('d1', 'Pattern work or not?',
-        `${fmt(ceiling)} broken, 8 miles, light wind. No forecast for the field.`,
-        brief,
-        {
-          go: 'Go. It is legal VFR and it is only the pattern.',
-          'go-plan': 'Go, but fly a lower pattern to stay clear of the clouds.',
-          delay: 'Wait for it to lift.',
-          cancel: 'Not today.',
-        },
-        { go: 'unsafe', 'go-plan': 'marginal', cancel: 'best' },
-        {
-          go: 'Legal is not the question your minimum asks. On the crosswind leg the bases are ragged and lower than reported; you are in and out of wisps at pattern altitude.',
-          'go-plan': 'A low pattern trades cloud clearance for obstacle and traffic margin, and everyone else is flying the published one. It is how a small problem becomes a big one.',
-          delay: 'Fine, as long as "lift" means a report back above your minimum, not a hopeful look at the sky.',
-          cancel: 'The clean call. You set that number for a day like this one.',
-        },
-        `${fmt(ceiling)} feet is under your ${fmt(ctx.minimums.ceilingFt)} foot minimum.`,
-      ),
+      v === 1
+        ? decision('d1', 'Pattern work or not?',
+          `${fmt(ceiling)} broken, ${visSm} miles, light wind. No forecast for the field. It looks gloomy out.`,
+          brief,
+          {
+            go: 'Go, and fly the normal pattern.',
+            'go-plan': 'Go, but stay in the pattern only and land at the first sign of lowering.',
+            delay: 'Wait for it to brighten up.',
+            cancel: 'Not today. It looks gloomy.',
+          },
+          { go: 'best', 'go-plan': 'acceptable' },
+          {
+            go: `A ${fmt(ceiling)} foot ceiling leaves a 1,000 foot pattern with ${fmt(ceiling - 1000)} feet below the clouds, and it is inside the minimum you set. Grey is not the same as low.`,
+            'go-plan': 'Fine, and you were only flying the pattern anyway. Nothing on the report needed the extra rule.',
+            delay: 'You lose the morning to the color of the sky. The numbers were inside every line you drew.',
+            cancel: `Gloomy is a feeling. ${fmt(ceiling)} feet is a number, and it clears your ${fmt(ctx.minimums.ceilingFt)} foot minimum.`,
+          },
+          `${fmt(ceiling)} feet is legal, tall enough for a normal pattern, and at or above your ${fmt(ctx.minimums.ceilingFt)} foot minimum.`,
+        )
+        : v === 2
+          ? decision('d1', 'Pattern work or not?',
+            `${fmt(ceiling)} overcast, ${visSm} miles in mist, light wind. No forecast for the field.${f.airspace === 'G' ? '' : ' A friend says ATC will give you special VFR if you ask.'}`,
+            brief,
+            {
+              go: 'Go. It is only the pattern.',
+              'go-plan': f.airspace === 'G' ? 'Go, and fly a low, tight pattern.' : 'Ask ATC for special VFR and stay in the pattern.',
+              delay: 'Wait for it to lift.',
+              cancel: 'Not today.',
+            },
+            { go: 'unsafe', 'go-plan': 'unsafe', cancel: 'best' },
+            {
+              go: f.airspace === 'G'
+                ? `Class G by day asks for little, and a ${fmt(ceiling)} foot overcast leaves a pattern a few hundred feet off the ground, under your own minimum by ${fmt(ctx.minimums.ceilingFt - ceiling)} feet.`
+                : `Under a ${fmt(ceiling)} foot ceiling, VFR in the surface area is not legal (91.155(c)) without a special VFR clearance.`,
+              'go-plan': f.airspace === 'G'
+                ? 'A low pattern trades the cloud for the ground, the towers and the traffic flying the normal one.'
+                : `Special VFR by day is legal with a mile and clear of clouds (91.157), and it is a way to get home, not a way to practice. A pattern under ${fmt(ceiling)} feet puts you a few hundred feet off the trees, and ${fmt(ctx.minimums.ceilingFt - ceiling)} feet under your own minimum.`,
+              delay: 'Fine, as long as "lift" means a report back above your minimum, not a hopeful look at the sky.',
+              cancel: 'The clean call. Some legal options are for getting home, not for going up.',
+            },
+            f.airspace === 'G'
+              ? `${fmt(ceiling)} feet may be legal in Class G by day, and it is far under your ${fmt(ctx.minimums.ceilingFt)} foot minimum and too low for a normal pattern.`
+              : `${fmt(ceiling)} feet is under the 1,000 foot legal minimum in a surface area and far under yours. Special VFR exists for getting in or out, not for practice.`,
+          )
+          : decision('d1', 'Pattern work or not?',
+            `${fmt(ceiling)} broken, ${visSm} miles, light wind. No forecast for the field.`,
+            brief,
+            {
+              go: 'Go. It is legal VFR and it is only the pattern.',
+              'go-plan': 'Go, but fly a lower pattern to stay clear of the clouds.',
+              delay: 'Wait for it to lift.',
+              cancel: 'Not today.',
+            },
+            { go: 'unsafe', 'go-plan': 'marginal', cancel: 'best' },
+            {
+              go: 'Legal is not the question your minimum asks. On the crosswind leg the bases are ragged and lower than reported; you are in and out of wisps at pattern altitude.',
+              'go-plan': 'A low pattern trades cloud clearance for obstacle and traffic margin, and everyone else is flying the published one. It is how a small problem becomes a big one.',
+              delay: 'Fine, as long as "lift" means a report back above your minimum, not a hopeful look at the sky.',
+              cancel: 'The clean call. You set that number for a day like this one.',
+            },
+            `${fmt(ceiling)} feet is under your ${fmt(ctx.minimums.ceilingFt)} foot minimum.`,
+          ),
     ];
   },
 };
@@ -423,7 +626,11 @@ const spread: Lesson = {
   summary: 'Fly an evening flight with a narrow temperature and dew point spread, and make the call when the field goes down behind you.',
   acs: ['PA.I.C', 'PA.IX.A'],
   refs: ['Aviation Weather Handbook (FAA-H-8083-28), fog', '14 CFR 91.155 and 91.157, special VFR'],
+  variants: 2,
   build(ctx) {
+    // 0: the alternate you picked is clear. 1: the mist has reached the
+    // alternate too, and a bigger field farther inland is the way out.
+    const v = ctx.variant ?? 0;
     const f = ctx.airport;
     const rwy = mainRunway(f);
     // An evening flight whatever time the pilot opens the lesson.
@@ -508,24 +715,43 @@ const spread: Lesson = {
         },
         figure: { kind: 'metar', raw: special, marks: ['2SM', cloud('BKN', 700), '10/10'] },
       },
-      {
-        kind: 'decide', id: 'd2', title: 'Twenty minutes out',
-        situation: `Home is ${fmt(700)} overcast-broken and 2 miles. Your inland alternate, fifteen minutes away and higher, reports clear and 10. Sunset is in ten minutes.`,
-        options: [
-          { id: 'go', label: 'Continue home and get in under it.' },
-          { id: 'go-plan', label: 'Divert to the alternate now.' },
-          { id: 'delay', label: 'Hold nearby and wait for it to lift.' },
-          { id: 'cancel', label: 'Ask the tower for a special VFR clearance home.' },
-        ],
-        grades: { go: 'unsafe', 'go-plan': 'best', delay: 'marginal', cancel: 'marginal' },
-        consequence: {
-          go: 'Under a 700 foot ceiling you can\'t fly a legal VFR pattern in the surface area, and in the dark the mist and the ground look the same. This is how VFR-into-IMC accidents start.',
-          'go-plan': 'You land at the alternate in the last of the light, tie down, and call for a ride. The airplane comes home tomorrow morning.',
-          delay: 'Mist after sunset tends to get worse, not better, and every lap of holding is fuel you will want later.',
-          cancel: 'Special VFR needs 1 mile and clear of clouds, and at night it also needs an instrument rating and an IFR-equipped airplane (91.157). Ten minutes from sunset, you\'re about to lose it.',
+      v === 1
+        ? {
+          kind: 'decide', id: 'd2', title: 'Twenty minutes out',
+          situation: `Home is ${fmt(700)} overcast-broken and 2 miles. You check your inland alternate before turning for it: fifteen minutes away, now 1,100 broken and 4 miles in mist and going down. A bigger airport thirty minutes inland reports clear and 10. You have an hour and forty minutes of fuel. Sunset is in ten minutes.`,
+          options: [
+            { id: 'go', label: 'Continue home and get in under it.' },
+            { id: 'go-plan', label: 'Divert to the alternate you picked, as planned.' },
+            { id: 'far', label: 'Divert to the bigger airport thirty minutes inland.' },
+            { id: 'cancel', label: 'Ask the tower for a special VFR clearance home.' },
+          ],
+          grades: { go: 'unsafe', 'go-plan': 'marginal', far: 'best', cancel: 'marginal' },
+          consequence: {
+            go: 'Under a 700 foot ceiling you can\'t fly a legal VFR pattern in the surface area, and in the dark the mist and the ground look the same. This is how VFR-into-IMC accidents start.',
+            'go-plan': 'The plan was good when you made it. Now the alternate is going the same way as home, and you would arrive in the dark to a field just above VFR minimums and dropping.',
+            far: 'Thirty minutes with over an hour and a half of fuel, toward clear air. You land in the dark at a lit field in good weather, and you call for a ride.',
+            cancel: 'Special VFR needs 1 mile and clear of clouds, and at night it also needs an instrument rating and an IFR-equipped airplane (91.157). Ten minutes from sunset, you\'re about to lose it.',
+          },
+          why: 'An alternate is a plan, not a promise: check it before you turn for it. When the weather is moving, head for the air it hasn\'t reached yet, while you have the fuel and some light.',
+        }
+        : {
+          kind: 'decide', id: 'd2', title: 'Twenty minutes out',
+          situation: `Home is ${fmt(700)} overcast-broken and 2 miles. Your inland alternate, fifteen minutes away and higher, reports clear and 10. Sunset is in ten minutes.`,
+          options: [
+            { id: 'go', label: 'Continue home and get in under it.' },
+            { id: 'go-plan', label: 'Divert to the alternate now.' },
+            { id: 'delay', label: 'Hold nearby and wait for it to lift.' },
+            { id: 'cancel', label: 'Ask the tower for a special VFR clearance home.' },
+          ],
+          grades: { go: 'unsafe', 'go-plan': 'best', delay: 'marginal', cancel: 'marginal' },
+          consequence: {
+            go: 'Under a 700 foot ceiling you can\'t fly a legal VFR pattern in the surface area, and in the dark the mist and the ground look the same. This is how VFR-into-IMC accidents start.',
+            'go-plan': 'You land at the alternate in the last of the light, tie down, and call for a ride. The airplane comes home tomorrow morning.',
+            delay: 'Mist after sunset tends to get worse, not better, and every lap of holding is fuel you will want later.',
+            cancel: 'Special VFR needs 1 mile and clear of clouds, and at night it also needs an instrument rating and an IFR-equipped airplane (91.157). Ten minutes from sunset, you\'re about to lose it.',
+          },
+          why: 'The field is below basic VFR minimums, the light is going, and you have an alternate in good weather. Picking that alternate before takeoff is what made this decision easy.',
         },
-        why: 'The field is below basic VFR minimums, the light is going, and you have an alternate in good weather. Picking that alternate before takeoff is what made this decision easy.',
-      },
     ];
   },
 };
