@@ -10,6 +10,7 @@
 
 import { load, save } from '../lib/storage';
 import { spoken } from './speech';
+import { kokoroAudio, modelState } from './models/client';
 
 export interface RadioPrefs {
   /** Speak the controller and the ATIS. Off until the pilot turns it on. */
@@ -20,11 +21,19 @@ export interface RadioPrefs {
   radio: boolean;
   /** Browser voice name; null picks the first local English voice. */
   voice: string | null;
-  /** Speaking rate for browser voices. Controllers run a little quick. */
+  /** Speaking rate. Controllers run a little quick. */
   rate: number;
+  /** Who reads: the device's own voice, or Kokoro once it is downloaded. */
+  engine: 'device' | 'kokoro';
+  /** Kokoro voice id (models/client.ts, KOKORO_VOICES). */
+  kokoroVoice: string;
+  /** Show the hold-to-talk button; needs the Moonshine download. Typing always works. */
+  speechInput: boolean;
 }
 
-export const defaultRadioPrefs: RadioPrefs = { sound: false, listenFirst: false, radio: true, voice: null, rate: 1.15 };
+export const defaultRadioPrefs: RadioPrefs = {
+  sound: false, listenFirst: false, radio: true, voice: null, rate: 1.15, engine: 'device', kokoroVoice: 'am_michael', speechInput: false,
+};
 const KEY = 'downwind.radio.prefs.v1';
 export const loadRadioPrefs = (): RadioPrefs => ({ ...defaultRadioPrefs, ...load<Partial<RadioPrefs>>(KEY, {}) });
 export const saveRadioPrefs = (p: RadioPrefs) => save(KEY, p);
@@ -152,11 +161,38 @@ export function stopSpeaking() {
 }
 
 /**
- * Reads a transmission aloud with a device voice. Resolves when it is done,
- * or right away when the device has no voice. Starting a new one stops the last.
+ * Reads a transmission aloud: Kokoro when the pilot chose it and it is
+ * loaded, otherwise a device voice. Resolves when it is done, or right away
+ * when the device has no voice. Starting a new one stops the last.
  */
-export function speak(text: string, prefs: RadioPrefs): Promise<void> {
+export async function speak(text: string, prefs: RadioPrefs): Promise<void> {
   stopSpeaking();
+  if (prefs.engine === 'kokoro' && modelState('kokoro').status === 'ready') {
+    const ac = audio();
+    if (ac) {
+      let cancelled = false;
+      current = { stop: () => { cancelled = true; } };
+      const token = current;
+      try {
+        // Kokoro reads a little slower than a browser voice at the same setting, so nudge it up.
+        const { samples, rate } = await kokoroAudio(spoken(text), prefs.kokoroVoice, Math.min(1.5, prefs.rate * 1.05));
+        if (cancelled || current !== token) return;
+        await ac.resume();
+        const buf = ac.createBuffer(1, samples.length, rate);
+        buf.getChannelData(0).set(samples);
+        const play = playOnRadio(buf, prefs.radio);
+        current = play;
+        return play.done;
+      } catch {
+        // Fall through to the device voice.
+        if (cancelled) return;
+      }
+    }
+  }
+  return speakOnDevice(text, prefs);
+}
+
+function speakOnDevice(text: string, prefs: RadioPrefs): Promise<void> {
   const s = synth();
   if (!s) return Promise.resolve();
   const ac = audio();

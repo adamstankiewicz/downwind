@@ -28,7 +28,15 @@ export default defineConfig({
       workbox: {
         // .mjs too, so the PDF viewer's worker is on the device before the first handbook opens.
         globPatterns: ['**/*.{js,mjs,css,html,svg,png}'],
+        // The optional voice and speech models load only when the pilot downloads them.
+        globIgnores: ['**/kokoro.worker-*.js', '**/moonshine.worker-*.js'],
         runtimeCaching: [
+          {
+            // Once downloaded, the model workers and their runtime stay on the device for offline use.
+            urlPattern: ({ url }) => /\/assets\/(kokoro\.worker|moonshine\.worker|ort-wasm)[^/]*$/.test(url.pathname),
+            handler: 'CacheFirst',
+            options: { cacheName: 'radio-models', cacheableResponse: { statuses: [200] } },
+          },
           {
             urlPattern: ({ url }) => url.pathname.startsWith('/api/awc/'),
             handler: 'NetworkFirst',

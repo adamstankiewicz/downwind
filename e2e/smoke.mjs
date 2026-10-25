@@ -747,10 +747,21 @@ async function runSkip() {
 // Radio practice, a whole flight: the ATIS copy pad, initial calls that leave
 // things out (so the controller's correction shows), readbacks that echo the
 // controller, the decisions, and the debrief. Flights are random, so the loop
-// reads each step from the page.
+// reads each step from the page. Then sound and listen first on a second
+// flight: the words hide behind "Show the words", the play controls exist, the
+// model downloads are offered and never started, and hold to talk stays away
+// until its model is ready. Headless Chromium has no voices, so speech is
+// only counted, never heard.
 async function runRadio(viewport) {
   const label = `[radio ${viewport.width}px]`;
   const { browser, page, errors } = await open(viewport, false);
+  await page.addInitScript(() => {
+    window.__spoke = 0;
+    if ('speechSynthesis' in window) {
+      const real = window.speechSynthesis.speak.bind(window.speechSynthesis);
+      window.speechSynthesis.speak = (u) => { window.__spoke++; return real(u); };
+    }
+  });
   const btn = (name) => page.getByRole('button', { name, exact: true });
   const main = () => page.locator('main').innerText();
   const noHScroll = async (where) => {
@@ -823,6 +834,65 @@ async function runRadio(viewport) {
   await noHScroll('radio debrief');
   await btn('New flight').click();
   check(await btn('Check my copy').isVisible(), `${label} a new flight starts at the ATIS`);
+
+  // Sound off by default: nothing was spoken through the whole first flight.
+  const hasSynth = await page.evaluate(() => 'speechSynthesis' in window);
+  const spoke = () => page.evaluate(() => window.__spoke);
+  check((await spoke()) === 0, `${label} nothing spoken with sound off`);
+  check((await page.locator('.tape > .xmit.atc .say').count()) === 1 && (await btn('Show the words').count()) === 0, `${label} ATIS words shown with sound off`);
+  await btn('Sound settings').click();
+  check(await btn('Listen first').isDisabled(), `${label} listen first waits for sound`);
+  await btn('Sound').click();
+  check((await btn('Sound').getAttribute('aria-pressed')) === 'true', `${label} sound switch reports on`);
+  await btn('Listen first').click();
+  check((await btn('Listen first').getAttribute('aria-pressed')) === 'true', `${label} listen first switch reports on`);
+  check(await btn("Your device's voice").isVisible() && await btn('Kokoro (86 MB download, once)').isVisible(), `${label} both voices offered`);
+  await btn('Kokoro (86 MB download, once)').click();
+  check(await btn('Download Kokoro').isVisible(), `${label} Kokoro is a download the pilot starts`);
+  await btn("Your device's voice").click();
+  await btn('Speak your calls').click();
+  check(await btn('Download Moonshine').isVisible(), `${label} Moonshine is a download the pilot starts`);
+  check(/runs on this device/.test(await main()), `${label} settings say models run on this device`);
+  await btn('Sound settings').click();
+  check((await btn('Download Kokoro').count()) === 0, `${label} sound settings close`);
+  check((await page.locator('.tape > .xmit.atc .say').count()) === 0 && await btn('Show the words').isVisible(), `${label} ATIS words hidden under listen first`);
+  check(await btn('Play the ATIS').isVisible(), `${label} ATIS has a play control`);
+  await btn('Play the ATIS').click();
+  if (hasSynth) check((await spoke()) === 1, `${label} play the ATIS speaks once (${await spoke()})`);
+  await btn('Show the words').click();
+  check(await page.locator('.tape > .xmit.atc .say').isVisible(), `${label} ATIS words appear on Show the words`);
+  await noHScroll('ATIS under listen first');
+  await page.getByLabel('Information', { exact: true }).fill('Delta');
+  await page.getByLabel('Wind', { exact: true }).fill('240 at 8');
+  await page.getByLabel('Altimeter', { exact: true }).fill('29.92');
+  await btn('24').click();
+  await btn('Check my copy').click();
+  await btn('Continue').click();
+  // The first call to Ground has no controller line to hide, and no talk button without Moonshine.
+  const call = page.getByLabel('Your call');
+  check(await call.isVisible() && (await btn('Show the words').count()) === 0, `${label} a call with no controller line has nothing to hide`);
+  check((await btn('Hold to talk').count()) === 0, `${label} no hold to talk until Moonshine is ready`);
+  await call.fill('November 52XY');
+  await btn('Transmit').click();
+  if (await call.isVisible()) {
+    if (hasSynth) check((await spoke()) >= 2, `${label} the controller's correction is spoken`);
+    await call.fill('November 52XY');
+    await btn('Transmit').click();
+  }
+  await btn('Continue').click();
+  // The taxi readback: the controller spoke, the words wait, then show, and stay once transmitted.
+  const before = await spoke();
+  check((await page.locator('.tape > .xmit.atc .say').count()) === 0 && await btn('Show the words').isVisible(), `${label} readback step hides the controller's words`);
+  check(await btn('Play the controller').isVisible(), `${label} readback step has a play control`);
+  if (hasSynth) check(before >= 3, `${label} the controller spoke when the step opened (${before})`);
+  await noHScroll('readback under listen first');
+  await btn('Show the words').click();
+  const said = (await page.locator('.tape > .xmit.atc .say').first().innerText()).replace(/^November 2XY,\s*/, '').replace(/\.$/, '');
+  check(said.length > 10, `${label} the controller's words appear on Show the words`);
+  await call.fill(`${said}, November 2XY`);
+  await btn('Transmit').click();
+  check((await page.locator('.tape > .xmit.atc .say').count()) === 1 && (await btn('Show the words').count()) === 0, `${label} words stay shown after transmitting`);
+  check(await page.getByText('A good call').first().isVisible(), `${label} the good call is never hidden`);
   check(errors.length === 0, `${label} no console or page errors${errors.length ? ': ' + errors.join(' | ') : ''}`);
   await browser.close();
 }
