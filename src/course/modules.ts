@@ -1,9 +1,10 @@
 // The syllabus: nine modules in ACS order (FAA-S-ACS-6C, Private Pilot
-// Airplane). Module 2 is written; the rest show their planned lessons so the
-// pilot can see the whole course from day one.
+// Airplane). Written modules carry their lessons; the rest show their planned
+// lessons so the pilot can see the whole course from day one.
 
 import type { Lesson, Module } from './types';
 import { pilotAirplaneLessons } from './pilotAirplane';
+import { systemsLessons } from './systems';
 import { weatherLessons } from './weather';
 
 export const modules: Module[] = [
@@ -46,8 +47,8 @@ export const modules: Module[] = [
   {
     n: 7, title: 'Systems and the panel', acsAreas: ['I.G', 'IX.C'],
     summary: 'Your airplane\'s systems, its avionics, and what to do when one of them quits.',
-    lessons: [],
-    outline: ['Electrical system and the alternator light', 'Vacuum, electric and backup instruments', 'GPS failure and paper backup', 'Carburetor ice and fuel systems'],
+    lessons: systemsLessons,
+    outline: [],
   },
   {
     n: 8, title: 'Human factors and risk', acsAreas: ['I.H', 'II'],
