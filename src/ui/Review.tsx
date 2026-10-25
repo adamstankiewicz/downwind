@@ -1,9 +1,11 @@
-// Review: an FSRS session over the items due now. Pick an answer, then reveal;
-// the scheduler uses whether it was right.
+// Review: an FSRS session over the items due now. Pick an answer, then reveal.
+// The scheduler reads its rating from the answer: right or wrong, how long it
+// took, and whether a wrong pick was an unsafe one, which also comes back
+// once more before the session ends.
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReviewItem } from '../review/items';
-import { dueItems, recordAnswer } from '../review/scheduler';
+import { dueItems, recordAnswer, wordsIn } from '../review/scheduler';
 import { Card, PageHead } from './common';
 import { RefChips } from '../refs/RefViewer';
 
@@ -20,9 +22,14 @@ export function Review() {
   const [picked, setPicked] = useState<number | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [done, setDone] = useState<Answered[]>([]);
+  const shownAt = useRef(Date.now());
+  const requeued = useRef(new Set<string>());
 
   const item = session[idx];
   const finished = idx >= session.length;
+  useEffect(() => {
+    shownAt.current = Date.now();
+  }, [idx, session]);
 
   const restart = () => {
     setSession(dueItems());
@@ -30,12 +37,18 @@ export function Review() {
     setPicked(null);
     setRevealed(false);
     setDone([]);
+    requeued.current.clear();
   };
 
   const commit = () => {
     if (picked === null || !item) return;
     const correct = picked === item.answer;
-    recordAnswer(item.id, correct);
+    const unsafe = !correct && (item.unsafeOptions?.includes(picked) ?? false);
+    recordAnswer(item.id, { correct, unsafe, seconds: (Date.now() - shownAt.current) / 1000, words: wordsIn(item) });
+    if (unsafe && !requeued.current.has(item.id)) {
+      requeued.current.add(item.id);
+      setSession([...session, item]);
+    }
     setDone([...done, { item, correct }]);
     setRevealed(true);
   };
@@ -72,8 +85,8 @@ export function Review() {
           </div>
           {right < done.length && <p className="help">Missed items come back soonest.</p>}
           <ul className="findings">
-            {done.map((d) => (
-              <li key={d.item.id} className={`finding ${d.correct ? 'right' : 'illegal'}`}>
+            {done.map((d, i) => (
+              <li key={`${d.item.id}-${i}`} className={`finding ${d.correct ? 'right' : 'illegal'}`}>
                 <span className="sev">{d.correct ? 'Right' : 'Missed'}</span>
                 <h4>{d.item.prompt}</h4>
                 <p>{d.item.options[d.item.answer]}</p>
