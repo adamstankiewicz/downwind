@@ -29,7 +29,7 @@ const SECTIONS: { id: SectionId; title: string; lesson: string | null; taughtBy:
   { id: 'forecast', title: 'Forecast through your return', lesson: '2.3', taughtBy: 'Lesson 2.3' },
   { id: 'ceiling', title: 'Ceiling and visibility', lesson: '2.4', taughtBy: 'Lesson 2.4' },
   { id: 'trend', title: 'Fog and trend', lesson: '2.5', taughtBy: 'Lesson 2.5' },
-  { id: 'airplane', title: 'Airplane', lesson: null, taughtBy: 'Module 3' },
+  { id: 'airplane', title: 'Airplane', lesson: '3.2', taughtBy: 'Lesson 3.2' },
 ];
 
 const FINDING_SECTION: Record<string, SectionId> = {
@@ -86,6 +86,11 @@ function promptFor(id: SectionId, brief: Brief, mins: PersonalMinimums): Blank |
         ? null
         : { id: 'spread', label: 'Temperature and dew point spread', unit: '°C', answer: facts.tempDewSpreadC, tolerance: 0,
             explain: `${facts.tempDewSpreadC}°C. Within about 3, watch for fog as it cools.` };
+    case 'airplane':
+      return facts.densityAltitudeFt === null
+        ? null
+        : { id: 'da', label: 'Density altitude', unit: 'ft', answer: facts.densityAltitudeFt, tolerance: 200,
+            explain: `Pressure altitude from the field elevation and altimeter, then about 120 feet for every degree above standard: ${facts.densityAltitudeFt.toLocaleString('en-US')} ft.` };
     default:
       return null;
   }
