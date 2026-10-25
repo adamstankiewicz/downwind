@@ -46,6 +46,12 @@ const WINDS: WindAloft[] = [
   { altFt: 6000, dirTrue: 290, speedKt: 22, tempC: 4 },
   { altFt: 9000, dirTrue: 290, speedKt: 30, tempC: -1 },
 ];
+/** A different day: an easterly flow aloft, a tailwind for the westbound trip. Practice data. */
+const WINDS_EAST: WindAloft[] = [
+  { altFt: 3000, dirTrue: 80, speedKt: 8, tempC: null },
+  { altFt: 6000, dirTrue: 90, speedKt: 18, tempC: 6 },
+  { altFt: 9000, dirTrue: 100, speedKt: 26, tempC: 1 },
+];
 /** What the wind actually does on the day: the same direction, fifteen knots more than forecast. */
 const surprise = (w: { dirTrue: number; speedKt: number }) => ({ dirTrue: w.dirTrue, speedKt: w.speedKt + 15 });
 
@@ -120,7 +126,10 @@ const navLogLesson: Lesson = {
   summary: 'Measure a route on the chart, turn true courses into magnetic, work time and fuel for each leg, and plan the fuel for the trip home.',
   acs: ['PA.I.D'],
   refs: ['PHAK, flight planning', '14 CFR 91.159', '14 CFR 91.151'],
+  variants: 2,
   build(ctx) {
+    // The second situation: the destination's self-serve pump is out by NOTAM.
+    const pumpOut = ctx.variant === 1;
     const p = xcAirplane(ctx.aircraft);
     const still = log(p, { dirTrue: 0, speedKt: 0 });
     const [l1, l2] = still.legs;
@@ -136,7 +145,8 @@ const navLogLesson: Lesson = {
     const onBoard = Math.min(p.usableGal, Math.ceil(need + gph * 0.15));
     const tanks = fuelPlan(p.perf, { ...trip, onBoardGal: onBoard });
     const full = fuelPlan(p.perf, { ...trip, onBoardGal: p.usableGal });
-    const grades = gradeFuelPlan({ plan: tanks, fullPlan: full, gph, destinationHasFuel: dest.fuel });
+    const fuelThere = dest.fuel && !pumpOut;
+    const grades = gradeFuelPlan({ plan: tanks, fullPlan: full, gph, destinationHasFuel: fuelThere });
     const reserveMin = vfrReserveMin(false);
     // The trip home with ten knots more headwind than planned.
     const homeHead = Math.round((still.totalNm / Math.max(tas - 10, 1)) * 60);
@@ -192,7 +202,7 @@ const navLogLesson: Lesson = {
       },
       {
         kind: 'decide', id: 'd1', title: 'Fuel for the trip home',
-        situation: `The whole log: ${fmt1(still.totalNm)} nm and ${still.totalMin} minutes each way, ${plan.climbMin} minutes of climb each time you depart. Out and back nonstop needs ${fmt1(tanks.requiredGal)} gallons including the ${reserveMin} minute day reserve. There are ${fmt(onBoard)} gallons in the tanks, ${fmt(p.usableGal)} when full. ${dest.name} ${dest.fuel ? 'sells fuel' : 'has no fuel'}.`,
+        situation: `The whole log: ${fmt1(still.totalNm)} nm and ${still.totalMin} minutes each way, ${plan.climbMin} minutes of climb each time you depart. Out and back nonstop needs ${fmt1(tanks.requiredGal)} gallons including the ${reserveMin} minute day reserve. There are ${fmt(onBoard)} gallons in the tanks, ${fmt(p.usableGal)} when full. ${pumpOut ? `${dest.name} usually sells fuel, but the NOTAMs say: SELF SERVE FUEL UNAVBL.` : `${dest.name} ${dest.fuel ? 'sells fuel' : 'has no fuel'}.`}`,
         figure: { kind: 'navlog', log: still, altitudeMsl: plan.cruiseFt },
         options: [
           option('nonstop', 'Go as fueled and fly home nonstop. It is legal.'),
@@ -206,12 +216,14 @@ const navLogLesson: Lesson = {
           'top-off': grades['top-off'] === 'unsafe' || grades['top-off'] === 'marginal'
             ? `Full tanks still leave only ${fmt1(full.marginGal)} gallons over the reserve for the round trip. This trip needs a fuel stop.`
             : `Full tanks give ${fmt1(full.marginGal)} gallons over the reserve for the round trip. Check the weight and balance with full fuel and you're done.`,
-          'fuel-stop': dest.fuel
+          'fuel-stop': fuelThere
             ? `You land at ${dest.name} with plenty, buy fuel, and fly home with a full reserve and then some. A fuel stop is part of the plan, not an admission.`
-            : `${dest.name} has no fuel. Check the chart supplement before you plan a stop.`,
+            : pumpOut
+              ? `You land at ${dest.name} and the pump has a bag over it, as the NOTAM said. Now the trip home is on what is left in the tanks. Plan around the NOTAMs, not around what the field usually has.`
+              : `${dest.name} has no fuel. Check the chart supplement before you plan a stop.`,
           shorter: 'Safe, but the trip worked. Fixing the fuel was the skill here.',
         },
-        why: `${reserveMin} minutes is the legal floor for day VFR (91.151), at normal cruise. A plan that lands with less than another half hour on top is legal but has nowhere to put a stronger headwind, a vector or a go-around.`,
+        why: `${pumpOut ? 'A fuel stop only counts if the fuel is really there: the NOTAMs, a call to the FBO, or the chart supplement\'s hours tell you. ' : ''}${reserveMin} minutes is the legal floor for day VFR (91.151), at normal cruise. A plan that lands with less than another half hour on top is legal but has nowhere to put a stronger headwind, a vector or a go-around.`,
       },
     ];
   },
@@ -227,12 +239,15 @@ const windsAloft: Lesson = {
   summary: 'Read a winds aloft forecast, interpolate to your altitude, solve the wind triangle, and choose the altitude that gets you there legally and soonest.',
   acs: ['PA.I.D', 'PA.I.C'],
   refs: ['Aviation Weather Handbook, winds aloft', 'PHAK, wind triangle', '14 CFR 91.159'],
+  variants: 2,
   build(ctx) {
+    // The usual westerly headwind, or a day the flow aloft turns easterly and helps.
+    const winds = ctx.variant === 1 ? WINDS_EAST : WINDS;
     const p = xcAirplane(ctx.aircraft);
     const tas = p.perf.cruise.tasKt;
     const plan = routePlan(p);
-    const fb = `XYZ ${WINDS.map(fbGroup).join(' ')}`;
-    const at = (alt: number) => windAt(WINDS, alt);
+    const fb = `XYZ ${winds.map(fbGroup).join(' ')}`;
+    const at = (alt: number) => windAt(winds, alt);
     const w45 = at(plan.cruiseFt);
     const leg45 = log(p, w45).legs[0];
     const turnAlt = plan.cruiseFt + 2000;
@@ -242,8 +257,9 @@ const windsAloft: Lesson = {
     const grades = gradeCruiseAltitudes({ options, magCourses: log(p, w45).legs.map((l) => l.magCourse), lowestGroundFt: lowestGround(ROUTE), mefFt: plan.mefFt });
     const byAlt = Object.fromEntries(options.map((o) => [o.altFt, o.minutes]));
     const id = (alt: number) => `alt-${alt}`;
-    const below = (alt: number) => WINDS.filter((w) => w.altFt <= alt).slice(-1)[0] ?? WINDS[0];
-    const above = (alt: number) => WINDS.find((w) => w.altFt > alt) ?? WINDS[WINDS.length - 1];
+    const below = (alt: number) => winds.filter((w) => w.altFt <= alt).slice(-1)[0] ?? winds[0];
+    const above = (alt: number) => winds.find((w) => w.altFt > alt) ?? winds[winds.length - 1];
+    const headwind = Math.round(wT.speedKt * Math.cos(((wT.dirTrue - legT.trueCourse) * Math.PI) / 180));
     const [lo, hi] = [below(turnAlt), above(turnAlt)];
     const [loEx, hiEx] = [below(plan.cruiseFt), above(plan.cruiseFt)];
 
@@ -257,7 +273,7 @@ const windsAloft: Lesson = {
           ? `Quick, ${mins(o.minutes)}, but ${fmt(o.altFt)} is less than 1,000 feet over the ${fmt(plan.mefFt)} foot maximum elevation figure. Over the hills and past the lighted tower that leaves no room for a downdraft, a lower ceiling, or an engine problem.`
           : g === 'best'
             ? `${o.minutes} minutes en route, legal for the course, and at least 1,000 feet over everything on the route. The best mix of time and margin today.`
-            : `Legal and clear of the terrain, but the stronger wind up there makes it ${o.minutes} minutes, ${o.minutes - Math.min(...options.filter((x) => grades[x.altFt] === 'best').map((x) => x.minutes))} more than the best choice.`;
+            : `Legal and clear of the terrain, but the wind at ${fmt(o.altFt)} makes it ${o.minutes} minutes, ${o.minutes - Math.min(...options.filter((x) => grades[x.altFt] === 'best').map((x) => x.minutes))} more than the best choice.`;
     }
 
     return [
@@ -298,7 +314,9 @@ const windsAloft: Lesson = {
           { id: 'mh', label: 'Magnetic heading', unit: '°', answer: legT.magHeading, tolerance: 2,
             explain: `True course ${deg(legT.trueCourse)}°, wind correction ${signed(legT.wcaDeg)}°, true heading ${deg(legT.trueHeading)}°, plus ${Math.abs(VAR)}° west: ${deg(legT.magHeading)}°.` },
           { id: 'gs', label: 'Groundspeed', unit: 'kt', answer: legT.groundspeedKt, tolerance: 3,
-            explain: `${fmt(tas)} knots true into a ${Math.max(0, Math.round(wT.speedKt * Math.cos(((wT.dirTrue - legT.trueCourse) * Math.PI) / 180)))} knot headwind component is about ${legT.groundspeedKt} over the ground.` },
+            explain: headwind >= 0
+              ? `${fmt(tas)} knots true into a ${headwind} knot headwind component is about ${legT.groundspeedKt} over the ground.`
+              : `${fmt(tas)} knots true with a ${-headwind} knot tailwind component is about ${legT.groundspeedKt} over the ground.` },
         ],
       },
       {
@@ -309,7 +327,7 @@ const windsAloft: Lesson = {
         grades: Object.fromEntries(options.map((o) => [id(o.altFt), grades[o.altFt]])),
         consequence,
         keepOrder: true,
-        why: 'Three things pick a cruising altitude: the hemispheric rule (91.159) when you are more than 3,000 feet above the ground, a margin over the highest terrain and obstacles, and then the wind. Legal and clear come before fast.',
+        why: `Three things pick a cruising altitude: the hemispheric rule (91.159) when you are more than 3,000 feet above the ground, a margin over the highest terrain and obstacles, and then the wind. Legal and clear come before fast.${ctx.variant === 1 ? ' With the wind behind you and growing with height, the higher legal altitude pays for its climb.' : ' Into a wind that grows with height, the lowest altitude with margin is usually quickest.'}`,
       },
     ];
   },
@@ -333,7 +351,10 @@ const checkpoints: Lesson = {
   summary: 'Time each checkpoint, work out the groundspeed you are really getting, and refuse a landmark that does not fit the clock.',
   acs: ['PA.VI.A'],
   refs: ['PHAK, pilotage and dead reckoning'],
+  variants: 2,
   build(ctx) {
+    // The lake under the wing: a pond a third of the way along, or the real one, on time.
+    const onTime = ctx.variant === 1;
     const p = xcAirplane(ctx.aircraft);
     const { plan, planned, real } = flownPlan(p);
     const dep = wholeHourAfter(ctx.now, 1);
@@ -346,7 +367,7 @@ const checkpoints: Lesson = {
     const remainingNm = planned.legs.slice(1).reduce((n, l) => n + l.distanceNm, 0);
     const toDest = Math.round((remainingNm / gsMeasured) * 60);
     // The lake that isn't Long Lake: under the wing a third of the way along the leg.
-    const sightMin = Math.max(2, Math.round(toLake / 3));
+    const sightMin = onTime ? toLake : Math.max(2, Math.round(toLake / 3));
     const clock = fitsTheClock({ gsKt: gsMeasured, minutes: sightMin, checkpointAlongNm: p2.distanceNm });
     const grades = gradeSighting(clock.fits);
     const tower = R.obstacles.find((o) => o.id === 'tower-1749')!;
@@ -394,25 +415,25 @@ const checkpoints: Lesson = {
       },
       {
         kind: 'decide', id: 'd1', title: 'A lake under the wing',
-        situation: `${mins(sightMin)} past ${p1.to.name} a narrow lake slides under the left wing. The next line on your log is the turn to ${p3.to.name}.`,
+        situation: `${mins(sightMin)} past ${p1.to.name} a narrow lake slides under the left wing${onTime ? ', with a dam at its south end' : ''}. The next line on your log is the turn to ${p3.to.name}.`,
         figure: { kind: 'chart', route: ROUTE, focus: { id: p2.to.id, radiusNm: 14 }, marker: { pos: destination(p2.from, p2.trueCourse, clock.expectedNm), altMsl: plan.cruiseFt, label: 'Dead reckoning' } },
         options: [
           option('turn-now', `It's ${p2.to.name}. Turn to the ${p3.to.name} heading.`),
-          option('hold-heading', `Hold heading. ${p2.to.name} isn't due for another ${mins(toLake - sightMin)}.`),
+          option('hold-heading', toLake > sightMin ? `Hold heading. ${p2.to.name} isn't due for another ${mins(toLake - sightMin)}.` : `Hold heading a little longer, in case it's another lake.`),
           option('circle', 'Circle the lake and compare its shape with the chart.'),
         ],
         grades,
         consequence: {
           'turn-now': clock.fits
-            ? `It fits: ${fmt1(clock.expectedNm)} nm flown and ${p2.to.name} is ${fmt1(p2.distanceNm)} along. A good fix.`
+            ? `It fits: ${fmt1(clock.expectedNm)} nm flown and ${p2.to.name} is ${fmt1(p2.distanceNm)} along. You note the time, turn to the ${p3.to.name} heading, and work the next ETA from the groundspeed you measured.`
             : `You turn ${fmt1(p2.distanceNm - clock.expectedNm)} nm early, onto a line about ${fmt1(offsetNm)} nm off the one on your chart. ${p3.to.name} doesn't show up on time, nothing else matches either, and the next lesson but one starts here.`,
           'hold-heading': clock.fits
-            ? 'Fine, though the lake fit the clock and you could have taken the fix.'
+            ? `The lake fit the chart and the clock, and the dam was where it should be. Every minute you hold heading now carries you further past the turn, and you will have to find your way back to the line. Refusing a good fix costs time, just as taking a wrong one does.`
             : `At ${mins(towerMin)} past ${p1.to.name} the lighted tower passes off your ${tw.crossNm < 0 ? 'left' : 'right'}, where the chart puts it, and ${p2.to.name}, with the dam at its south end, slides under you right on the new time. The first lake was a pond the chart doesn't bother with.`,
           circle: 'You learn it is the wrong lake, which is useful, at the cost of a few minutes and some fuel, with your heading and time to rebuild afterwards. Holding heading would have told you the same thing for free.',
         },
         why: clock.fits
-          ? 'The feature matched the clock.'
+          ? `At ${gsMeasured} knots, ${mins(sightMin)} puts you ${fmt1(clock.expectedNm)} nm past ${p1.to.name}, and ${p2.to.name} is ${fmt1(p2.distanceNm)} nm along. Chart and clock agree, and the dam confirms it. Take the fix and turn on time.`
           : `At ${gsMeasured} knots, ${mins(sightMin)} puts you ${fmt1(clock.expectedNm)} nm past ${p1.to.name}. ${p2.to.name} is ${fmt1(p2.distanceNm)} nm along: ${fmt1(clock.offByNm)} nm from where you are. A checkpoint has to match the chart **and** the clock.`,
       },
     ];
@@ -433,14 +454,21 @@ function divertField(id: string): DiversionField {
   return { id: a.id, name: a.name, pos: a.pos, elevationFt: a.elevationFt, runwayFt: a.runwayFt, surface: a.surface, fuel: a.fuel };
 }
 
-function divertSituation(p: XcAirplane) {
+/** Where the showers are on the day, by situation: on the ridge ahead, or building over Ridgeback to the south. */
+const DIVERT_WEATHER = [
+  { from: 'pinecrest', bearing: 260, nm: 3, radiusNm: 8 },
+  { from: 'KXRB', bearing: 0, nm: 0, radiusNm: 7 },
+];
+
+function divertSituation(p: XcAirplane, variant = 0) {
   const { plan, actual, real } = flownPlan(p);
   const [r1, r2, r3] = real.legs;
   const past = 4;
   const pos = destination(r3.from, r3.trueCourse, past);
   const elapsedMin = plan.climbMin + r1.minutes + r2.minutes + Math.round((past / r3.groundspeedKt) * 60);
   const fuelGal = Math.round((p.usableGal - p.perf.taxiFuelGal - (elapsedMin * p.perf.cruise.gph) / 60) * 10) / 10;
-  const weather = { center: destination(point('pinecrest'), 260, 3), radiusNm: 8 };
+  const w = DIVERT_WEATHER[variant] ?? DIVERT_WEATHER[0];
+  const weather = { center: destination(point(w.from), w.bearing, w.nm), radiusNm: w.radiusNm };
   const facts = diversionFacts({
     from: pos, fields: DIVERT_IDS.map((d) => divertField(d.field)), weather, perf: p.perf,
     tasKt: p.perf.cruise.tasKt, windFromTrue: actual.dirTrue, windKt: actual.speedKt, variationDeg: VAR,
@@ -452,7 +480,7 @@ function divertSituation(p: XcAirplane) {
 function divertConsequence(f: DiversionFacts, g: Grade, all: DiversionFacts[], grades: Record<string, Grade>): string {
   const best = all.filter((x) => grades[x.field.id] === 'best');
   const where = `${NameOf(f.field.id)}: ${fmt1(f.leg.distanceNm)} nm, heading ${deg(f.leg.magHeading)}°, ${f.leg.minutes} minutes.`;
-  if (f.intoWeather) return `${where} The line there runs through the showers you are turning away from. A diversion that flies into the reason for diverting isn't one.`;
+  if (f.intoWeather) return `${where} The line there runs through the showers. A diversion that flies into the reason for diverting isn't one.`;
   if (f.fuelMarginGal < 0) return `${where} You would land below the legal reserve.`;
   if (f.runwayFactor < 1) return `${where} Its ${fmt(f.field.runwayFt)} feet is shorter than the ${fmt(f.landingOver50Ft)} feet you need over a 50 foot obstacle.`;
   if (g === 'marginal') return `${where} Closest, but ${fmt(f.field.runwayFt)} feet of ${f.field.surface} against a ${fmt(f.landingOver50Ft)} foot landing over a 50 foot obstacle is only ${f.runwayFactor} times what you need, on a field you have never seen. Keep it in your pocket for an emergency, not a weather diversion.`;
@@ -467,21 +495,26 @@ const diversion: Lesson = {
   summary: 'Turn away from weather ahead, estimate heading, distance and time to the fields around you, and pick the one that is really there for you.',
   acs: ['PA.VI.C'],
   refs: ['PHAK, flight diversion', '14 CFR 91.103, preflight action', '14 CFR 91.151'],
+  variants: 2,
   build(ctx) {
     const p = xcAirplane(ctx.aircraft);
-    const { plan, actual, pos, fuelGal, facts, grades } = divertSituation(p);
+    const south = ctx.variant === 1;
+    const { plan, actual, pos, fuelGal, facts, grades } = divertSituation(p, ctx.variant ?? 0);
     const by = (id: string) => facts.find((f) => f.field.id === id)!;
     const home = by(HOME);
     const turn = by('KXRB');
     const bases = Math.max(500, round100(ctx.minimums.ceilingFt - 1500));
     const marker = { pos, altMsl: plan.cruiseFt, label: 'You' };
     const ids = DIVERT_IDS.map((d) => d.field);
-    const chart = { kind: 'chart' as const, highlight: [...ids, 'pinecrest'], marker };
+    const chart = { kind: 'chart' as const, highlight: [...ids, south ? 'KXRB' : 'pinecrest'], marker };
+    const sky = south
+      ? `a line of showers is building over ${nameOf('KXRB')}, south of your course, bases about ${fmt(bases)} feet and spreading your way. The ridge ahead is still clear, for now.`
+      : `the ridge ahead around ${nameOf('pinecrest')} is going into cloud: rain showers, bases about ${fmt(bases)} feet over the hills and lowering.`;
 
     return [
       {
-        kind: 'brief', id: 'b1', title: 'The hills ahead go grey',
-        scene: `${chartLine(ctx)} ${Math.round(distanceNm(point('long-lake'), pos))} miles past ${nameOf('long-lake')} at ${fmt(plan.cruiseFt)}, the ridge ahead around ${nameOf('pinecrest')} is going into cloud: rain showers, bases about ${fmt(bases)} feet over the hills and lowering. Your ceiling minimum is ${fmt(ctx.minimums.ceilingFt)} feet. You left with full tanks and have ${fmt1(fuelGal)} gallons now.${sampleLine(p)}`,
+        kind: 'brief', id: 'b1', title: south ? 'Showers to the south' : 'The hills ahead go grey',
+        scene: `${chartLine(ctx)} ${Math.round(distanceNm(point('long-lake'), pos))} miles past ${nameOf('long-lake')} at ${fmt(plan.cruiseFt)}, ${sky} Your ceiling minimum is ${fmt(ctx.minimums.ceilingFt)} feet. You left with full tanks and have ${fmt1(fuelGal)} gallons now.${sampleLine(p)}`,
         say: {
           full: 'Decide to divert **early**, while you have altitude, fuel and options. Then fly toward the new field **first** and refine on the way: turn to a rough heading, note the time, then work the numbers. In the air you estimate. A heading within 10 degrees and a time within a few minutes is a good start, and the first checkpoint on the new line corrects the rest.',
           short: 'Turn first, then refine. Note the time.',
@@ -524,7 +557,7 @@ const diversion: Lesson = {
         options: DIVERT_IDS.map((d) => {
           const f = by(d.field);
           return option(d.option, d.option === 'press-on'
-            ? `Press on to ${f.field.name} and get under it.`
+            ? (south ? `Press on to ${f.field.name} and stay ahead of the showers.` : `Press on to ${f.field.name} and get under it.`)
             : d.option === 'home' ? `Turn around for ${nameOf(HOME)}.` : `Divert to ${f.field.name}.`);
         }),
         grades: Object.fromEntries(DIVERT_IDS.map((d) => [d.option, grades[d.field]])),
@@ -538,22 +571,30 @@ const diversion: Lesson = {
 // ---------------------------------------------------------------- 5.5
 
 // Home from Quill Valley, eastbound at 5,500, with a north wind far stronger
-// than forecast pushing the airplane south of course toward Bayport's Class B.
+// than forecast pushing the airplane south of course toward Bayport's Class B
+// (or, in the second situation, a south wind pushing it north toward Quarry's Class C).
 const LOST_FROM = DEST;
 const LOST_TO = HOME;
 const LOST_ALT = 5500;
 const LOST_FIX = 'long-lake';
-const LOST_FORECAST = { dirTrue: 340, speedKt: 5 };
-const LOST_ACTUAL = { dirTrue: 340, speedKt: 25 };
+/** By situation: a north wind pushing you south toward Bayport, or a south wind and a lower tank pushing you north toward Quarry. */
+const LOST_DAYS = [
+  { forecast: { dirTrue: 340, speedKt: 5 }, actual: { dirTrue: 340, speedKt: 25 }, startShare: 0.6 },
+  { forecast: { dirTrue: 170, speedKt: 5 }, actual: { dirTrue: 170, speedKt: 25 }, startShare: 0.45 },
+];
 const LOST_LATE_MIN = 6;
 
-function approachFreq(): { name: string; freq: string } {
-  const b = R.airspace.find((v) => v.cls === 'B' && v.note)!;
+/** The radar facility printed beside a Class B or C: Bayport's by default. */
+function approachFreq(cls: 'B' | 'C' = 'B'): { name: string; freq: string } {
+  const b = R.airspace.find((v) => v.cls === cls && v.note)!;
   const m = b.note!.match(/^(.*?) (\d{3}\.\d{2,3})/);
   return { name: m ? m[1] : 'Approach', freq: m ? m[2] : '' };
 }
 
-export function lostSituation(p: XcAirplane) {
+export function lostSituation(p: XcAirplane, variant = 0) {
+  const day = LOST_DAYS[variant] ?? LOST_DAYS[0];
+  const LOST_FORECAST = day.forecast;
+  const LOST_ACTUAL = day.actual;
   const from = point(LOST_FROM);
   const to = point(LOST_TO);
   const fix = point(LOST_FIX);
@@ -570,7 +611,7 @@ export function lostSituation(p: XcAirplane) {
   const track = trueCourse(from, actualPos);
   const gs = (distanceNm(from, actualPos) / minutes) * 60;
   const ahead = minutesToClearanceAirspace(R, actualPos, track, gs, LOST_ALT);
-  const startGal = Math.round(p.usableGal * 0.6);
+  const startGal = Math.round(p.usableGal * day.startShare);
   const fuelGal = Math.round((startGal - p.perf.taxiFuelGal - (minutes * gph) / 60) * 10) / 10;
   const enduranceAfterReserve = Math.floor((fuelGal / gph) * 60 - vfrReserveMin(false));
   const back = legTo(actualPos, from, { tasKt: tas, windFromTrue: LOST_ACTUAL.dirTrue, windKt: LOST_ACTUAL.speedKt, variationDeg: VAR, gph });
@@ -578,7 +619,7 @@ export function lostSituation(p: XcAirplane) {
   const obstacle = R.obstacles.some((o) => distanceNm(o.pos, actualPos) <= 5 && o.mslFt > descentAlt - 500);
   const grades = gradeLost({ enduranceAfterReserveMin: enduranceAfterReserve, minutesBackToFix: back.minutes, minutesToClearanceAirspace: ahead?.minutes ?? null, obstacleWithin5NmAboveDescentAlt: obstacle });
   const off = alongTrack(from, to, actualPos);
-  return { plan, fixDue, minutes, actualPos, drNm, drPos, track, gs, ahead, startGal, fuelGal, enduranceAfterReserve, back, obstacle, grades, off, misplacedNm: Math.round(distanceNm(actualPos, drPos) * 10) / 10 };
+  return { day, plan, fixDue, minutes, actualPos, drNm, drPos, track, gs, ahead, startGal, fuelGal, enduranceAfterReserve, back, obstacle, grades, off, misplacedNm: Math.round(distanceNm(actualPos, drPos) * 10) / 10 };
 }
 
 const lost: Lesson = {
@@ -587,10 +628,17 @@ const lost: Lesson = {
   summary: 'When nothing below matches the chart: climb, communicate, confess, comply, conserve, and keep out of airspace you can no longer see coming.',
   acs: ['PA.VI.D', 'PA.VI.B'],
   refs: ['PHAK, lost procedures', 'AIM 6-3-1', '14 CFR 91.131'],
+  variants: 2,
   build(ctx) {
     const p = xcAirplane(ctx.aircraft);
-    const s = lostSituation(p);
-    const app = approachFreq();
+    const s = lostSituation(p, ctx.variant ?? 0);
+    const { forecast: LOST_FORECAST, actual: LOST_ACTUAL } = s.day;
+    const north = ctx.variant === 1;
+    // Call the radar facility whose airspace the drift is carrying you toward.
+    const cls = north ? 'C' : 'B';
+    const app = approachFreq(cls);
+    const shelves = north ? ['xqc-c1', 'xqc-c2'] : ['xbb-b2', 'xbb-b3'];
+    const className = north ? 'Class Charlie' : 'Class Bravo';
     const dep = wholeHourAfter(ctx.now, 1);
     const route = [LOST_FROM, LOST_FIX, 'harlow', LOST_TO];
     const fixName = nameOf(LOST_FIX);
@@ -612,11 +660,11 @@ const lost: Lesson = {
       {
         kind: 'example', id: 'e1', title: 'The five Cs, here',
         say: {
-          full: `On this chart the nearest radar facility is **${app.name}**, printed beside its Class B. That is your first call. If you can't raise them, 121.5 is monitored by flight service and many airliners overhead.`,
+          full: `On this chart the radar facility for the airspace near you is **${app.name}**, printed beside its Class ${cls}. That is your first call. If you can't raise them, 121.5 is monitored by flight service and many airliners overhead.`,
           short: `${app.name} first, then 121.5.`,
         },
         work: [
-          { label: 'Climb', value: 'A few thousand feet', note: 'More to see, more radio range, more glide. Stay below the clouds and out of the Class B shelves.' },
+          { label: 'Climb', value: 'A few thousand feet', note: `More to see, more radio range, more glide. Stay below the clouds and out of the Class ${cls} shelves.` },
           { label: 'Communicate', value: `${app.name} ${app.freq}`, note: 'Or 121.5. Squawk what they give you.' },
           { label: 'Confess', value: '"Unsure of position"', note: 'Your call sign, altitude, heading, last known fix and fuel.' },
           { label: 'Comply', value: 'Fly their vector', note: 'They see you on radar; you don\'t.' },
@@ -647,7 +695,7 @@ const lost: Lesson = {
         ],
         grades: s.grades,
         consequence: {
-          'climb-call': `${app.name} has you on radar within a minute: ${fmt1(Math.abs(s.off.crossNm))} nm ${side} of your course and ${fmt1(s.misplacedNm)} nm from where dead reckoning put you. ${s.ahead ? `"Turn ${side === 'right' ? 'left' : 'right'} heading ${deg(s.plan.magHeading + (side === 'right' ? -30 : 30))}, remain clear of the Class Bravo." ` : ''}You're on the ground at home with fuel to spare.`,
+          'climb-call': `${app.name} has you on radar within a minute: ${fmt1(Math.abs(s.off.crossNm))} nm ${side} of your course and ${fmt1(s.misplacedNm)} nm from where dead reckoning put you. ${s.ahead ? `"Turn ${side === 'right' ? 'left' : 'right'} heading ${deg(s.plan.magHeading + (side === 'right' ? -30 : 30))}, remain clear of the ${className}." ` : ''}You're on the ground at home with fuel to spare.`,
           reverse: s.grades.reverse === 'acceptable'
             ? `Retracing works here: ${mins(s.back.minutes)} into the wind gets you back to ${nameOf(LOST_FROM)}, inside your ${s.enduranceAfterReserve} minutes. But you would be flying a reciprocal of a heading that was already wrong, and a call would have fixed it in one minute.`
             : `${mins(s.back.minutes)} into the wind is more than your ${s.enduranceAfterReserve} minutes before the reserve.`,
@@ -666,7 +714,7 @@ const lost: Lesson = {
           full: `Dead reckoning drifted because the wind was stronger than the forecast. That's normal, and it's why a checkpoint that doesn't show up on time is your cue to fix your position, not to keep looking.`,
           short: 'A late checkpoint is the cue to fix your position.',
         },
-        figure: { kind: 'chart', route, highlight: [...route, 'xbb-b2', 'xbb-b3'], marker: { pos: s.actualPos, altMsl: LOST_ALT, label: 'You were here' } },
+        figure: { kind: 'chart', route, highlight: [...route, ...shelves], marker: { pos: s.actualPos, altMsl: LOST_ALT, label: 'You were here' } },
       },
     ];
   },
