@@ -575,3 +575,86 @@ dl.kv dd { margin: 0; }
 .chip-add input { min-height: 44px; padding: 6px 10px; border: 1px solid var(--rule); background: var(--panel); color: var(--ink); border-radius: var(--r); width: 180px; max-width: 100%; }
 .check { display: flex; gap: 12px; align-items: flex-start; font-size: 0.95rem; min-height: 44px; }
 .check input { width: 22px; height: 22px; margin: 2px 0 0; accent-color: var(--ink); flex: none; }
+
+/* References: chips that open the source, and the handbook viewer.
+   A handbook chip carries a small book and opens the viewer here; a regulation
+   or AIM chip carries ↗ and leaves. The viewer is a drawer on the right at
+   desktop, so the lesson stays in view beside the open book; on a phone it
+   takes the screen. The page itself is always white paper, whatever the theme,
+   with a highlighter stroke over the cited words and a pencil tick in the margin. */
+.refs { align-items: center; }
+.chip.ref { color: var(--ink); background: var(--panel); text-decoration: none; cursor: pointer; font: inherit; font-family: var(--label); font-weight: 500; font-size: 0.8rem; min-height: 28px; display: inline-flex; align-items: center; gap: 5px; padding: 1px 8px; }
+.chip.ref:hover { border-color: var(--ink); }
+.chip.ref.book { padding-left: 6px; }
+.chip.ref .glyph { width: 13px; height: 13px; flex: none; color: var(--brand); }
+.chip.ref .ext, .refv .ext { color: var(--muted); font-size: 0.8em; margin-left: 0.15em; }
+@media (pointer: coarse) {
+  .chip.ref { min-height: 44px; padding: 6px 12px; font-size: 0.85rem; }
+  .chip.ref.book { padding-left: 10px; }
+  .chip.ref .glyph { width: 15px; height: 15px; }
+}
+.refv { position: fixed; inset: 0; z-index: 50; background: color-mix(in srgb, var(--ink) 40%, transparent); display: flex; justify-content: flex-end; align-items: stretch; }
+.refv-panel { background: var(--paper); border-left: var(--hair) solid var(--rule); width: min(880px, 100%); display: flex; flex-direction: column; min-height: 0; }
+.refv-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 14px 18px 12px; border-bottom: var(--hair) solid var(--rule); }
+.refv-title { display: grid; gap: 4px; min-width: 0; }
+.refv-title h2 { margin: 0; font-size: 1.15rem; line-height: 1.25; }
+/* The index tab: why the book is open at this page. */
+.refv-tab { justify-self: start; display: inline-flex; align-items: center; gap: 8px; font-family: var(--label); font-weight: 600; letter-spacing: 0.01em; font-size: 0.85rem; color: var(--now); margin-bottom: 2px; }
+.refv-tab i { display: block; width: 14px; height: 18px; background: var(--now); clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 72%, 0 100%); }
+.refv-meta { display: flex; flex-wrap: wrap; gap: 2px 14px; align-items: baseline; color: var(--muted); font-family: var(--label); font-weight: 500; letter-spacing: 0.01em; font-size: 0.85rem; }
+.refv-ed { font-family: var(--mono); font-size: 0.75rem; letter-spacing: 0; }
+.refv-faa { color: var(--classb); text-decoration: underline; text-underline-offset: 2px; }
+.refv-close { flex: none; }
+.refv-bar { display: flex; justify-content: space-between; align-items: center; gap: 8px 16px; padding: 8px 18px; border-bottom: 1px solid var(--rule-soft); flex-wrap: wrap; }
+.refv-nav, .refv-zoom { display: flex; align-items: center; gap: 6px; }
+.refv-nav .btn, .refv-zoom .btn { min-width: 44px; padding: 4px 10px; font-size: 1.15rem; line-height: 1; }
+.refv-zoom .refv-fit { font-size: 0.85rem; font-family: var(--label); font-weight: 500; letter-spacing: 0.01em; min-width: 7ch; padding: 4px 12px; }
+.refv-zoom .refv-fit[aria-pressed="true"] { color: var(--muted); }
+.refv-page { font-family: var(--label); font-weight: 500; letter-spacing: 0.01em; min-width: 10ch; text-align: center; }
+.refv-note { margin: 0; padding: 8px 18px 8px 26px; background: var(--tint-a); font-size: 0.9rem; position: relative; }
+.refv-note::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 12px; background: repeating-linear-gradient(135deg, var(--amber) 0 3px, transparent 3px 8px); }
+/* Before the page is drawn: a blank sheet on the desk, then the status under it. */
+.refv-wait { flex: 1; min-height: 0; overflow: auto; background: var(--panel-2); padding: 16px; display: grid; gap: 14px; align-content: start; justify-items: center; }
+.refv-blank { width: min(100%, 560px); aspect-ratio: 8.5 / 11; max-height: 60vh; background: #fff; box-shadow: 0 1px 0 var(--rule); padding: 48px 56px; display: grid; gap: 12px; align-content: start; }
+.refv-blank:not(.err) { color-scheme: light; }
+.refv-blank > i { display: block; height: 7px; background: #e3e2db; width: 92%; }
+.refv-blank > i.t { height: 12px; width: 55%; background: #d6d5cc; margin-bottom: 8px; }
+.refv-blank > i.s { width: 64%; }
+@media (prefers-reduced-motion: no-preference) {
+  .refv-blank:not(.err) > i { animation: refv-ink 1.6s ease-in-out infinite; }
+  .refv-blank > i:nth-child(2n) { animation-delay: .2s; }
+  .refv-blank > i:nth-child(3n) { animation-delay: .4s; }
+  @keyframes refv-ink { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+}
+.refv-blank.err { aspect-ratio: auto; max-height: none; padding: 28px 24px; display: block; color: #15202b; }
+.refv-err { display: grid; gap: 8px; justify-items: start; max-width: 40ch; }
+.refv-err svg { width: 44px; height: 44px; color: #8a5a00; margin-bottom: 6px; }
+.refv-err p b { font-weight: 600; }
+.refv-err p + p { color: #52606e; font-size: 0.95rem; }
+.refv-err .btn { margin-top: 8px; border-color: #15202b; background: #fff; color: #15202b; }
+.refv-msg { margin: 0; color: var(--muted); font-family: var(--label); font-weight: 500; letter-spacing: 0.01em; font-size: 0.9rem; display: grid; gap: 8px; justify-items: center; width: min(100%, 560px); }
+.refv-prog { display: block; width: 100%; height: 3px; background: var(--rule-soft); position: relative; overflow: hidden; }
+.refv-prog i { position: absolute; inset: 0 auto 0 0; background: var(--now); }
+@media (prefers-reduced-motion: no-preference) { .refv-prog i { transition: width .3s; } }
+/* The desk: scrolls both ways once the page is zoomed past the width. */
+.refv-stage { flex: 1; overflow: auto; padding: 16px; background: var(--panel-2); min-height: 0; overscroll-behavior: contain; position: relative; }
+.refv-sheet { --pen: #ffe55c; position: relative; margin: 0 auto; background: #fff; box-shadow: 0 1px 0 var(--rule), 0 0 0 1px color-mix(in srgb, var(--rule) 40%, transparent); color-scheme: light; }
+.refv-sheet canvas { display: block; }
+.refv-pin { position: absolute; left: 0; width: 5px; background: var(--brand); border-radius: 0 2px 2px 0; }
+.refv-pin::after { content: ""; position: absolute; left: 100%; top: 50%; width: 0; height: 0; border: 5px solid transparent; border-left: 6px solid var(--brand); transform: translateY(-50%); }
+.textLayer { position: absolute; inset: 0; overflow: hidden; line-height: 1; text-align: initial; opacity: 1; forced-color-adjust: none; transform-origin: 0 0; }
+.textLayer span, .textLayer br { color: transparent; position: absolute; white-space: pre; cursor: text; transform-origin: 0 0; }
+/* The highlighter: a stroke a little taller than the text, flat ends, ink multiplied through it. */
+.textLayer .hit { background: var(--pen); box-shadow: 0 0 0 0.1em var(--pen); border-radius: 0.1em; mix-blend-mode: multiply; }
+.textLayer ::selection { background: color-mix(in srgb, var(--classb) 30%, transparent); }
+@media (max-width: 640px) {
+  .refv-panel { border-left: 0; }
+  .refv-head { padding: calc(10px + env(safe-area-inset-top, 0px)) 14px 10px; }
+  .refv-bar { padding: 6px 10px; gap: 6px 10px; }
+  .refv-nav .btn, .refv-zoom .btn { padding: 4px 6px; }
+  .refv-zoom .refv-fit { min-width: 0; padding: 4px 8px; }
+  .refv-page { min-width: 0; }
+  .refv-stage, .refv-wait { padding: 0 0 env(safe-area-inset-bottom, 0px); }
+  .refv-blank { box-shadow: none; max-height: 46vh; padding: 28px 24px; }
+  .refv-msg { padding: 0 16px; }
+}

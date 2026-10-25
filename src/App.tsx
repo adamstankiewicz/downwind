@@ -11,6 +11,7 @@ import { useAircraft, useAirport, useCourse, useLoading, useLogbook, useOnboardi
 import { lessonById } from './course/modules';
 import { lessonContext } from './course/practice';
 import type { Lesson } from './course/types';
+import { RefProvider } from './refs/RefViewer';
 
 type Rail = 'course' | 'tools' | 'logbook' | 'pilot';
 type Screen = { rail: Rail; view?: 'lesson' | 'daily'; lessonId?: string };
@@ -72,75 +73,77 @@ export function App() {
   const lesson = screen.view === 'lesson' && screen.lessonId ? lessonById(screen.lessonId) : undefined;
 
   return (
-    <div className="shell">
-      <nav className="rail" aria-label="Screens">
-        <div className="brand" aria-hidden="true"><Mark /><span>Downwind</span></div>
-        {RAILS.map((n) => (
-          <button key={n.id} type="button" aria-current={screen.rail === n.id ? 'page' : undefined} onClick={() => go({ rail: n.id })}>
-            {n.icon}
-            <span>{n.label}</span>
-          </button>
-        ))}
-        <div className="rail-foot" aria-hidden="true">{airport?.icao ?? ''}</div>
-      </nav>
+    <RefProvider>
+      <div className="shell">
+        <nav className="rail" aria-label="Screens">
+          <div className="brand" aria-hidden="true"><Mark /><span>Downwind</span></div>
+          {RAILS.map((n) => (
+            <button key={n.id} type="button" aria-current={screen.rail === n.id ? 'page' : undefined} onClick={() => go({ rail: n.id })}>
+              {n.icon}
+              <span>{n.label}</span>
+            </button>
+          ))}
+          <div className="rail-foot" aria-hidden="true">{airport?.icao ?? ''}</div>
+        </nav>
 
-      <main className="page">
-        {screen.rail === 'course' && lesson && (
-          <LessonPlayer
-            key={`${lesson.id}-${ctxKey}`}
-            lesson={lesson}
-            ctx={ctx}
-            progress={progress}
-            setProgress={setProgress}
-            onExit={() => go({ rail: 'course' })}
-            onNext={startLesson}
-          />
-        )}
-        {screen.rail === 'course' && screen.view === 'daily' && airport && (
-          <DailyFlight
-            airport={airport}
-            aircraft={aircraft}
-            loading={loading}
-            pilot={pilot}
-            progress={progress}
-            log={log}
-            setLog={setLog}
-            goAirplane={() => openTool('airplane')}
-            goLogbook={() => go({ rail: 'logbook' })}
-            onExit={() => go({ rail: 'course' })}
-          />
-        )}
-        {screen.rail === 'course' && !lesson && (screen.view !== 'daily' || !airport) && (
-          <CourseHome
-            progress={progress}
-            airport={airport}
-            hasAircraft={aircraft.id !== 'custom' || aircraft.emptyWeightLb > 0}
-            onStart={startLesson}
-            onDaily={() => go({ rail: 'course', view: 'daily' })}
-            onSetup={() => rerunSetup(1)}
-          />
-        )}
-        {screen.rail === 'tools' && (
-          <Tools tool={tool} setTool={setTool} airport={airport} aircraft={aircraft} setAircraft={setAircraft} loading={loading} setLoading={setLoading} epoch={epoch} onSetup={() => rerunSetup(1)} />
-        )}
-        {screen.rail === 'logbook' && <Logbook progress={progress} log={log} epoch={epoch} goReview={() => openTool('review')} goCourse={() => go({ rail: 'course' })} />}
-        {screen.rail === 'pilot' && (
-          <Settings
-            airport={airport}
-            pilot={pilot}
-            setPilot={setPilot}
-            theme={theme}
-            setTheme={setTheme}
-            onReviewReset={() => setEpoch((e) => e + 1)}
-            onCourseReset={() => { setProgress({}); setLog([]); }}
-            onRerunSetup={() => rerunSetup(0)}
-          />
-        )}
-        <footer className="about">
-          <span>Training aid, not for navigation. Not a substitute for an official briefing or a CFI.</span>
-          <span>Downwind</span>
-        </footer>
-      </main>
-    </div>
+        <main className="page">
+          {screen.rail === 'course' && lesson && (
+            <LessonPlayer
+              key={`${lesson.id}-${ctxKey}`}
+              lesson={lesson}
+              ctx={ctx}
+              progress={progress}
+              setProgress={setProgress}
+              onExit={() => go({ rail: 'course' })}
+              onNext={startLesson}
+            />
+          )}
+          {screen.rail === 'course' && screen.view === 'daily' && airport && (
+            <DailyFlight
+              airport={airport}
+              aircraft={aircraft}
+              loading={loading}
+              pilot={pilot}
+              progress={progress}
+              log={log}
+              setLog={setLog}
+              goAirplane={() => openTool('airplane')}
+              goLogbook={() => go({ rail: 'logbook' })}
+              onExit={() => go({ rail: 'course' })}
+            />
+          )}
+          {screen.rail === 'course' && !lesson && (screen.view !== 'daily' || !airport) && (
+            <CourseHome
+              progress={progress}
+              airport={airport}
+              hasAircraft={aircraft.id !== 'custom' || aircraft.emptyWeightLb > 0}
+              onStart={startLesson}
+              onDaily={() => go({ rail: 'course', view: 'daily' })}
+              onSetup={() => rerunSetup(1)}
+            />
+          )}
+          {screen.rail === 'tools' && (
+            <Tools tool={tool} setTool={setTool} airport={airport} aircraft={aircraft} setAircraft={setAircraft} loading={loading} setLoading={setLoading} epoch={epoch} onSetup={() => rerunSetup(1)} />
+          )}
+          {screen.rail === 'logbook' && <Logbook progress={progress} log={log} epoch={epoch} goReview={() => openTool('review')} goCourse={() => go({ rail: 'course' })} />}
+          {screen.rail === 'pilot' && (
+            <Settings
+              airport={airport}
+              pilot={pilot}
+              setPilot={setPilot}
+              theme={theme}
+              setTheme={setTheme}
+              onReviewReset={() => setEpoch((e) => e + 1)}
+              onCourseReset={() => { setProgress({}); setLog([]); }}
+              onRerunSetup={() => rerunSetup(0)}
+            />
+          )}
+          <footer className="about">
+            <span>Training aid, not for navigation. Not a substitute for an official briefing or a CFI.</span>
+            <span>Downwind</span>
+          </footer>
+        </main>
+      </div>
+    </RefProvider>
   );
 }

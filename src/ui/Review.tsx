@@ -5,6 +5,7 @@ import { useState } from 'react';
 import type { ReviewItem } from '../review/items';
 import { dueItems, recordAnswer } from '../review/scheduler';
 import { Card, PageHead } from './common';
+import { RefChips } from '../refs/RefViewer';
 
 const KEYS = ['A', 'B', 'C', 'D', 'E', 'F'];
 
@@ -76,7 +77,7 @@ export function Review() {
                 <span className="sev">{d.correct ? 'Right' : 'Missed'}</span>
                 <h4>{d.item.prompt}</h4>
                 <p>{d.item.options[d.item.answer]}</p>
-                <div className="refs"><span className="chip acs">{d.item.acs}</span><span className="chip">{d.item.ref}</span></div>
+                <div className="refs"><span className="chip acs">{d.item.acs}</span><RefChips refs={[d.item.ref]} /></div>
               </li>
             ))}
           </ul>
@@ -134,7 +135,7 @@ export function Review() {
                   <span>{item.explanation}</span>
                   <div className="refs">
                     <span className="chip acs">{item.acs}</span>
-                    <span className="chip">{item.ref}</span>
+                    <RefChips refs={[item.ref]} />
                   </div>
                 </div>
                 <button type="button" className="btn primary" onClick={next}>{idx + 1 < session.length ? 'Next' : 'Finish'}</button>
