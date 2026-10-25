@@ -16,7 +16,8 @@ export type ModelResult =
 export interface AskModel {
   /** What the adapter calls, such as `anthropic:claude-haiku-5-5`. */
   id: string;
-  complete(prompt: { system: string; user: string; schema: Record<string, unknown>; maxTokens: number }): Promise<ModelResult>;
+  /** `strong` is set when the question is one the cheap model gets wrong too often; a router uses it, others ignore it. */
+  complete(prompt: { system: string; user: string; schema: Record<string, unknown>; maxTokens: number; strong?: boolean }): Promise<ModelResult>;
 }
 
 export class ModelError extends Error {

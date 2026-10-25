@@ -7,8 +7,9 @@ import { emptyAnswers } from '../../course/progress';
 import { modules } from '../../course/modules';
 import { resolvesToSource } from '../../refs/resolve';
 import { askContext, askRequest, citableRefs, parseReply, systemPrompt, userMessage, MAX_QUESTION } from '../context';
-import { handleAsk } from '../../../worker/ask';
-import { anthropicModel } from '../../../worker/models/anthropic';
+import { handleAsk, needsStrong } from '../../../worker/ask';
+import { routedModel } from '../../../worker/models/router';
+import { anthropicModel, parseSpec } from '../../../worker/models/anthropic';
 import type Anthropic from '@anthropic-ai/sdk';
 import { askInstructor, askedToday, DAILY_LIMIT } from '../client';
 import { afterEach, vi } from 'vitest';
@@ -131,6 +132,34 @@ describe('worker /api/ask', () => {
     await handleAsk(post(), key, anthropicModel('k', 'claude-sonnet-5-5', grab));
     await handleAsk(post(), key, anthropicModel('k', 'claude-haiku-5-5', grab));
     expect(sent).toEqual([{ type: 'between_tools' }, { type: 'disabled' }]);
+  });
+
+  it('thinks only when the spec asks, with room for it', async () => {
+    const sent: Anthropic.MessageCreateParamsNonStreaming[] = [];
+    const grab = async (p: Anthropic.MessageCreateParamsNonStreaming) => { sent.push(p); return reply(JSON.stringify({ answer: 'Yes.', refs: [] })); };
+    await handleAsk(post(), key, anthropicModel('k', 'claude-haiku-5-5+think:medium', grab));
+    expect(sent[0].model).toBe('claude-haiku-5-5');
+    expect(sent[0].thinking).toEqual({ type: 'adaptive' });
+    expect(sent[0].output_config?.effort).toBe('medium');
+    expect(sent[0].max_tokens).toBeGreaterThan(400);
+    expect(parseSpec('claude-sonnet-5-5')).toEqual({ model: 'claude-sonnet-5-5', think: false, effort: 'low' });
+  });
+
+  it('sends only uncommitted decisions and unchecked blanks to the strong model', async () => {
+    const steps = lesson.build(ctx);
+    const decide = steps.find((s) => s.kind === 'decide')!;
+    const req = (step: (typeof steps)[number], revealed: boolean) => askRequest('Which one?', [], askContext(lesson, step, ctx, emptyAnswers(), revealed));
+    expect(needsStrong(req(decide, false))).toBe(true);
+    expect(needsStrong(req(decide, true))).toBe(false);
+    expect(needsStrong(req(steps[0], false))).toBe(false);
+
+    const used: string[] = [];
+    const fake = (name: string) => anthropicModel('k', name, async (p) => { used.push(p.model); return reply(JSON.stringify({ answer: 'Look at the rule.', refs: [] })); });
+    const router = routedModel(fake('claude-haiku-5-5'), fake('claude-sonnet-5-5'));
+    await handleAsk(post(JSON.stringify(req(decide, false))), key, router);
+    await handleAsk(post(JSON.stringify(req(decide, true))), key, router);
+    await handleAsk(post(), key, router);
+    expect(used).toEqual(['claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-haiku-5-5']);
   });
 
   it('limits bursts from one address when the rate limit is bound', async () => {

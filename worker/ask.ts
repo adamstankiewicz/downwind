@@ -5,19 +5,25 @@
 //
 // Every model must pass the eval suite (evals/ask) before it is configured here.
 //
-// Cost: the cheapest current model with thinking off; the system prompt is
+// Routing: Haiku answers most questions. The questions it gets wrong too
+// often in the evals (see needsStrong) go to Sonnet, about 20 times the price.
+//
+// Cost: the cheapest current model with thinking off for most questions; the system prompt is
 // the same on every request and cached; the lesson context is short; answers
 // are capped; identical questions on the same step are served from the edge
 // cache for a day; and an optional rate limit caps bursts per address.
 
 import { MAX_FOLLOWUPS, MAX_QUESTION, REPLY_SCHEMA, parseReply, systemPrompt, userMessage, type AskRequest } from '../src/ask/context';
 import { anthropicModel } from './models/anthropic';
+import { routedModel } from './models/router';
 import { ModelError, type AskModel } from './models/types';
 
 export interface AskEnv {
   ANTHROPIC_API_KEY?: string;
-  /** Optional override of the model id. */
+  /** Optional override of the model for most questions, such as `claude-haiku-5-5` or `claude-haiku-5-5+think`. */
   ASK_MODEL?: string;
+  /** Optional override of the model for the hard questions; `none` sends every question to ASK_MODEL. */
+  ASK_STRONG_MODEL?: string;
   /** Optional comma-separated origins allowed to ask, such as the app's own. Unset allows any. */
   ASK_ORIGINS?: string;
   /** Optional Workers rate limit binding (wrangler.toml [[ratelimits]]), keyed by client address. */
@@ -30,9 +36,23 @@ const MAX_BODY = 16_000;
 const UNAVAILABLE = 'Ask the instructor is not set up on this server.';
 const COULD_NOT = 'The instructor could not answer.';
 
+export const DEFAULT_STRONG_MODEL = 'claude-sonnet-5-5';
+
 /** The model the worker is configured with, or null when it has none. */
 export function configuredModel(env: AskEnv): AskModel | null {
-  return env.ANTHROPIC_API_KEY ? anthropicModel(env.ANTHROPIC_API_KEY, env.ASK_MODEL || undefined) : null;
+  if (!env.ANTHROPIC_API_KEY) return null;
+  const cheap = anthropicModel(env.ANTHROPIC_API_KEY, env.ASK_MODEL || undefined);
+  const strong = env.ASK_STRONG_MODEL || DEFAULT_STRONG_MODEL;
+  return strong === 'none' ? cheap : routedModel(cheap, anthropicModel(env.ANTHROPIC_API_KEY, strong));
+}
+
+/**
+ * Questions the cheap model should not answer: a decision not yet committed or
+ * blanks not yet checked, where a slip gives the answer away.
+ */
+export function needsStrong(req: AskRequest): boolean {
+  const step = req.context.step as { kind?: string; committed?: boolean; checked?: boolean };
+  return (step.kind === 'decide' && !step.committed) || (step.kind === 'turn' && !step.checked);
 }
 
 /** `model` is for tests and evals; production uses the configured one. */
@@ -51,7 +71,7 @@ export async function handleAsk(request: Request, env: AskEnv, model: AskModel |
   if (!req) return json({ error: 'Not a question.' }, 400, cors);
 
   const cache = (globalThis as unknown as { caches?: { default: Cache } }).caches?.default;
-  const key = new Request(`https://ask.cache/${encodeURIComponent(model.id)}/${await sha256(JSON.stringify(req))}`);
+  const key = new Request(`https://ask.cache/${encodeURIComponent(model.id)}/${needsStrong(req) ? 's' : 'c'}/${await sha256(JSON.stringify(req))}`);
   const hit = await cache?.match(key);
   if (hit) return withHeaders(hit, cors);
 
@@ -62,7 +82,7 @@ export async function handleAsk(request: Request, env: AskEnv, model: AskModel |
 
   let result;
   try {
-    result = await model.complete({ system: systemPrompt(), user: userMessage(req), schema: REPLY_SCHEMA, maxTokens: MAX_TOKENS });
+    result = await model.complete({ system: systemPrompt(), user: userMessage(req), schema: REPLY_SCHEMA, maxTokens: MAX_TOKENS, strong: needsStrong(req) });
   } catch (e) {
     const reason = e instanceof ModelError ? e.reason : 'failed';
     if (reason === 'busy') return json({ error: 'Busy. Try again in a minute.' }, 429, cors);

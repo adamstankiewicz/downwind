@@ -16,7 +16,7 @@ import { handleAsk } from '../../worker/ask';
 import type { AskModel, ModelResult } from '../../worker/models/types';
 import { builtCases, type BuiltCase } from './cases';
 import { gradeCase, hardPassed, parseOutput, passed, type Check } from './grade';
-import { costOf, makeModel, PRICES } from './providers';
+import { costOf, makeModel } from './providers';
 import { CRITERIA, JUDGE_MODEL, judge, judgeAvailable, type Criterion, type Verdict } from './judge';
 
 const SPECS = (process.env.ASK_EVAL_MODELS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
@@ -169,7 +169,7 @@ export function summarize(rows: Row[], caseCount: number): string {
     const lat = rs.map((r) => r.latencyMs).sort((a, b) => a - b)[rs.length >> 1] ?? 0;
     const avg = (f: (r: Row) => number | undefined) => Math.round(rs.reduce((s, r) => s + (f(r) ?? 0), 0) / Math.max(1, rs.length));
     const cost = rs.reduce((s, r) => s + r.costUsd, 0) / Math.max(1, rs.length);
-    const priced = PRICES[m.replace(/^anthropic:/, '')];
+    const priced = m.startsWith('anthropic:') || m.startsWith('route:');
     out.push(`| ${m} | ${pct(rs.filter((r) => r.pass).length, rs.length)} | ${pct(rs.filter((r) => r.hardPass).length, rs.length)} | ${judged.length ? pct(judgePass, judged.length) : 'n/a'} | ${(lat / 1000).toFixed(1)} s | ${avg((r) => r.inputTokens)} / ${avg((r) => r.outputTokens)} | ${priced ? `$${cost.toFixed(5)}` : '$0 (on device)'} |`);
   }
   if (rows.some((r) => r.verdict)) {
