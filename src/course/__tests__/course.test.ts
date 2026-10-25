@@ -116,21 +116,20 @@ describe('scoring', () => {
   const steps = weatherLessons[4].build(ctx);
 
   it('shows the in-flight brief only after going', () => {
-    const a: LessonAnswers = { blanks: {}, decisions: { d1: { choice: 'go-plan', confidence: 60 } } };
+    const a: LessonAnswers = { blanks: {}, decisions: { d1: { choice: 'go-plan' } } };
     expect(visibleSteps(steps, a).map((s) => s.id)).toContain('b2');
     expect(visibleSteps(steps, a).map((s) => s.id)).not.toContain('b3');
-    const b: LessonAnswers = { blanks: {}, decisions: { d1: { choice: 'cancel', confidence: 60 } } };
+    const b: LessonAnswers = { blanks: {}, decisions: { d1: { choice: 'cancel' } } };
     expect(visibleSteps(steps, b).map((s) => s.id)).toContain('b3');
     expect(visibleSteps(steps, emptyAnswers()).map((s) => s.id)).not.toContain('b2');
   });
 
-  it('grades by the worst decision and flags confident mistakes', () => {
+  it('grades by the worst decision', () => {
     const r = scoreLesson(steps, {
       blanks: { t1: { spread: '2', fm: '0' } },
-      decisions: { d1: { choice: 'go-plan', confidence: 50 }, d2: { choice: 'go', confidence: 80 } },
+      decisions: { d1: { choice: 'go-plan' }, d2: { choice: 'go' } },
     });
     expect(r.grade).toBe('unsafe');
-    expect(r.confidentlyWrong).toBe(true);
     expect(r.blanksRight).toBe(1);
     expect(r.decisions.find((d) => d.stepId === 'd2')?.best).toEqual(['go-plan']);
   });
@@ -149,7 +148,7 @@ describe('scoring', () => {
     expect(nextLesson(p)?.id).toBe('2.1');
     const lesson = weatherLessons[0];
     expect(coachLevel(p, lesson)).toBe('full');
-    const r = scoreLesson(lesson.build(ctx), { blanks: {}, decisions: { d1: { choice: 'go', confidence: 80 } } });
+    const r = scoreLesson(lesson.build(ctx), { blanks: {}, decisions: { d1: { choice: 'go' } } });
     p = recordLesson(p, '2.1', r, NOW);
     expect(nextLesson(p)?.id).toBe('2.2');
     expect(coachLevel(p, lesson)).toBe('short');
@@ -172,7 +171,7 @@ describe('daily sheet', () => {
     expect(none.every((s) => !s.covered && s.prompt === null)).toBe(true);
     expect(none.flatMap((s) => s.findings)).toHaveLength(brief.findings.length);
 
-    const done = { completedAt: NOW.toISOString(), attempts: 1, lastAt: '', lastGrade: 'best', bestGrade: 'best', lcg: 'Perform', confidentlyWrong: false } as const;
+    const done = { completedAt: NOW.toISOString(), attempts: 1, lastAt: '', lastGrade: 'best', bestGrade: 'best', lcg: 'Perform' } as const;
     const some = dailySheet(brief, { '2.1': done, '2.2': done, '2.4': done }, mins);
     const by = Object.fromEntries(some.map((s) => [s.id, s]));
     expect(by.report.prompt?.answer).toBe('MVFR');

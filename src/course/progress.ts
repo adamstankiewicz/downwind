@@ -17,14 +17,14 @@ export interface LessonRecord {
   lastGrade: Grade;
   bestGrade: Grade;
   lcg: Lcg;
-  confidentlyWrong: boolean;
+  /** Older saves may still carry this flag from the removed confidence slider. */
+  confidentlyWrong?: boolean;
 }
 
 export type CourseProgress = Record<string, LessonRecord>;
 
 export interface DecisionAnswer {
   choice: ChoiceId;
-  confidence: number;
 }
 
 export interface LessonAnswers {
@@ -38,14 +38,12 @@ export interface DecisionResult {
   title: string;
   choice: ChoiceId;
   grade: Grade;
-  confidence: number;
   best: ChoiceId[];
 }
 
 export interface LessonResult {
   grade: Grade;
   lcg: Lcg;
-  confidentlyWrong: boolean;
   blanksRight: number;
   blanksTotal: number;
   decisions: DecisionResult[];
@@ -100,7 +98,7 @@ export function scoreLesson(steps: Step[], answers: LessonAnswers): LessonResult
       if (!a) continue;
       const top = RANK.slice().reverse().find((g) => Object.values(s.grades).includes(g))!;
       decisions.push({
-        stepId: s.id, title: s.title, choice: a.choice, grade: s.grades[a.choice], confidence: a.confidence,
+        stepId: s.id, title: s.title, choice: a.choice, grade: s.grades[a.choice],
         best: (Object.keys(s.grades) as ChoiceId[]).filter((id) => s.grades[id] === top),
       });
     }
@@ -109,7 +107,6 @@ export function scoreLesson(steps: Step[], answers: LessonAnswers): LessonResult
   return {
     grade,
     lcg: lcgFor(grade, total ? right / total : 1),
-    confidentlyWrong: decisions.some((d) => (d.grade === 'unsafe' || d.grade === 'marginal') && d.confidence >= 70),
     blanksRight: right,
     blanksTotal: total,
     decisions,
@@ -128,7 +125,6 @@ export function recordLesson(progress: CourseProgress, lessonId: string, result:
       lastGrade: result.grade,
       bestGrade: prev ? better(prev.bestGrade, result.grade) : result.grade,
       lcg: result.lcg,
-      confidentlyWrong: result.confidentlyWrong,
     },
   };
 }

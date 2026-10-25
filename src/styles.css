@@ -436,11 +436,6 @@ footer.about {
 .choice.revealed.picked { opacity: 1; }
 .choice.right { border-color: var(--vfr); box-shadow: inset 3px 0 0 var(--vfr); }
 .choice.wrong { border-color: var(--ifr); box-shadow: inset 3px 0 0 var(--ifr); }
-.conf { display: grid; gap: 6px; font-size: 0.9rem; color: var(--muted); max-width: 520px; }
-.conf-row { display: flex; justify-content: space-between; gap: 8px; }
-.conf-row label { color: var(--ink); font-weight: 600; }
-.conf-row b { color: var(--ink); font-weight: 600; }
-.conf input[type="range"] { width: 100%; accent-color: var(--ink); margin: 0; min-height: 44px; }
 .gradechip { font-family: var(--label); font-size: 0.8rem; font-weight: 600; letter-spacing: 0.01em; padding: 1px 8px; border: 1px solid currentColor; border-radius: var(--r); white-space: nowrap; }
 .gradechip.best { color: var(--vfr); } .gradechip.acceptable { color: var(--classb); } .gradechip.marginal { color: var(--amber); } .gradechip.unsafe { color: var(--ifr); }
 

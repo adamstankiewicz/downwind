@@ -1,4 +1,4 @@
-// Readiness: mastery per ACS Area I task, plus the confidently-wrong rate.
+// Readiness: mastery per ACS Area I task.
 
 import { masteryByTask } from '../review/scheduler';
 import { reviewItems } from '../review/items';
@@ -25,8 +25,6 @@ export function Readiness({ goReview, embedded }: { goReview: () => void; embedd
 
   const answered = mastery.reduce((n, m) => n + m.answered, 0);
   const weighted = answered ? mastery.reduce((n, m) => n + m.correctRate * m.answered, 0) / answered : 0;
-  const cwTasks = mastery.filter((m) => m.answered > 0);
-  const cwRate = cwTasks.length ? cwTasks.reduce((n, m) => n + m.confidentlyWrongRate * m.answered, 0) / cwTasks.reduce((n, m) => n + m.answered, 0) : 0;
 
   return (
     <>
@@ -71,13 +69,13 @@ export function Readiness({ goReview, embedded }: { goReview: () => void; embedd
             <p className="help">Green is 80% and up, blue 60 to 79, amber below. Tasks without items yet (Operation of Systems) fill in with later content.</p>
           </Card>
           <div className="stack">
-            <Card title="Calibration">
+            <Card title="Overall">
               <div className="score-row">
                 <div className="stat"><span className="k">Weighted correct</span><span className="v">{Math.round(weighted * 100)}%</span></div>
-                <div className="stat"><span className="k">Confidently wrong</span><span className={`v ${cwRate > 0.2 ? 'warn' : ''}`}>{Math.round(cwRate * 100)}%</span></div>
+                <div className="stat"><span className="k">Answered</span><span className="v">{answered}</span></div>
               </div>
               <p className="help">
-                Confidently wrong is the share of missed answers given at 70% confidence or higher. A high number means you don't know what you don't know, which is the dangerous kind of gap. A low number with a low score just means you need more reps.
+                Missed items come back sooner, so a low score on a task mostly means it needs more reps. The weakest tasks are listed next.
               </p>
             </Card>
             <Card title="Weakest tasks">

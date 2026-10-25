@@ -40,7 +40,7 @@ export function Logbook({ progress, log, epoch, goReview, goCourse }: { progress
                 return (
                   <li key={id}>
                     <span className="z">{fmtDate(r.lastAt)}</span>
-                    <span className="what"><b><span className="lid">{id}</span> {l?.title ?? 'Lesson'}</b><small>{r.attempts} attempt{r.attempts === 1 ? '' : 's'}, best {GRADE_LABEL[r.bestGrade].toLowerCase()}, {r.lcg}{r.confidentlyWrong ? ', confidently wrong last time' : ''}</small></span>
+                    <span className="what"><b><span className="lid">{id}</span> {l?.title ?? 'Lesson'}</b><small>{r.attempts} attempt{r.attempts === 1 ? '' : 's'}, best {GRADE_LABEL[r.bestGrade].toLowerCase()}, {r.lcg}</small></span>
                     <span className={`g ${r.lastGrade}`}>{GRADE_LABEL[r.lastGrade]}</span>
                   </li>
                 );
@@ -59,12 +59,11 @@ export function Logbook({ progress, log, epoch, goReview, goCourse }: { progress
                 <li key={s.id}>
                   <span className="z">{fmtDate(s.filedAt)}<br />{fmtZ(s.filedAt)}</span>
                   <span className="what">
-                    <b>{s.station}, {CHOICE_LABEL[s.choice]} at {s.confidence}% sure</b>
+                    <b>{s.station}, {CHOICE_LABEL[s.choice]}</b>
                     <small>
                       {s.source === 'sample' ? 'Practice weather. ' : ''}
                       {s.readingsTotal ? `${s.readingsRight} of ${s.readingsTotal} readings matched. ` : 'No lines asked. '}
                       {s.findings.filter((f) => f.severity !== 'info').length ? `Flagged: ${s.findings.filter((f) => f.severity !== 'info').map((f) => f.title.toLowerCase()).join('; ')}.` : 'Nothing flagged.'}
-                      {s.confidentlyWrong ? ' Confidently wrong.' : ''}
                     </small>
                   </span>
                   <span className={`g ${s.grade}`}>{GRADE_LABEL[s.grade]}</span>

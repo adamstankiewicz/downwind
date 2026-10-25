@@ -206,9 +206,8 @@ function StepView({ step, level, answers, setAnswers, checked, onCheck, committe
   }
   const a = answers.decisions[step.id];
   const choice = a?.choice ?? null;
-  const confidence = a?.confidence ?? 50;
-  const setDecision = (patch: Partial<{ choice: ChoiceId; confidence: number }>) =>
-    setAnswers((x) => ({ ...x, decisions: { ...x.decisions, [step.id]: { choice: patch.choice ?? x.decisions[step.id]?.choice ?? 'go', confidence: patch.confidence ?? x.decisions[step.id]?.confidence ?? 50 } } }));
+  const setChoice = (id: ChoiceId) =>
+    setAnswers((x) => ({ ...x, decisions: { ...x.decisions, [step.id]: { choice: id } } }));
   return (
     <section className="step">
       <h2>{step.title}</h2>
@@ -219,21 +218,13 @@ function StepView({ step, level, answers, setAnswers, checked, onCheck, committe
           const picked = choice === o.id;
           const grade = committed ? step.grades[o.id] : null;
           return (
-            <button key={o.id} type="button" className={`choice ${committed ? 'revealed' : ''} ${picked ? 'picked' : ''}`} aria-pressed={picked} disabled={committed} onClick={() => setDecision({ choice: o.id })}>
+            <button key={o.id} type="button" className={`choice ${committed ? 'revealed' : ''} ${picked ? 'picked' : ''}`} aria-pressed={picked} disabled={committed} onClick={() => setChoice(o.id)}>
               <span className="key">{KEYS[i]}</span>
               <span>{o.label}</span>
               {grade && <span className={`gradechip ${grade}`}>{GRADE_LABEL[grade]}</span>}
             </button>
           );
         })}
-      </div>
-      <div className="conf">
-        <div className="conf-row">
-          <label htmlFor={`${step.id}-conf`}>How sure are you?</label>
-          <b>{confidence}%</b>
-        </div>
-        <input id={`${step.id}-conf`} type="range" min={0} max={100} step={5} value={confidence} disabled={committed} onChange={(e) => setDecision({ confidence: Number(e.target.value) })} />
-        <div className="conf-row"><span>Guessing</span><span>Certain</span></div>
       </div>
       {!committed ? (
         <div className="cta">
@@ -269,12 +260,6 @@ function Debrief({ lesson, steps, answers, result, progress, onAgain, onNext, on
         <h2>Debrief</h2>
         <div className={`grade ${result.grade}`}>{GRADE_LABEL[result.grade]}</div>
         <p className="lcg">Learner-centered grading: {result.lcg}. {LCG_TEXT[result.lcg]}</p>
-        {result.confidentlyWrong && (
-          <div className="callout">
-            <b>Confidently wrong</b>
-            <span>You were at least 70% sure of a call that graded marginal or unsafe. The gap between confidence and outcome is the thing to study, more than the answer itself.</span>
-          </div>
-        )}
       </section>
 
       <section className="step">
@@ -287,7 +272,7 @@ function Debrief({ lesson, steps, answers, result, progress, onAgain, onNext, on
             return (
               <li key={d.stepId}>
                 <h3>{d.title}</h3>
-                <p className="dec-row"><span className="muted">You chose</span> <span>{mine.label}</span> <span className={`gradechip ${d.grade}`}>{GRADE_LABEL[d.grade]}</span> <span className="muted">at {d.confidence}% sure</span></p>
+                <p className="dec-row"><span className="muted">You chose</span> <span>{mine.label}</span> <span className={`gradechip ${d.grade}`}>{GRADE_LABEL[d.grade]}</span></p>
                 {!d.best.includes(d.choice) && (
                   <p className="dec-row"><span className="muted">{best.length > 1 ? 'Best calls' : 'Best call'}</span> <span>{best.map((b) => b.label).join(' Or: ')}</span></p>
                 )}

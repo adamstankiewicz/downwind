@@ -110,7 +110,7 @@ async function run(viewport, live) {
   check((await page.getByText(/^(Best call|Unsafe|Marginal|Acceptable)$/).count()) === 0, `${label} grades hidden before commit`);
   check((await page.locator('.metar').count()) > 0, `${label} the report stays open beside the decision`);
   await page.getByRole('button', { name: /Drive out and start the preflight/ }).click();
-  await page.locator('#d1-conf').fill('80');
+  check((await page.locator('input[type=range]').count()) === 0, `${label} no confidence slider`);
   await btn('Commit').click();
   body = await main();
   check(/Best call/.test(body) && /A good day/.test(body), `${label} grades and consequence shown after commit`);
@@ -157,12 +157,11 @@ async function run(viewport, live) {
   check(/Your reading matched/.test(await main()), `${label} reading compared and matched`);
   await noHScroll('daily sheet');
   await page.getByRole('button', { name: /Go as planned/ }).click();
-  await page.locator('#conf').fill('80');
   await btn('Sign and commit').click();
   await page.getByRole('heading', { name: 'Debrief', exact: true }).waitFor();
   body = await main();
   check(/Learner-centered grading/.test(body), `${label} daily debrief shows LCG`);
-  check(live ? /Best call/.test(body) : /Confidently wrong/.test(body) && /Unsafe|Marginal/.test(body), `${label} daily grade matches conditions`);
+  check(live ? /Best call/.test(body) : /Unsafe|Marginal/.test(body), `${label} daily grade matches conditions`);
   if (!live) {
     check((await page.locator('.line.drove').count()) > 0, `${label} lines that drove the grade are marked`);
     check(/taught in Lesson 2\.2|Lesson 2\.4 teaches/.test(body) || /teaches this/.test(body), `${label} notes name the lesson that teaches each line`);
@@ -177,7 +176,7 @@ async function run(viewport, live) {
   await rail('Logbook').click();
   body = await main();
   check(/2\.1 Reading the METAR/.test(body) && /1 attempt/.test(body), `${label} logbook lists the lesson flown`);
-  check(/Go at 80% sure/.test(body), `${label} logbook lists the filed briefing`);
+  check(/, Go\b/.test(body) && !/% sure/.test(body), `${label} logbook lists the filed briefing`);
   check(/Review readiness/.test(body), `${label} readiness folded into the logbook`);
   await noHScroll('logbook');
 

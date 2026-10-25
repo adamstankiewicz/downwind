@@ -60,7 +60,7 @@ export function CourseHome({ progress, airport, hasAircraft, onStart, onDaily, o
                 {refly.map((l) => (
                   <button type="button" key={l.id} className="sess refly" onClick={() => onStart(l)}>
                     <b>Fly {l.id} again: {l.title}</b>
-                    <span className="d">Last time: {GRADE_LABEL[progress[l.id].lastGrade].toLowerCase()}{progress[l.id].confidentlyWrong ? ', and you were sure of it' : ''}. {l.minutes} min.</span>
+                    <span className="d">Last time: {GRADE_LABEL[progress[l.id].lastGrade].toLowerCase()}. {l.minutes} min.</span>
                     <span className="t">Again</span>
                   </button>
                 ))}

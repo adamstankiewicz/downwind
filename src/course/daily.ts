@@ -117,8 +117,6 @@ export interface FiledSheet {
   departure: string;
   choice: ChoiceId;
   grade: Grade;
-  confidence: number;
-  confidentlyWrong: boolean;
   readingsRight: number;
   readingsTotal: number;
   findings: { title: string; severity: Finding['severity'] }[];

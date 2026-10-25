@@ -39,7 +39,6 @@ export function DailyFlight({ airport, aircraft, loading, pilot, progress, log, 
   const [readings, setReadings] = useState<Record<string, string>>({});
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
   const [choice, setChoice] = useState<ChoiceId | null>(null);
-  const [confidence, setConfidence] = useState(50);
   const [committed, setCommitted] = useState(false);
   const [filedId, setFiledId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -78,7 +77,7 @@ export function DailyFlight({ airport, aircraft, loading, pilot, progress, log, 
     [wx, airport, aircraft, wb, pilot.minimums, departure, tripHours],
   );
   const sections = useMemo(() => (brief ? dailySheet(brief, progress, pilot.minimums) : []), [brief, progress, pilot.minimums]);
-  const result = useMemo(() => (brief && committed && choice ? runDebrief(brief, choice, confidence) : null), [brief, committed, choice, confidence]);
+  const result = useMemo(() => (brief && committed && choice ? runDebrief(brief, choice) : null), [brief, committed, choice]);
   useEffect(() => {
     if (result) debriefRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [result]);
@@ -101,8 +100,8 @@ export function DailyFlight({ airport, aircraft, loading, pilot, progress, log, 
   const file = () => {
     if (!brief || !result || !choice || !wx) return;
     const entry: Omit<FiledSheet, 'id' | 'filedAt'> = {
-      station: airport.icao, source: wx.source, departure: departure.toISOString(), choice, grade: result.grade, confidence,
-      confidentlyWrong: result.confidentlyWrong, readingsRight, readingsTotal: asked.length,
+      station: airport.icao, source: wx.source, departure: departure.toISOString(), choice, grade: result.grade,
+      readingsRight, readingsTotal: asked.length,
       findings: brief.findings.map((f) => ({ title: f.title, severity: f.severity })),
     };
     const next = fileSheet(log, entry);
@@ -198,14 +197,6 @@ export function DailyFlight({ airport, aircraft, loading, pilot, progress, log, 
                   );
                 })}
               </div>
-              <div className="conf">
-                <div className="conf-row">
-                  <label htmlFor="conf">How sure are you?</label>
-                  <b>{confidence}%</b>
-                </div>
-                <input id="conf" type="range" min={0} max={100} step={5} value={confidence} disabled={committed || !allRead} onChange={(e) => setConfidence(Number(e.target.value))} />
-                <div className="conf-row"><span>Guessing</span><span>Certain</span></div>
-              </div>
               {!committed ? (
                 <div className="cta">
                   <button type="button" className="btn primary" disabled={!choice || !allRead} onClick={() => setCommitted(true)}>Sign and commit</button>
@@ -224,12 +215,6 @@ export function DailyFlight({ airport, aircraft, loading, pilot, progress, log, 
                 <div className={`grade ${result.grade}`}>{GRADE_LABEL[result.grade]}</div>
                 <p className="lcg">Learner-centered grading: {result.lcg}.</p>
                 <p className="voice">{result.rationale}{asked.length ? ` Your readings: ${readingsRight} of ${asked.length} matched the sheet.` : ''}</p>
-                {result.confidentlyWrong && (
-                  <div className="callout">
-                    <b>Confidently wrong</b>
-                    <span>You were {confidence}% sure of {result.grade === 'unsafe' ? 'an unsafe' : `a ${result.grade}`} call. That gap is the thing to study, more than the answer itself.</span>
-                  </div>
-                )}
                 {brief.findings.length === 0
                   ? <p className="muted">Nothing flagged. Legal, inside the airplane's numbers and inside your minimums.</p>
                   : <p className="muted small">The lines that drove the grade are marked above, each with its note and the lesson that teaches it.</p>}

@@ -277,11 +277,10 @@ export interface Debrief {
   rationale: string;
   /** Learner-centered grading level this attempt demonstrates. */
   lcg: 'Explain' | 'Practice' | 'Perform' | 'Manage/Decide';
-  confidentlyWrong: boolean;
   keyFindings: Finding[];
 }
 
-export function debrief(brief: Brief, choice: ChoiceId, confidencePct: number): Debrief {
+export function debrief(brief: Brief, choice: ChoiceId): Debrief {
   const grade = brief.grades[choice];
   const lcg = grade === 'best' ? 'Manage/Decide' : grade === 'acceptable' ? 'Perform' : grade === 'marginal' ? 'Practice' : 'Explain';
   const rank: Severity[] = ['illegal', 'limit', 'personal', 'caution', 'info'];
@@ -290,7 +289,6 @@ export function debrief(brief: Brief, choice: ChoiceId, confidencePct: number): 
     grade,
     rationale: brief.rationale,
     lcg,
-    confidentlyWrong: (grade === 'unsafe' || grade === 'marginal') && confidencePct >= 70,
     keyFindings,
   };
 }
