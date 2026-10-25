@@ -3,8 +3,9 @@
 //   node e2e/smoke.mjs [http://localhost:4173]
 // Weather and airport requests are stubbed, so it runs offline and exercises
 // both the live path and the practice-weather fallback. Covers onboarding,
-// the course home, lessons 1.1, 2.1 and 7.1 end to end, the start of 2.2, the daily flight
-// through filing, and every rail screen, at desktop and phone widths.
+// the course home, lessons 1.1, 2.1, 5.1 and 7.1 end to end, the start of
+// 2.2, the daily flight through filing, and every rail screen, at desktop and
+// phone widths.
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 
@@ -229,6 +230,44 @@ async function run(viewport, live) {
   check(stored71['7.1']?.lastGrade === 'best', `${label} lesson 7.1 recorded in course progress`);
   await noHScroll('lesson 7.1 debrief');
   await btn('Back to course').click();
+  await page.getByRole('heading', { name: 'Ground school', exact: true }).waitFor();
+
+  // Lesson 5.1, end to end: the nav log on the practice sectional.
+  await page.locator('summary').filter({ hasText: 'Cross-country and diversion' }).click();
+  await page.getByRole('button', { name: /5\.1 Building a nav log/ }).click();
+  await page.getByRole('heading', { name: 'A trip to Quill Valley' }).waitFor();
+  body = await main();
+  check(/practice sectional/i.test(body) && /Not a real chart/.test(body), `${label} 5.1 flies on the practice sectional, labeled practice`);
+  check(/sample values/.test(body), `${label} 5.1 labels the sample airplane numbers`);
+  check((await page.locator('.sectional svg').count()) === 1, `${label} 5.1 brief shows the chart with the route`);
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: /Leg 1: KXYZ to Harlow/ }).waitFor();
+  check((await page.locator('.navlog tbody tr').count()) === 1, `${label} 5.1 worked example shows the first leg of the nav log`);
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'Your turn', exact: true }).waitFor();
+  const prompt = await page.locator('.situ').first().innerText();
+  const [, tc, nm, tas] = prompt.match(/measures (\d{3})° and the distance ([\d.]+) nm.*?at (\d+) knots/) ?? [];
+  await page.getByLabel(/Magnetic course/).fill(String((Number(tc) + 14) % 360));
+  await page.getByLabel(/Time/).fill(String(Math.round((Number(nm) / Number(tas)) * 60)));
+  await page.getByRole('button', { name: 'Even thousands plus 500', exact: true }).click();
+  await btn('Check my numbers').click();
+  check((await page.getByText(/^Right\./).count()) === 3, `${label} 5.1 magnetic course, time and hemisphere checked right`);
+  await noHScroll('lesson 5.1 turn');
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'Fuel for the trip home' }).waitFor();
+  check((await page.locator('.navlog tfoot').count()) === 1, `${label} 5.1 decision shows the whole nav log`);
+  await page.getByRole('button', { name: /buy fuel at Quill Valley/ }).click();
+  await btn('Commit').click();
+  body = await main();
+  check(/Best call/.test(body) && /fuel stop is part of the plan/.test(body), `${label} 5.1 fuel stop graded best with its consequence`);
+  await btn('Debrief').click();
+  await page.getByRole('heading', { name: 'Debrief', exact: true }).waitFor();
+  body = await main();
+  check(/PA\.I\.D/.test(body) && /PHAK, flight planning/.test(body) && /3 of 3/.test(body), `${label} 5.1 debrief shows ACS code, reference and 3 of 3`);
+  const stored5 = await page.evaluate(() => JSON.parse(localStorage.getItem('downwind.course.v1') ?? '{}'));
+  check(stored5['5.1']?.lastGrade === 'best', `${label} lesson 5.1 recorded in course progress`);
+  await noHScroll('lesson 5.1 debrief');
+  await rail('Course').click();
   await page.getByRole('heading', { name: 'Ground school', exact: true }).waitFor();
 
   // Daily flight: the sheet

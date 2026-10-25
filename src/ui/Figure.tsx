@@ -4,6 +4,7 @@
 // figure is practice material built for the lesson, and says so.
 
 import type { Figure as FigureModel, PerfChartId, RecordColumn, RecordRow, RecordsVariant } from '../course/types';
+import { practiceRegion } from '../chart/practiceRegion';
 import { readTable, type Performance, type PerfTable } from '../lib/perf';
 import type { NavLog } from '../lib/nav';
 import { parseTaf } from '../lib/taf';
@@ -40,7 +41,8 @@ export function Figure({ figure, practiceField }: { figure: FigureModel; practic
     );
   }
   if (figure.kind === 'chart') {
-    const legs = figure.route && figure.route.length > 1 ? `${figure.route.join(' to ')}. ` : '';
+    const place = (id: string) => practiceRegion.checkpoints.find((c) => c.id === id)?.name ?? id;
+    const legs = figure.route && figure.route.length > 1 ? `${figure.route.map(place).join(' to ')}. ` : '';
     return (
       <figure className="fig">
         <div className="fig-chart">
