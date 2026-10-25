@@ -69,6 +69,12 @@ describe('references', () => {
     expect(citableRefs('AIM 7-1')).toEqual([]);
   });
 
+  it('names the POH section when the model cites it by name only', () => {
+    expect(citableRefs(['POH, emergency procedures', 'POH performance charts', 'POH, the good bits'])).toEqual([
+      'POH section 3, emergency procedures', 'POH section 5, performance',
+    ]);
+  });
+
   it('lists only passages that resolve in the system prompt', () => {
     const listed = systemPrompt().split('\n').filter((l) => l.startsWith('  - ')).map((l) => l.slice(4));
     expect(listed.length).toBeGreaterThan(10);

@@ -427,7 +427,7 @@ const shortStrip: Lesson = {
         kind: 'brief', id: 'b1', title: 'A strip with trees at the end',
         scene: `You flew into a grass strip this morning for breakfast: a made-up field for this lesson, ${fmt(runway)} feet of dry grass at ${fmt(elev)} feet, with 50 foot trees past the far end. It's mid-afternoon now and ${pmT}°C. ${airplaneNote(ap)}`,
         say: {
-          full: 'The POH takeoff chart gives two numbers: the **ground roll**, and the **total distance to clear a 50 foot obstacle**. The second is the one that matters with trees at the end. Read the chart at your **pressure altitude and temperature**, then apply the **notes** under it: so many percent less for each few knots of headwind, much more for a tailwind, and a share of the ground roll added on grass. The chart assumes a new airplane, a perfect technique and a test pilot, so add a margin. This course adds half again.',
+          full: 'The POH takeoff chart gives two numbers: the **ground roll**, and the **total distance to clear a 50 foot obstacle**. The second is the one that matters with trees at the end. Read the chart at your **pressure altitude and temperature**, interpolating between rows or taking the worse one, never extrapolating off the chart, then apply the **notes** under it: so many percent less for each few knots of headwind, much more for a tailwind, and a share of the ground roll added on grass. The chart assumes a new airplane, a perfect technique and a test pilot, so add a margin. This course adds half again.',
           short: 'Chart, then the notes, then half again.',
         },
         figure: { kind: 'perf', chart: 'takeoff-50', performance: p, paFt: am.pressureAltFt, oatC: amT, sample: ap.samplePerf },

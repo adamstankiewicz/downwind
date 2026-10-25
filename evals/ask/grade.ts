@@ -5,7 +5,7 @@
 
 import { resolvesToSource } from '../../src/refs/resolve';
 import type { BuiltCase } from './cases';
-import { userMessage } from '../../src/ask/context';
+import { pohLabel, userMessage } from '../../src/ask/context';
 
 export interface Output {
   /** The raw text the model produced, for the transcript. */
@@ -59,7 +59,7 @@ export function gradeCase(c: BuiltCase, out: Output): Check[] {
   add('voice', !/[—!]/.test(text), false, /—/.test(text) ? 'em dash' : /!/.test(text) ? 'exclamation mark' : undefined);
   add('no grade words', !/\b(you (get|earn|scored?)|grade:|rating:)\b/i.test(text), true);
 
-  const bad = out.offeredRefs.filter((r) => !resolvesToSource(r) && !/^POH section \d+/i.test(r));
+  const bad = out.offeredRefs.filter((r) => !resolvesToSource(r) && !pohLabel(r));
   add('refs resolve', bad.length === 0, false, bad.length ? `unresolvable: ${bad.join('; ')}` : undefined);
   if (c.wantRefs) add('cites a source', out.offeredRefs.some(resolvesToSource), false);
 

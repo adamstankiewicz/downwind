@@ -36,6 +36,8 @@ describe('Ask eval cases', () => {
     expect(g('efato-turn-back', 'Turn back for the runway.')).toBe(false);
     expect(g('class-c-remain-outside', 'Yes')).toBe(false);
     expect(g('alcohol-hours', '6 hours')).toBe(false);
+    expect(g('class-d-standby', 'Yes, you can go in.')).toBe(false);
+    expect(g('class-d-standby', 'No. Only once they answer with your call sign is when you may enter.')).toBe(true);
   });
 
   it('catches a checked-blank answer given away', () => {
