@@ -241,7 +241,7 @@ export function ceilingDials(ctx: LessonContext, start: { ceilingFt: number; vis
       { id: 'vis', label: 'Visibility', value: `${metar.visibilitySm} SM`, tone: (metar.visibilitySm ?? 0) < mins.visibilitySm ? 'over' : undefined },
       { id: 'cat', label: 'Category', value: metar.category ?? 'none' },
       { id: 'legal', label: surface ? 'Legal VFR here' : 'Class G', value: legal ? 'Yes' : 'No', tone: legal ? undefined : 'over' },
-      { id: 'clear', label: 'Pattern to cloud', value: below > 0 ? `${fmt(below)} ft` : 'in it', tone: below < CLOUD_CLEARANCE_FT ? 'over' : undefined },
+      { id: 'clear', label: 'Pattern to cloud', value: below > 0 ? `${fmt(below)} ft` : 'in the cloud', tone: below < CLOUD_CLEARANCE_FT ? 'over' : undefined },
     ];
 
     const lines: DialLine[] = [];
@@ -328,7 +328,6 @@ export function takeoffDials(s: StripSetup, start: { oatC: number; headwindKt: n
     {
       id: 'wind', label: 'Wind on the nose', unit: 'kt', min: -5, max: 15, step: 1, initial: start.headwindKt,
       format: (v) => (v === 0 ? 'calm' : v > 0 ? `${v} kt head` : `${-v} kt tail`),
-      marks: [{ at: 0, label: 'Calm', kind: 'airplane' }],
     },
   ];
 

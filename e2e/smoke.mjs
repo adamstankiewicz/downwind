@@ -5,7 +5,7 @@
 // both the live path and the practice-weather fallback. Ask the instructor is
 // stubbed too: on in the live runs, with no API key in the offline ones. Covers onboarding,
 // the course home, lessons 1.1 and 2.1 to 9.1 end to
-// end, the start of 2.2, the daily flight through filing, and every rail
+// end, 2.2 through its dials, the daily flight through filing, and every rail
 // screen, at desktop and phone widths.
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
@@ -219,6 +219,40 @@ async function run(viewport, live) {
   check(/variation/i.test(await main()), `${label} lesson 2.2 starts with the two-norths brief`);
   await btn('Continue').click();
   check((await page.locator('svg[aria-label*="Runway"]').count()) > 0, `${label} 2.2 worked example shows the wind diagram`);
+
+  // Dials: through the turn, then turn the wind and watch the engine follow.
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'Your turn', exact: true }).waitFor();
+  for (const input of await page.locator('.blanks input').all()) await input.fill('1');
+  await btn('Check my numbers').click();
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'Turn the wind' }).waitFor();
+  check((await page.locator('input[type=range]').count()) === 3, `${label} 2.2 dials step shows wind direction, speed and gust dials`);
+  check(await btn('Continue').isDisabled(), `${label} dials step waits for the find-it check`);
+  check(/How the engine grades it right now/.test(await main()) && (await page.locator('.verdict .gradechip').count()) === 4, `${label} dials show live grades for the four choices`);
+  check((await page.locator('aside svg[aria-label*="Runway"]').count()) > 0 && /as you have turned it|written for this lesson/.test(await main()), `${label} dials step shows the live wind figure and report`);
+  const runwayBefore = await page.locator('.readouts > div').filter({ hasText: 'Best runway' }).locator('dd').innerText();
+  const dir = page.getByLabel(/Wind from, true/);
+  const dirStart = Number(await dir.inputValue());
+  await dir.focus();
+  for (let i = 0; i < 18; i++) await page.keyboard.press(dirStart > 180 ? 'ArrowLeft' : 'ArrowRight');
+  const runwayAfter = await page.locator('.readouts > div').filter({ hasText: 'Best runway' }).locator('dd').innerText();
+  body = await main();
+  check(runwayAfter !== runwayBefore && /favors runway/.test(body), `${label} turning the wind 180 degrees flips the runway and says so (${runwayBefore} to ${runwayAfter})`);
+  check(/as you have turned it/.test(body), `${label} turned report is labeled as turned`);
+  await btn("Back to the lesson's numbers").click();
+  check(Number(await dir.inputValue()) === dirStart, `${label} reset puts the dials back on the lesson's numbers`);
+  const gust = page.getByLabel(/Gusts to/);
+  await gust.focus();
+  await page.keyboard.press('Home');
+  check(/no gust/.test(await main()), `${label} gust dial at zero reads no gust`);
+  await btn('Check this setting').click();
+  body = await main();
+  check(/Right\.|Not quite\./.test(body) && /across/.test(body), `${label} the engine checks the dial setting and explains it`);
+  check(await btn('Continue').isEnabled(), `${label} dials step can continue after the check`);
+  await noHScroll('lesson 2.2 dials');
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: /Holding short of/ }).waitFor();
   await btn('Leave lesson').click();
   await page.getByRole('heading', { name: 'Ground school', exact: true }).waitFor();
   body = await main();
