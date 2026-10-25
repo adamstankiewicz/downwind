@@ -159,6 +159,13 @@ export const Icons = {
       <path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" />
     </svg>
   ),
+  trip: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+      <circle cx="6" cy="17" r="2.4" />
+      <circle cx="18" cy="7" r="2.4" />
+      <path d="M8 15.5c3-1 2-5.5 5-7.5 1-.6 2-.9 3-1" strokeDasharray="2.5 2.5" strokeLinecap="round" />
+    </svg>
+  ),
   refresh: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
       <path d="M20 12a8 8 0 1 1-2.3-5.6" />

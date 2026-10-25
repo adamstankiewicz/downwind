@@ -54,6 +54,8 @@ export function fromAwc(json: unknown, ident: string): Airport | null {
     | undefined;
   if (!r) return null;
   const elev = Number(r.elev);
+  const lat = Number(r.lat);
+  const lon = Number(r.lon);
   const runways = (Array.isArray(r.runways) ? r.runways : [])
     .flatMap((rw: Record<string, unknown>) => runwayEnds(String(rw.id ?? ''), rw.alignment))
     .filter((e) => !/H/.test(e.id));
@@ -67,6 +69,7 @@ export function fromAwc(json: unknown, ident: string): Airport | null {
     airspace: 'D',
     runways,
     tafStations: [ident],
+    ...(Number.isFinite(lat) && Number.isFinite(lon) && r.lat !== null && r.lon !== null ? { pos: { lat, lon } } : {}),
     verify: ['elevation', 'runway headings', 'magnetic variation', 'airspace class', 'TAF stations'],
   };
 }

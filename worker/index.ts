@@ -25,7 +25,7 @@ export default {
 
 async function proxyAwc(request: Request, url: URL): Promise<Response> {
   const product = url.pathname.replace('/api/awc/', '');
-  if (!/^(metar|taf|pirep|airsigmet|gairmet|windtemp|airport)$/.test(product)) {
+  if (!/^(metar|taf|pirep|airsigmet|gairmet|windtemp|airport|stationinfo)$/.test(product)) {
     return new Response('Unknown product', { status: 400 });
   }
   const upstream = `${AWC}/${product}${url.search}`;

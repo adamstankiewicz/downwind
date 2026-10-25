@@ -9,6 +9,7 @@ import type { Airport } from '../data/airports';
 import { computeWb, FUEL_LB_PER_GAL, type LoadItem, type WbResult } from '../lib/wb';
 import { COURSE_KEY, type CourseProgress } from '../course/progress';
 import { LOGBOOK_KEY, type FiledSheet } from '../course/daily';
+import { DEFAULT_TRIP_PREFS, type TripHistoryEntry, type TripPrefs } from '../scenarios/trip';
 
 export const KEYS = {
   aircraft: 'downwind.aircraft.v1',
@@ -17,6 +18,8 @@ export const KEYS = {
   airport: 'downwind.airport.v1',
   theme: 'downwind.theme.v1',
   onboarding: 'downwind.onboarding.v1',
+  tripPrefs: 'downwind.trip.prefs.v1',
+  tripHistory: 'downwind.trip.history.v1',
 } as const;
 
 export interface OnboardingState {
@@ -75,6 +78,14 @@ export function useCourse() {
 }
 export function useLogbook() {
   return usePersisted<FiledSheet[]>(LOGBOOK_KEY, []);
+}
+
+export function useTripPrefs() {
+  return usePersisted<TripPrefs>(KEYS.tripPrefs, DEFAULT_TRIP_PREFS);
+}
+/** Trips planned, newest first, for variety in the next set. */
+export function useTripHistory() {
+  return usePersisted<TripHistoryEntry[]>(KEYS.tripHistory, []);
 }
 
 export function useAircraft() {

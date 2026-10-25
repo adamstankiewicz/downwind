@@ -5,8 +5,8 @@
 // both the live path and the practice-weather fallback. Ask the instructor is
 // stubbed too: on in the live runs, with no API key in the offline ones. Covers onboarding,
 // the course home, lessons 1.1 and 2.1 to 9.1 end to
-// end, 2.2 through its dials, the daily flight through filing, and every rail
-// screen, at desktop and phone widths.
+// end, 2.2 through its dials, the daily flight through filing, Trip and its
+// planning lesson, and every rail screen, at desktop and phone widths.
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 
@@ -16,7 +16,20 @@ const { chromium } = createRequire(import.meta.url)('playwright');
 const BASE = process.argv[2] ?? 'http://localhost:4173';
 const METAR = 'METAR KPSM 241656Z 32008KT 10SM FEW045 16/02 A3008 RMK AO2';
 const TAF = 'TAF KPSM 241720Z 2418/2518 32010KT P6SM FEW050 FM250000 VRB03KT P6SM SKC';
-const AIRPORT = [{ icaoId: 'KPSM', name: 'PORTSMOUTH INTL AT PEASE', state: 'NH', elev: 30, magdec: '15W', runways: [{ id: '16/34', alignment: '160' }] }];
+const AIRPORT = [{ icaoId: 'KPSM', name: 'PORTSMOUTH INTL AT PEASE', state: 'NH', elev: 30, magdec: '15W', lat: 43.08, lon: -70.82, tower: 'T', runways: [{ id: '16/34', dimension: '11321x150', surface: 'A', alignment: '160' }] }];
+// Made-up fields around the home field for Trip: two that pass, one under the ceiling minimum, one with a short grass strip.
+const TRIP_FIELDS = [
+  { icaoId: 'KQAA', name: 'TESTVILLE/TESTVILLE MUNI', lat: 43.55, lon: -71.45, elev: 150, magdec: '15W', tower: null, runways: [{ id: '05/23', dimension: '4000x75', surface: 'A', alignment: 50 }], sky: 'FEW050' },
+  { icaoId: 'KQBB', name: 'SAMPLETON/SAMPLETON RGNL', lat: 42.6, lon: -71.6, elev: 90, magdec: '15W', tower: 'T', runways: [{ id: '14/32', dimension: '5000x100', surface: 'A', alignment: 140 }], sky: 'SCT060' },
+  { icaoId: 'KQCC', name: 'EXAMPLE/EXAMPLE FLD', lat: 43.0, lon: -71.9, elev: 200, magdec: '15W', tower: null, runways: [{ id: '18/36', dimension: '4500x75', surface: 'A', alignment: 180 }], sky: 'BKN015' },
+  { icaoId: 'KQDD', name: 'PLACEHOLDER/PLACEHOLDER STRIP', lat: 43.45, lon: -70.95, elev: 120, magdec: '15W', tower: null, runways: [{ id: '09/27', dimension: '1900x80', surface: 'T', alignment: 90 }], sky: 'CLR' },
+];
+const p2 = (n) => String(n).padStart(2, '0');
+/** A winds aloft bulletin valid three hours from now, so it covers the default departure. */
+function windsAloft() {
+  const v = new Date(Date.now() + 3 * 3_600_000);
+  return [`VALID ${p2(v.getUTCDate())}${p2(v.getUTCHours())}00Z   FOR USE 0000-2400Z. TEMPS NEG ABV 24000`, '', 'FT  3000    6000    9000', 'PSM 2715 2722+05 2830-01'].join('\n');
+}
 
 const HANDBOOK = readFileSync(new URL('./fixtures/handbook.pdf', import.meta.url));
 
@@ -37,9 +50,20 @@ async function open(viewport, live) {
   await page.route('**/api/awc/**', (r) => {
     if (!live) return r.fulfill({ status: 500, body: 'down' });
     const u = new URL(r.request().url());
+    const json = (v) => r.fulfill({ contentType: 'application/json', body: JSON.stringify(v) });
+    const area = u.searchParams.has('bbox');
+    if (u.pathname.endsWith('/metar') && area) {
+      return json([{ icaoId: 'KPSM', rawOb: METAR }, ...TRIP_FIELDS.map((f) => ({ icaoId: f.icaoId, rawOb: `METAR ${f.icaoId} 241656Z 30008KT 10SM ${f.sky} 15/03 A3008 RMK AO2` }))]);
+    }
+    if (u.pathname.endsWith('/taf') && area) return json([{ icaoId: 'KPSM', rawTAF: TAF }]);
+    if (u.pathname.endsWith('/stationinfo')) return json([{ icaoId: 'KPSM', lat: 43.08, lon: -70.82 }, ...TRIP_FIELDS.map((f) => ({ icaoId: f.icaoId, lat: f.lat, lon: f.lon }))]);
+    if (u.pathname.endsWith('/windtemp')) return r.fulfill({ body: windsAloft() });
     if (u.pathname.endsWith('/metar')) return r.fulfill({ body: METAR });
     if (u.pathname.endsWith('/taf')) return r.fulfill({ body: TAF });
-    if (u.pathname.endsWith('/airport')) return r.fulfill({ contentType: 'application/json', body: JSON.stringify(AIRPORT) });
+    if (u.pathname.endsWith('/airport')) {
+      const ids = (u.searchParams.get('ids') ?? '').split(',');
+      return json([...AIRPORT, ...TRIP_FIELDS].filter((a) => ids.includes(a.icaoId)));
+    }
     return r.fulfill({ status: 404, body: '' });
   });
   // Ask the instructor: the worker has a key in live runs and none offline.
@@ -547,6 +571,49 @@ async function run(viewport, live) {
   check(await page.getByRole('heading', { name: 'Flight review summary' }).isVisible() && /Lessons flown, \d+ of \d+/.test(body), `${label} flight review summary counts the lessons flown`);
   check(/Ask your CFI/.test(body), `${label} summary says what to ask the CFI`);
   await noHScroll('logbook');
+
+  // Trip: recommendations from the home field, then the planning lesson end to end.
+  await rail('Trip').click();
+  await page.getByRole('heading', { name: /^Trips from/ }).waitFor();
+  await btn('Plan this trip').first().waitFor();
+  body = await main();
+  if (live) {
+    check(/Trips from KPSM/.test(body) && /KQAA/.test(body) && /KQBB/.test(body), `${label} trip ranks the live fields that pass`);
+    check(/Left out/.test(body) && /KQCC/.test(body) && /Ceiling under your minimum/.test(body) && /KQDD/.test(body) && /Runway under your minimum/.test(body), `${label} trip says what it left out and why`);
+  } else {
+    check(/Live weather unavailable/.test(body) && /Trips from KXYZ/.test(body), `${label} trip falls back to the practice chart when live data is down`);
+  }
+  check(/A training plan, not a briefing/.test(body) && /NOTAMs and TFRs/.test(body), `${label} trip says it is not a briefing`);
+  check((await page.locator('svg.tripmap').count()) === 1, `${label} trip draws the plan view`);
+  await noHScroll('trip');
+  await btn('Plan this trip').first().click();
+  await btn('Continue').waitFor();
+  check(/ to K\w+, \d+ nm/.test(await main()), `${label} trip lesson opens on the chosen route`);
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'The leg out' }).waitFor();
+  check(/Magnetic heading/.test(await main()) && (await page.locator('.navlog').count()) > 0, `${label} trip lesson works the leg out in a nav log`);
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'The leg home' }).waitFor();
+  for (const input of await page.locator('.blanks input').all()) await input.fill('1');
+  await btn('Check my numbers').click();
+  check(/Not quite/.test(await main()), `${label} trip lesson checks the leg home against the engine`);
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'Fuel and daylight' }).waitFor();
+  for (const input of await page.locator('.blanks input').all()) await input.fill('1');
+  await btn('Check my numbers').click();
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'The forecast moves' }).waitFor();
+  check(/amends/.test(await main()) && (await page.locator('svg.tripmap').count()) > 0, `${label} trip diversion shows the amended forecast and the map`);
+  await page.locator('button.choice', { hasText: 'Press on' }).click();
+  await btn('Commit').click();
+  check(/Marginal|Unsafe/.test(await page.locator('button.choice', { hasText: 'Press on' }).innerText()), `${label} pressing on under your minimum is not graded best`);
+  await noHScroll('trip diversion');
+  await btn('Debrief').click();
+  await page.getByRole('heading', { name: 'Debrief', exact: true }).waitFor();
+  const trips = await page.evaluate(() => JSON.parse(localStorage.getItem('downwind.trip.history.v1') ?? '[]'));
+  check(trips.length === 1, `${label} planned trip kept for variety`);
+  await page.getByRole('button', { name: 'Back to trips', exact: true }).first().click();
+  await page.getByRole('heading', { name: /^Trips from/ }).waitFor();
 
   // Tools
   await rail('Tools').click();

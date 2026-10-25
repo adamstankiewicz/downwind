@@ -70,14 +70,17 @@ only shows if the pilot went.
 | Weight and balance | `lib/wb.ts` |
 | Weather text and go/no-go grades | `lib/metar.ts`, `lib/taf.ts`, `scenarios/goNoGo.ts`, `course/practice.ts` |
 | The practice chart | `chart/practiceRegion.ts` |
+| Trip: candidate fields, round-trip plans, filters, ranking, the diversion | `scenarios/trip.ts`, live inputs in `lib/tripData.ts`, practice inputs in `course/tripPractice.ts` |
+| Sunrise and sunset, winds aloft text | `lib/sun.ts`, `lib/windsAloft.ts` |
 
 ## Figures
 
 Set these on a step's `figure`: `metar`, `taf`, `wind`, `chart` (the
 practice sectional with a route, highlights, a focus and an airplane
 marker), `perf` (a POH-style chart with the reading marked), `navlog`,
-`glide` and `sky` (the field from the side: ceiling, pattern, legal and
-personal lines). A dials step has no fixed figure; its `evaluate` returns
+`glide`, `sky` (the field from the side: ceiling, pattern, legal and
+personal lines) and `tripMap` (a schematic plan view around home, never a
+chart). A dials step has no fixed figure; its `evaluate` returns
 the figures for the current setting.
 
 ## Finishing a module

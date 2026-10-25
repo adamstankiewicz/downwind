@@ -16,6 +16,7 @@ import { ProfileFigure } from './ProfileFigure';
 import { SectionalChart } from './SectionalChart';
 import { CarbIceFigure, ElectricalFigure, PanelFigure } from './SystemsFigures';
 import { TafTimeline } from './TafTimeline';
+import { TripMap } from './TripMap';
 import { WindDiagram } from './WindDiagram';
 import { SkyFigure } from './SkyFigure';
 
@@ -90,6 +91,16 @@ export function Figure({ figure, practiceField }: { figure: FigureModel; practic
         <NavLogTable log={figure.log} />
         <figcaption>
           Nav log{figure.altitudeMsl ? ` at ${fmt(figure.altitudeMsl)} ft` : ''}. TC true course, WCA wind correction angle, TH true heading, MH magnetic heading, GS groundspeed. Time in minutes, fuel in gallons.
+        </figcaption>
+      </figure>
+    );
+  }
+  if (figure.kind === 'tripMap') {
+    return (
+      <figure className="fig">
+        <TripMap home={figure.home} points={figure.points} ringsNm={figure.ringsNm} route={figure.route} marker={figure.marker} label={`Plan view around ${figure.home.id}`} />
+        <figcaption>
+          Plan view from {figure.home.id}, true north up, to scale. Schematic: no terrain, airspace or obstacles, and not for navigation.{figure.practice ? ' Practice fields on a made-up chart.' : ' Plan the route on a current sectional.'}
         </figcaption>
       </figure>
     );

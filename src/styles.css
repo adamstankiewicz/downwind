@@ -1203,3 +1203,93 @@ dl.kv dd { margin: 0; }
 .profile { width: 100%; min-width: 0; border-radius: var(--r); overflow: hidden; border: 1px solid var(--line); background: var(--panel); }
 .profile svg { display: block; width: 100%; height: auto; font-family: var(--label); font-stretch: 87.5%; letter-spacing: 0.01em; }
 .profile svg text { font-variant-numeric: tabular-nums; }
+
+/* ---------- Trip: the kitchen table the night before ----------
+   The lead line runs across the top; under it the three picks on the left
+   and the plan view on the right, sticky, so a card and its dot are read
+   together. The plan view is schematic on the panel: range rings in the
+   line colour, home a hoop filled taxi-yellow ("here"), picks in ink, the
+   fields left out hollow and faint, the route a dashed ink line and the
+   airplane in the sock. Every engine number on a card is mono, set in one
+   ruled readout row so the three cards compare at a glance. */
+.trip { display: grid; gap: 24px; }
+.trip-controls { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: start; }
+.trip-controls .field { flex: 1 1 120px; max-width: 150px; }
+.trip-controls .field:first-child { flex-basis: 220px; max-width: 250px; }
+.trip-controls .field > span.hint { font-family: var(--label); }
+.trip-lead { display: grid; gap: 10px; }
+.trip-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 28px 48px; align-items: start; }
+.trip-main { display: grid; gap: 28px; min-width: 0; }
+.trip-tool { gap: 12px; }
+.trips { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; }
+.trip-card { display: grid; gap: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 18px 20px 20px; min-width: 0; }
+.trip-card-head { display: grid; gap: 2px; }
+.trip-card-head h3 { font-size: 1.125rem; line-height: 1.3; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
+.trip-id { font-family: var(--mono); font-weight: 700; }
+.trip-card-head .trip-id { font-size: 1.125rem; letter-spacing: 0.02em; }
+.trip-name { font-weight: 600; }
+.trip-meta { font-size: 13px; line-height: 16px; font-stretch: 87.5%; font-weight: 600; letter-spacing: 0.01em; color: var(--ink-2); }
+/* The readout row: one hairline above and below, cells divided by soft rules. */
+.trip-ro { margin: 0; display: flex; flex-wrap: wrap; border-top: var(--hair) solid var(--line); border-bottom: var(--hair) solid var(--line); }
+.trip-ro > div { display: grid; gap: 3px; align-content: start; padding: 10px 16px 11px 0; margin-right: 16px; border-right: 1px solid var(--line-soft); }
+.trip-ro > div:last-child { border-right: 0; margin-right: 0; padding-right: 0; }
+.trip-ro dt { font-size: 13px; line-height: 16px; font-stretch: 87.5%; font-weight: 600; letter-spacing: 0.01em; color: var(--ink-2); white-space: nowrap; }
+.trip-ro dd { margin: 0; font-size: 1.0625rem; line-height: 1.2; white-space: nowrap; }
+.trip-ro dd small { font-family: var(--label); font-size: 0.8125rem; font-stretch: 87.5%; font-weight: 600; color: var(--ink-2); margin-left: 0.25em; }
+.trip-pitch { font-family: var(--reading); font-size: 1.0625rem; line-height: 1.55; text-wrap: pretty; max-width: 60ch; }
+.trip-cautions { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 0.9rem; line-height: 1.45; }
+.trip-cautions li { padding-left: 12px; border-left: 3px solid var(--sky); }
+.trip-cautions b { color: var(--sky-ink); }
+.trip-card .cta { padding-top: 2px; }
+.trip-more { gap: 10px 20px; }
+.trip-filtered { display: grid; gap: 8px; }
+.trip-filtered h2 { font-stretch: 87.5%; font-size: 0.875rem; font-weight: 600; letter-spacing: 0.01em; color: var(--ink-2); }
+.trip-filtered ul { list-style: none; margin: 0; padding: 0; display: grid; border-top: var(--hair) solid var(--line); }
+.trip-filtered li { display: grid; grid-template-columns: 5.5ch minmax(0, 1fr) auto; gap: 4px 14px; align-items: baseline; padding: 9px 0; border-bottom: 1px solid var(--line-soft); font-size: 0.95rem; line-height: 1.45; color: var(--ink-2); }
+.trip-filtered .trip-id { color: var(--ink); font-weight: 400; }
+.trip-filtered .trip-why b { color: var(--ink); font-weight: 600; }
+.trip-filtered .trip-nm { font-size: 0.9rem; white-space: nowrap; }
+.trip-foot { display: grid; gap: 10px; max-width: 64ch; }
+.trip-disclaimer { padding: 12px 0 0; border-top: 2px solid var(--ink); font-size: 0.92rem; line-height: 1.5; }
+.trip-disclaimer b { font-weight: 700; }
+/* The plan view on the panel. */
+.tripmap { display: block; width: 100%; height: auto; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); font-family: var(--label); font-stretch: 87.5%; letter-spacing: 0.01em; font-variant-numeric: tabular-nums; }
+.tripmap .tm-ring { fill: none; stroke: var(--line); stroke-width: 1; }
+.tripmap .tm-meridian { stroke: var(--line-soft); stroke-width: 1; stroke-dasharray: 2 4; }
+.tripmap .tm-ring-label { font-size: 11px; font-weight: 600; fill: var(--ink-2); paint-order: stroke; stroke: var(--panel); stroke-width: 3px; stroke-linejoin: round; }
+.tripmap .tm-north path { fill: var(--ink); }
+.tripmap .tm-north text { font-size: 12px; font-weight: 700; fill: var(--ink); }
+.tripmap .tm-route { stroke: var(--ink); stroke-width: 2; stroke-dasharray: 7 5; stroke-linecap: round; }
+.tripmap .tm-dot.tm-pick, .tripmap .tm-dot.tm-dest { fill: var(--ink); stroke: var(--panel); stroke-width: 2; }
+.tripmap .tm-dot.tm-alternate { fill: var(--sky); stroke: var(--panel); stroke-width: 2; }
+.tripmap .tm-dot.tm-filtered { fill: var(--panel); stroke: var(--line); stroke-width: 1.5; }
+.tripmap .tm-home circle:first-child { fill: var(--taxi); stroke: var(--ink); stroke-width: 2; }
+.tripmap .tm-home .tm-home-dot { fill: var(--ink); stroke: none; }
+.tripmap .tm-airplane path { fill: var(--sock); stroke: var(--panel); stroke-width: 1; stroke-linejoin: round; }
+.tripmap .tm-label text { paint-order: stroke; stroke: var(--panel); stroke-width: 3.5px; stroke-linejoin: round; }
+.tripmap .tm-id { font-family: var(--mono); font-size: 12px; font-weight: 700; fill: var(--ink); }
+.tripmap .tm-sub { font-size: 11px; font-weight: 600; fill: var(--ink-2); }
+.tripmap .tm-label.tm-filtered .tm-id { fill: var(--ink-2); font-weight: 400; }
+.tripmap .tm-label.tm-filtered .tm-sub { fill: var(--ink-2); opacity: 0.85; }
+.tripmap .tm-label.tm-alternate .tm-id { fill: var(--sky-ink); }
+.tm-key { margin: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.8125rem; color: var(--ink-2); }
+.tm-key div { display: flex; align-items: center; gap: 8px; }
+.tm-key dt i { display: block; width: 12px; height: 12px; border-radius: 50%; box-sizing: border-box; }
+.tm-key dd { margin: 0; }
+.tm-key .k-home { background: var(--taxi); border: 2px solid var(--ink); }
+.tm-key .k-pick { background: var(--ink); }
+.tm-key .k-filtered { background: var(--panel); border: 1.5px solid var(--line); }
+@media (max-width: 959px) {
+  .trip-grid { grid-template-columns: 1fr; gap: 24px; }
+  .trip-grid .trip-tool { order: -1; position: static; }
+}
+@media (max-width: 559px) {
+  .trip-controls { gap: 10px 12px; }
+  .trip-controls .field { flex-basis: calc(33.333% - 8px); max-width: none; }
+  .trip-controls .field:first-child { flex-basis: 100%; max-width: none; }
+  .trip-card { padding: 16px 16px 18px; border-radius: var(--r); }
+  .trip-ro > div { padding-right: 12px; margin-right: 12px; }
+  .trip-ro dd { font-size: 1rem; }
+  .trip-filtered li { grid-template-columns: 5.5ch minmax(0, 1fr); }
+  .trip-filtered .trip-nm { grid-column: 2; }
+}
