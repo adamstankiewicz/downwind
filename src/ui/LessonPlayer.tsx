@@ -10,7 +10,7 @@ import {
   type CourseProgress, type LessonAnswers, type LessonResult,
 } from '../course/progress';
 import type { ChoiceId } from '../scenarios/goNoGo';
-import { GRADE_LABEL } from './common';
+import { GRADE_LABEL, Voice } from './common';
 import { Figure } from './Figure';
 import { Strip, type StripPoint } from './Strip';
 import { Rich } from './text';
@@ -143,7 +143,7 @@ function StepView({ step, level, answers, setAnswers, checked, onCheck, committe
       <section className="step">
         <h2>{step.title}</h2>
         {step.scene && <p className="situ">{step.scene}</p>}
-        <p className="voice"><Rich text={step.say[level]} /></p>
+        <Voice><Rich text={step.say[level]} /></Voice>
       </section>
     );
   }
@@ -151,7 +151,7 @@ function StepView({ step, level, answers, setAnswers, checked, onCheck, committe
     return (
       <section className="step">
         <h2>{step.title}</h2>
-        <p className="voice"><Rich text={step.say[level]} /></p>
+        <Voice><Rich text={step.say[level]} /></Voice>
         <dl className="work">
           {step.work.map((w) => (
             <div key={w.label}>
@@ -234,9 +234,7 @@ function StepView({ step, level, answers, setAnswers, checked, onCheck, committe
         </div>
       ) : (
         choice && (
-          <div className="cons">
-            <p>{step.consequence[choice]}</p>
-          </div>
+          <Voice className="cons">{step.consequence[choice]}</Voice>
         )
       )}
     </section>
@@ -277,7 +275,7 @@ function Debrief({ lesson, steps, answers, result, progress, onAgain, onNext, on
                 {!d.best.includes(d.choice) && (
                   <p className="dec-row"><span className="muted">{best.length > 1 ? 'Best calls' : 'Best call'}</span> <span>{best.map((b) => b.label).join(' Or: ')}</span></p>
                 )}
-                <p className="voice">{s.why}</p>
+                <Voice>{s.why}</Voice>
               </li>
             );
           })}

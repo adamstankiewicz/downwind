@@ -16,8 +16,8 @@ export default defineConfig({
         name: 'Downwind Ground School',
         short_name: 'Downwind',
         description: 'Scenario-based ground school and flight review prep.',
-        theme_color: '#f6f5f0',
-        background_color: '#f6f5f0',
+        theme_color: '#eef0ec',
+        background_color: '#eef0ec',
         display: 'standalone',
         icons: [
           { src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },

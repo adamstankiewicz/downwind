@@ -112,7 +112,7 @@ async function run(viewport, live) {
   await btn('Continue').click();
   await page.getByRole('heading', { name: 'Do you drive out?' }).waitFor();
   check(await btn('Commit').isDisabled(), `${label} Commit disabled before a choice`);
-  check((await page.getByText(/^(Best call|Unsafe|Marginal|Acceptable)$/).count()) === 0, `${label} grades hidden before commit`);
+  check((await page.getByText(/^(Best call|Unsafe|Marginal|Sound)$/).count()) === 0, `${label} grades hidden before commit`);
   check((await page.locator('.metar').count()) > 0, `${label} the report stays open beside the decision`);
   await page.getByRole('button', { name: /Drive out and start the preflight/ }).click();
   check((await page.locator('input[type=range]').count()) === 0, `${label} no confidence slider`);

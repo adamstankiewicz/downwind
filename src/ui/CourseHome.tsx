@@ -1,12 +1,14 @@
 // Course home: where you are in the nine modules, the next lesson introduced
 // in the instructor's voice, today's real conditions as a standing flight,
-// lessons worth flying again, and the whole syllabus with each lesson's state.
+// lessons worth flying again, and the whole syllabus as a taxiway: a yellow
+// centerline from module sign to module sign, with a hoop for every lesson.
 
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { Airport } from '../data/airports';
 import type { Lesson, Module } from '../course/types';
 import { modules } from '../course/modules';
 import { coachLevel, courseProgress, isDone, moduleProgress, nextLesson, toRefly, type CourseProgress } from '../course/progress';
-import { GRADE_LABEL } from './common';
+import { GRADE_LABEL, Voice } from './common';
 import { Strip } from './Strip';
 
 export function CourseHome({ progress, airport, hasAircraft, onStart, onDaily, onSetup }: {
@@ -72,7 +74,7 @@ export function CourseHome({ progress, airport, hasAircraft, onStart, onDaily, o
         <section className="course-list">
           <h2>The course</h2>
           <ol className="modules">
-            {modules.map((m) => <ModuleRow key={m.n} m={m} progress={progress} onStart={onStart} current={m.n === currentModule} />)}
+            {modules.map((m) => <ModuleRow key={m.n} m={m} progress={progress} onStart={onStart} current={m.n === currentModule} nextId={next?.id ?? null} />)}
           </ol>
           <p className="help">Nine modules in the order of the Private Pilot ACS. Modules marked "being written" show their planned lessons; the daily flight only asks what the written ones have covered.{!hasAircraft ? ' Lessons that need the airplane\'s numbers use what you have entered and say when something is missing.' : ''}</p>
         </section>
@@ -98,7 +100,7 @@ function NextLesson({ lesson, progress, airport, onStart, flown }: { lesson: Les
       <h2>Next lesson</h2>
       <p className="next-meta">Module {m.n}, {m.title}. Lesson {idx + 1} of {m.lessons.length}. {lesson.acs.join(', ')}.</p>
       <h3 className="next-title"><span className="lid">{lesson.id}</span> {lesson.title}</h3>
-      <p className="voice">{intro}</p>
+      <Voice>{intro}</Voice>
       <dl className="next-facts">
         <div><dt>About</dt><dd>{lesson.minutes} min</dd></div>
         <div><dt>Then</dt><dd>{after ? `${after.id} ${after.title}` : 'End of the module'}</dd></div>
@@ -116,49 +118,110 @@ function AllDone() {
     <section className="next">
       <h2>Next lesson</h2>
       <h3 className="next-title">Every written lesson is flown</h3>
-      <p className="voice">The rest of the course is being written. Fly the daily flight to keep the habit, and fly any lesson again from the list below.</p>
+      <Voice>The rest of the course is being written. Fly the daily flight to keep the habit, and fly any lesson again from the list below.</Voice>
     </section>
   );
 }
 
-function ModuleRow({ m, progress, onStart, current }: { m: Module; progress: CourseProgress; onStart: (l: Lesson) => void; current: boolean }) {
+const Check = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+    <path d="M5 12.5l4.5 4.5L19 7.5" />
+  </svg>
+);
+
+/** One module: its taxiway sign, then the path through its lessons. The
+ *  current module is a location sign (taxi on black), one still to come a
+ *  direction sign (black on taxi), one finished a plain panel with a check. */
+function ModuleRow({ m, progress, onStart, current, nextId }: { m: Module; progress: CourseProgress; onStart: (l: Lesson) => void; current: boolean; nextId: string | null }) {
   const p = moduleProgress(progress, m);
   const written = m.lessons.length > 0;
+  const done = written && p.done === p.total;
   return (
-    <li className={`module ${current ? 'current' : ''} ${written ? '' : 'planned'}`}>
+    <li className={`module ${current ? 'current' : ''} ${written ? '' : 'planned'} ${done ? 'done' : ''}`}>
       <details open={current}>
-        <summary>
-          <span className="m-n">{m.n}</span>
+        <summary className={`sign ${current ? 'here' : done ? 'was' : 'next'}`}>
+          <span className="m-n" aria-hidden="true">{done ? Check : m.n}</span>
           <span className="m-title">
             <b>{m.title}</b>
             <small>{m.summary}</small>
           </span>
           <span className="m-count">{written ? `${p.done} of ${p.total}` : 'being written'}</span>
-          <span className="m-bar" aria-hidden="true"><i style={{ width: written && p.total ? `${(p.done / p.total) * 100}%` : '0%' }} /></span>
         </summary>
-        <ol className="lessons">
+        <TaxiPath>
           {written
             ? m.lessons.map((l) => {
               const r = progress[l.id];
+              const state = isDone(progress, l.id) ? 'done' : l.id === nextId ? 'current' : r ? 'flown' : 'open';
               return (
-                <li key={l.id} className={isDone(progress, l.id) ? 'done' : ''}>
-                  <span className="l-id">{l.id}</span>
-                  <span className="l-title">{l.title}<small>{l.summary}</small></span>
-                  <span className={`l-state ${r ? r.lastGrade : ''}`}>{r ? `${GRADE_LABEL[r.lastGrade]}${r.attempts > 1 ? `, ${r.attempts} attempts` : ''}` : `${l.minutes} min`}</span>
-                  <button type="button" className="btn quiet sm" onClick={() => onStart(l)}>{r ? 'Fly again' : 'Start'}</button>
+                <li key={l.id} className={state}>
+                  <button type="button" className="lrow" onClick={() => onStart(l)}>
+                    <span className="node" aria-hidden="true">{state === 'done' ? Check : l.id}</span>
+                    <span className="l-title"><span className="lid">{l.id}</span> {l.title}</span>
+                    <span className={`l-state ${r ? r.lastGrade : state === 'current' ? 'now' : ''}`}>
+                      {r ? `${GRADE_LABEL[r.lastGrade]}${r.attempts > 1 ? `, ${r.attempts} attempts` : ''}` : state === 'current' ? `Flyable now, ${l.minutes} min` : `${l.minutes} min`}
+                    </span>
+                    <span className="vh">{r ? ', fly again' : ', start'}</span>
+                  </button>
                 </li>
               );
             })
             : m.outline.map((t, i) => (
-              <li key={t} className="outline">
-                <span className="l-id">{m.n}.{i + 1}</span>
-                <span className="l-title">{t}</span>
-                <span className="l-state muted">planned</span>
+              <li key={t} className="coming">
+                <div className="lrow">
+                  <span className="node" aria-hidden="true">{m.n}.{i + 1}</span>
+                  <span className="l-title"><span className="lid">{m.n}.{i + 1}</span> {t}</span>
+                  <span className="l-state coming">Coming</span>
+                </div>
               </li>
             ))}
-        </ol>
+        </TaxiPath>
         <p className="m-acs">ACS areas {m.acsAreas.join(', ')}</p>
       </details>
     </li>
+  );
+}
+
+/** Sign-to-sign centerline. The line enters from the sign's number square
+ *  above, winds through every hoop (measured after layout so wrapped titles
+ *  never break it) and leaves toward the next sign below. */
+const SIGN_X = 26;
+
+function TaxiPath({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [geo, setGeo] = useState({ d: '', w: 0, h: 0 });
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => {
+      const box = el.getBoundingClientRect();
+      const pts = Array.from(el.querySelectorAll<HTMLElement>('.node')).map((n) => {
+        const b = n.getBoundingClientRect();
+        return [b.left + b.width / 2 - box.left, b.top + b.height / 2 - box.top];
+      });
+      const r = (v: number) => Math.round(v * 10) / 10;
+      let prev: [number, number] = [SIGN_X, 0];
+      let d = `M ${SIGN_X} 0`;
+      for (const [x, y] of [...pts, [SIGN_X, box.height]]) {
+        const my = r((prev[1] + y) / 2);
+        d += ` C ${r(prev[0])} ${my}, ${r(x)} ${my}, ${r(x)} ${r(y)}`;
+        prev = [x, y];
+      }
+      setGeo((g) => (g.d === d ? g : { d, w: Math.round(box.width), h: Math.round(box.height) }));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [children]);
+  return (
+    <div className="path" ref={ref}>
+      {geo.w > 0 && (
+        <svg className="path-line" aria-hidden="true" focusable="false" width={geo.w} height={geo.h} viewBox={`0 0 ${geo.w} ${geo.h}`}>
+          <path d={geo.d} className="edge" />
+          <path d={geo.d} className="paint" />
+        </svg>
+      )}
+      <ol className="lessons">{children}</ol>
+    </div>
   );
 }

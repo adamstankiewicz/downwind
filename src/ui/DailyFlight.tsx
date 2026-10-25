@@ -10,7 +10,7 @@ import { fetchWeather, sampleWeather, type WeatherBundle } from '../lib/weather'
 import { buildBrief, debrief as runDebrief, type Brief, type ChoiceId, type Finding } from '../scenarios/goNoGo';
 import { dailySheet, fileSheet, type FiledSheet, type SheetSection } from '../course/daily';
 import { checkBlank, type CourseProgress } from '../course/progress';
-import { Field, GRADE_LABEL, Icons, NoAircraftNotice, Notice, SEVERITY_LABEL, SampleAircraftNotice } from './common';
+import { Field, GRADE_LABEL, Icons, NoAircraftNotice, Notice, SEVERITY_LABEL, SampleAircraftNotice, Voice } from './common';
 import { RawReport } from './MetarBlock';
 import { WindDiagram } from './WindDiagram';
 import { TafTimeline } from './TafTimeline';
@@ -153,8 +153,8 @@ export function DailyFlight({ airport, aircraft, loading, pilot, progress, log, 
                   <input type="number" inputMode="numeric" min={1} max={12} step={1} value={tripHours} onChange={(e) => setTripHours(Math.min(12, Math.max(1, Math.round(e.target.valueAsNumber || 1))))} />
                 </Field>
               </div>
-              {covered === 0 && <p className="voice">Nothing on this sheet has been taught yet, so every line is filled in for you. Read it, decide anyway, and the grade still uses every finding. Lesson 2.1 is where the questions start.</p>}
-              {covered > 0 && !committed && <p className="voice">{asked.length ? `${asked.length} line${asked.length === 1 ? ' asks' : 's ask'} for your reading before the sheet shows its own. ` : ''}I will not prompt on the lines you have earned. Sign when you are ready.</p>}
+              {covered === 0 && <Voice>Nothing on this sheet has been taught yet, so every line is filled in for you. Read it, decide anyway, and the grade still uses every finding. Lesson 2.1 is where the questions start.</Voice>}
+              {covered > 0 && !committed && <Voice>{asked.length ? `${asked.length} line${asked.length === 1 ? ' asks' : 's ask'} for your reading before the sheet shows its own. ` : ''}I will not prompt on the lines you have earned. Sign when you are ready.</Voice>}
             </section>
 
             {sections.map((s) => (
@@ -215,7 +215,7 @@ export function DailyFlight({ airport, aircraft, loading, pilot, progress, log, 
                 </div>
                 <div className={`grade ${result.grade}`}>{GRADE_LABEL[result.grade]}</div>
                 <p className="lcg">Learner-centered grading: {result.lcg}.</p>
-                <p className="voice">{result.rationale}{asked.length ? ` Your readings: ${readingsRight} of ${asked.length} matched the sheet.` : ''}</p>
+                <Voice>{result.rationale}{asked.length ? ` Your readings: ${readingsRight} of ${asked.length} matched the sheet.` : ''}</Voice>
                 {brief.findings.length === 0
                   ? <p className="muted">Nothing flagged. Legal, inside the airplane's numbers and inside your minimums.</p>
                   : <p className="muted small">The lines that drove the grade are marked above, each with its note and the lesson that teaches it.</p>}
@@ -397,7 +397,7 @@ function FindingRow({ f, note, taughtBy, covered }: { f: Finding; note: boolean;
       <h4>{f.title}</h4>
       {note && (
         <>
-          <p className="voice">{f.detail} {covered ? `You did this in ${taughtBy}.` : `${taughtBy} teaches this; it is marked here anyway, because safety does not wait for the syllabus.`}</p>
+          <Voice>{f.detail} {covered ? `You did this in ${taughtBy}.` : `${taughtBy} teaches this; it is marked here anyway, because safety does not wait for the syllabus.`}</Voice>
           <div className="refs">
             {f.acs.map((a) => <span key={a} className="chip acs">{a}</span>)}
             <RefChips refs={f.refs} />

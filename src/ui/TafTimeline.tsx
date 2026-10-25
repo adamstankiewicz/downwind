@@ -26,7 +26,7 @@ export const CAT_COLOR: Record<FlightCategory, string> = {
 };
 
 function color(p: TafPeriod): string {
-  return p.category ? CAT_COLOR[p.category] : 'var(--rule)';
+  return p.category ? CAT_COLOR[p.category] : 'var(--line)';
 }
 
 function windText(p: TafPeriod): string {
@@ -72,7 +72,7 @@ export function TafTimeline({ taf, departure, tripHours }: { taf: Taf | null; de
     <div className="timeline">
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`TAF timeline from ${fmtLocal(departure)} departure to ${fmtLocal(ret)} return`}>
         {/* window shading */}
-        <rect x={x(0)} y="6" width={x(tripHours) - x(0)} height={H - 28} fill="var(--tint-b)" />
+        <rect x={x(0)} y="6" width={x(tripHours) - x(0)} height={H - 28} fill="var(--sky-tint)" />
         {/* main periods */}
         {main.map((s, i) => {
           const w = x(s.b) - x(s.a);
@@ -80,7 +80,7 @@ export function TafTimeline({ taf, departure, tripHours }: { taf: Taf | null; de
             <g key={`m${i}`}>
               <rect x={x(s.a)} y="14" width={w} height="26" fill={color(s.p)} opacity="0.9" />
               {w > 60 && (
-                <text x={x(s.a) + 6} y="31" fontFamily="var(--label)" fontSize="11" fill="var(--paper)" fontWeight="600">
+                <text x={x(s.a) + 6} y="31" fontFamily="var(--label)" fontSize="11" fill={s.p.category === 'VFR' ? 'var(--cat-ink-dark)' : 'var(--cat-ink-light)'} fontWeight="700">
                   {s.p.category ?? '—'} {windText(s.p)}
                 </text>
               )}
@@ -106,7 +106,7 @@ export function TafTimeline({ taf, departure, tripHours }: { taf: Taf | null; de
         {ticks.map((h) => (
           <g key={h}>
             <line x1={x(h)} y1={H - 26} x2={x(h)} y2={H - 18} stroke="var(--ink)" />
-            <text x={x(h)} y={H - 6} textAnchor="middle" fontFamily="var(--label)" fontSize="10" fill="var(--muted)">
+            <text x={x(h)} y={H - 6} textAnchor="middle" fontFamily="var(--label)" fontSize="10" fill="var(--ink-2)">
               {h === 0 ? 'Depart' : h === tripHours ? 'Return' : `+${h} h`}
             </text>
           </g>
