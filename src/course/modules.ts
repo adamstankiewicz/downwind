@@ -3,14 +3,15 @@
 // pilot can see the whole course from day one.
 
 import type { Lesson, Module } from './types';
+import { pilotAirplaneLessons } from './pilotAirplane';
 import { weatherLessons } from './weather';
 
 export const modules: Module[] = [
   {
     n: 1, title: 'Pilot and airplane', acsAreas: ['I.A', 'I.B'],
     summary: 'Certificates, currency, documents and airworthiness: what has to be true before the airplane moves.',
-    lessons: [],
-    outline: ['Are you current to carry passengers?', 'The documents in the airplane', 'Is it airworthy today?', 'Inoperative equipment and 91.213', 'The flight review and 61.56'],
+    lessons: pilotAirplaneLessons,
+    outline: [],
   },
   {
     n: 2, title: 'Weather', acsAreas: ['I.C'],

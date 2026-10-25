@@ -21,6 +21,8 @@ export interface LessonContext {
   aircraft: AircraftProfile;
   minimums: PersonalMinimums;
   now: Date;
+  /** The pilot's last flight review (ISO date), when they have entered it. */
+  lastFlightReview?: string | null;
 }
 
 /** What the instructor says, at two levels. `short` is used once the pilot has the idea. */
@@ -43,7 +45,28 @@ export type Figure =
   | { kind: 'perf'; chart: PerfChartId; performance: Performance; paFt: number; oatC: number; sample: boolean }
   | { kind: 'navlog'; log: NavLog; altitudeMsl?: number }
   /** Glide range from a height, with candidate fields by bearing and distance. */
-  | { kind: 'glide'; heightAglFt: number; rangeNm: number; windFromTrue?: number; windKt?: number; fields: { name: string; bearingTrue: number; distanceNm: number; reachable: boolean }[] };
+  | { kind: 'glide'; heightAglFt: number; rangeNm: number; windFromTrue?: number; windKt?: number; fields: { name: string; bearingTrue: number; distanceNm: number; reachable: boolean }[] }
+  /**
+   * A page of paperwork made up for the lesson: logbook lines, the documents
+   * in the airplane, maintenance entries or a squawk list. `focus` rows are the
+   * ones the step is about. Cells are plain text; the caption says it is made up.
+   */
+  | { kind: 'records'; variant: RecordsVariant; title: string; columns: RecordColumn[]; rows: RecordRow[]; caption: string };
+
+export type RecordsVariant = 'logbook' | 'documents' | 'maintenance' | 'squawks';
+
+export interface RecordColumn {
+  label: string;
+  /** Numbers and dates right-aligned in the mono face. */
+  num?: boolean;
+}
+
+export interface RecordRow {
+  cells: string[];
+  focus?: boolean;
+  /** A short line under the row, such as a remark or a placard. */
+  note?: string;
+}
 
 export type PerfChartId = 'takeoff-roll' | 'takeoff-50' | 'landing-roll' | 'landing-50' | 'climb';
 

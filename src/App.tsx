@@ -38,7 +38,10 @@ export function App() {
   const [epoch, setEpoch] = useState(0);
   // A new lesson context per lesson start, so the practice weather is built for now.
   const [ctxKey, setCtxKey] = useState(0);
-  const ctx = useMemo(() => lessonContext(airport, aircraft, pilot.minimums), [airport, aircraft, pilot.minimums, ctxKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const ctx = useMemo(
+    () => ({ ...lessonContext(airport, aircraft, pilot.minimums), lastFlightReview: pilot.lastFlightReview }),
+    [airport, aircraft, pilot.minimums, pilot.lastFlightReview, ctxKey], // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
   const go = (s: Screen) => {
     setScreen(s);

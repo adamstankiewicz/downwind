@@ -145,12 +145,13 @@ describe('scoring', () => {
 
   it('moves through the course and fades the instructor', () => {
     let p = {};
-    expect(nextLesson(p)?.id).toBe('2.1');
+    expect(nextLesson(p)?.id).toBe('1.1');
     const lesson = weatherLessons[0];
     expect(coachLevel(p, lesson)).toBe('full');
     const r = scoreLesson(lesson.build(ctx), { blanks: {}, decisions: { d1: { choice: 'go' } } });
     p = recordLesson(p, '2.1', r, NOW);
-    expect(nextLesson(p)?.id).toBe('2.2');
+    // Module 1 still comes first.
+    expect(nextLesson(p)?.id).toBe('1.1');
     expect(coachLevel(p, lesson)).toBe('short');
     expect(coachLevel(p, weatherLessons[1])).toBe('full');
   });
