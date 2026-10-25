@@ -392,7 +392,7 @@ const classC: Lesson = {
         kind: 'brief', id: 'b1', title: 'A fuel stop with radar',
         scene: `You're flying from ${home.id} to ${qc.name} (${qc.id}), ${Math.round(tripNm)} nm north, for fuel and lunch. It is a Class C field.${yourField(ctx, 'C')}`,
         say: {
-          full: `Class C is drawn as two solid magenta circles. The **inner ring**, about 5 nm, goes from the surface up. The **shelf**, out to about 10 nm, has a floor, so you can pass beneath it. Both share the same ceiling, printed over the floor like a fraction. To enter you need **two-way radio communication established** with approach and a **transponder with Mode C** (91.130, 91.215). As with a tower, they establish it by saying your call sign. But if they add **"remain outside"**, you stay out, whatever else they said.`,
+          full: `Class C is drawn as two solid magenta circles. The **inner ring**, about 5 nm, goes from the surface up. The **shelf**, out to about 10 nm, has a floor, so you can pass beneath it. Both share the same ceiling, printed over the floor like a fraction. To enter you need **two-way radio communication established** with approach and a **transponder with Mode C** (91.130, 91.215). No clearance is needed, unlike Class B. As with a tower, they establish it by saying your call sign, even in the same breath as **"remain outside"**; that phrase is an instruction to stay out until they say otherwise.`,
           short: 'Inner ring from the surface, shelf with a floor. Your call sign, and no "remain outside".',
         },
         figure: { kind: 'chart', route: ['KXYZ', 'KXQC'], highlight: ['KXQC', 'xqc-c1', 'xqc-c2'] },

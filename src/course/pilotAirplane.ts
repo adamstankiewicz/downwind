@@ -147,7 +147,7 @@ const currentToCarry: Lesson = {
           ? `It's ${weekday(today)}. A friend has asked to come flying on ${weekday(flightDay)}, ${fmtDay(flightDay)}, in the afternoon. In this scenario sunset that day is at ${sunset}.`
           : `It's ${weekday(today)}. A friend has asked to come flying on ${weekday(flightDay)}, ${fmtDay(flightDay)}, for the sunset. In this scenario sunset that day is at ${sunset}.`,
         say: {
-          full: 'Before you can carry anyone, 61.57 asks what you have done lately. **Three takeoffs and landings in the preceding 90 days**, in the same category and class, as the sole manipulator of the controls. In a tailwheel airplane they must be to a full stop. **At night** the bar is higher: three takeoffs and landings **to a full stop**, made between **one hour after sunset and one hour before sunrise**. The logbook answers both questions. We will read it together.',
+          full: 'Before you can carry anyone, 61.57 asks what you have done lately. **Three takeoffs and landings in the preceding 90 days**, in the same category and class, as the sole manipulator of the controls. In a tailwheel airplane they must be to a full stop. **At night** the bar is higher: three takeoffs and landings **to a full stop**, made between **one hour after sunset and one hour before sunrise**. That is the narrower night: the night you log (14 CFR 1.1) starts earlier, at the end of evening civil twilight. The logbook answers both questions. We will read it together.',
           short: 'Three in 90 days. At night: three full stops, from an hour after sunset.',
         },
         figure,

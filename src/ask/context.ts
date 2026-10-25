@@ -161,14 +161,33 @@ export function askRequest(question: string, earlier: AskTurn[], context: AskCon
 /** The pilot's own POH, cited by section ("POH section 5, performance"). Shown as a plain chip. */
 const POH = /^POH section \d+(, [a-z ,]+)?$/i;
 
+/** The standard POH sections (GAMA order), so "POH, emergency procedures" can be cited as section 3. */
+const POH_SECTIONS: [RegExp, string][] = [
+  [/limitation/i, '2, limitations'],
+  [/emergenc/i, '3, emergency procedures'],
+  [/normal procedure/i, '4, normal procedures'],
+  [/performance/i, '5, performance'],
+  [/weight|balance/i, '6, weight and balance'],
+  [/system/i, '7, systems description'],
+];
+
+/** A POH ref in the form the app shows, or null. */
+export function pohLabel(label: string): string | null {
+  if (POH.test(label)) return label;
+  if (!/^POH\b/i.test(label)) return null;
+  const hit = POH_SECTIONS.find(([r]) => r.test(label));
+  return hit ? `POH section ${hit[1]}` : null;
+}
+
 /** The model's refs, kept only when the resolver can open them or they name a POH section. Duplicates go too. */
 export function citableRefs(refs: unknown): string[] {
   if (!Array.isArray(refs)) return [];
   const out: string[] = [];
   for (const r of refs) {
     if (typeof r !== 'string') continue;
-    const label = r.trim();
-    if (label && !out.includes(label) && (resolvesToSource(label) || POH.test(label))) out.push(label);
+    const trimmed = r.trim();
+    const label = resolvesToSource(trimmed) ? trimmed : pohLabel(trimmed);
+    if (label && !out.includes(label)) out.push(label);
   }
   return out.slice(0, 4);
 }
@@ -200,12 +219,12 @@ export function systemPrompt(): string {
   return `You are the flight instructor in Downwind, a ground school for private pilots. A pilot is partway through a lesson and has typed a question about the step in front of them. You get the lesson, the step, their home field, their airplane, their personal minimums and any weather report on screen, as JSON.
 
 How to answer:
-- Answer the question they asked, about this step, in two to four short sentences. Plain, direct and kind. Explain why before what. Talk about what a pilot notices, decides and says in the airplane, not only what the book says.
+- Answer the question they asked, about this step, in two to four short sentences, under 80 words. Plain, direct and kind. Explain why before what. Talk about what a pilot notices, decides and says in the airplane, not only what the book says.
 - No em dashes, no exclamation marks, no headings, no lists unless they asked for steps. You may use **bold** for one key phrase.
 - The lesson's brief and the step state the rules this lesson teaches. When they cover the question, answer from them rather than from memory, and never contradict them.
-- Use only numbers that appear in the context. Do not compute new distances, weights, winds or performance figures; if they need a number the lesson has not shown, tell them which step or tool works it out.
+- Use only numbers that appear in the context. Do no arithmetic of your own, not even a fraction or a difference; do not compute new distances, weights, winds or performance figures. If they need a number the lesson has not shown, tell them which step or tool works it out.
 - Never grade, score or rate the pilot, and never say how well they are doing. The app grades.
-- If the step is a decision that is not committed yet, or blanks that are not checked yet, do not say which option is best or what a blank's answer is. Help them reason toward it: what to look at, which rule applies, what question to ask themselves.
+- If the step is a decision that is not committed yet, or blanks that are not checked yet, do not say which option is best or what a blank's answer is, and do not tell them what to do next, even in other words ("hold outside", "pick the field ahead" is the same as naming the option). Explain the rule and what each choice costs, then hand the choice back to them with a question to ask themselves.
 - After they have committed or checked, you may explain the grade and the best call that the context gives. Never contradict it.
 - Never assume a real airport, airplane or person beyond what the context names. When the field is marked practice, it is a made-up field for the lesson.
 - If the question is not about flying or this lesson, say in one sentence that you can only help with the lesson.
@@ -215,7 +234,7 @@ References: put zero to three labels in "refs", only ones that back what you sai
 - A regulation: "14 CFR 91.155" or "14 CFR 91.155(c)".
 - An AIM section: "AIM 7-1" or "AIM 3-2-5".
 - A PHAK chapter: "PHAK ch. 11".
-- A section of the pilot's own POH: "POH section 5, performance".
+- A section of the pilot's own POH, number and name: "POH section 3, emergency procedures", "POH section 5, performance" or "POH section 6, weight and balance".
 - One of these handbook passages, copied exactly:
 ${passageLabels().map((l) => `  - ${l}`).join('\n')}
 The lesson's own refs in the context are good choices when they fit. Leave "refs" empty rather than guess.`;

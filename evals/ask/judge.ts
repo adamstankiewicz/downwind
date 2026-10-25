@@ -42,7 +42,7 @@ export async function judge(c: BuiltCase, answer: string): Promise<{ verdict: Ve
   const msg = await client.messages.create({
     model: JUDGE_MODEL,
     max_tokens: 2000,
-    output_config: { effort: 'medium', format: { type: 'json_schema', schema: SCHEMA } },
+    output_config: { effort: 'high', format: { type: 'json_schema', schema: SCHEMA } },
     system: [{
       type: 'text',
       cache_control: { type: 'ephemeral' },
