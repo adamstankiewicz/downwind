@@ -6,6 +6,7 @@ import type { Lesson, Module } from './types';
 import { pilotAirplaneLessons } from './pilotAirplane';
 import { systemsLessons } from './systems';
 import { emergencyLessons } from './emergencies';
+import { oralLessons } from './oral';
 import { weatherLessons } from './weather';
 import { crossCountryLessons } from './crossCountry';
 import { humanFactorsLessons } from './human';
@@ -63,8 +64,8 @@ export const modules: Module[] = [
   {
     n: 9, title: 'The oral and the flight review', acsAreas: ['I', 'XI'],
     summary: 'A scenario-based oral across the whole course, and a record your CFI can use for the 61.56 review.',
-    lessons: [],
-    outline: ['Mock oral: a weekend trip', 'Mock oral: the airplane', 'Your flight review summary'],
+    lessons: oralLessons,
+    outline: [],
   },
 ];
 

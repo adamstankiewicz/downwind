@@ -5,18 +5,19 @@ import { lessonById } from '../course/modules';
 import type { CourseProgress } from '../course/progress';
 import type { FiledSheet } from '../course/daily';
 import { GRADE_LABEL } from './common';
+import { FlightReviewSummary } from './FlightReviewSummary';
 import { Readiness } from './Readiness';
 
 const CHOICE_LABEL: Record<FiledSheet['choice'], string> = { go: 'Go', 'go-plan': 'Go with a plan', delay: 'Delay', cancel: 'Cancel' };
 
-export function Logbook({ progress, log, epoch, goReview, goCourse }: { progress: CourseProgress; log: FiledSheet[]; epoch: number; goReview: () => void; goCourse: () => void }) {
+export function Logbook({ progress, log, lastFlightReview, epoch, goReview, goCourse }: { progress: CourseProgress; log: FiledSheet[]; lastFlightReview: string | null; epoch: number; goReview: () => void; goCourse: () => void }) {
   const flown = Object.entries(progress).sort((a, b) => b[1].lastAt.localeCompare(a[1].lastAt));
   const fmtDate = (iso: string) => new Date(iso).toLocaleDateString([], { month: 'short', day: 'numeric' });
   const fmtZ = (iso: string) => { const d = new Date(iso); return `${String(d.getUTCHours()).padStart(2, '0')}${String(d.getUTCMinutes()).padStart(2, '0')}Z`; };
 
   return (
     <>
-      <div className="strip-head">
+      <div className="strip-head no-print">
         <div className="strip-title">
           <div>
             <h1>Logbook</h1>
@@ -25,7 +26,9 @@ export function Logbook({ progress, log, epoch, goReview, goCourse }: { progress
         </div>
       </div>
 
-      <div className="grid-2">
+      <FlightReviewSummary progress={progress} log={log} lastFlightReview={lastFlightReview} />
+
+      <div className="grid-2 no-print">
         <section className="card">
           <div className="card-head"><h2>Lessons flown</h2></div>
           {flown.length === 0 ? (
@@ -74,7 +77,9 @@ export function Logbook({ progress, log, epoch, goReview, goCourse }: { progress
         </section>
       </div>
 
-      <Readiness key={epoch} goReview={goReview} embedded />
+      <div className="stack no-print">
+        <Readiness key={epoch} goReview={goReview} embedded />
+      </div>
     </>
   );
 }

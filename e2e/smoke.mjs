@@ -87,6 +87,7 @@ async function run(viewport, live) {
   const planned = await page.locator('.module.planned').count();
   check(planned < 9 && (await page.locator('.module.planned .m-count').filter({ hasText: 'being written' }).count()) === planned, `${label} every unwritten module says so`);
   check((await page.locator('.module.planned').filter({ hasText: 'Human factors and risk' }).count()) === 0, `${label} module 8 is written`);
+  check((await page.locator('.module.planned').filter({ hasText: 'The oral and the flight review' }).count()) === 0, `${label} module 9 is written`);
   check(await page.getByRole('list', { name: 'Modules' }).locator('li').count() === 9, `${label} strip shows nine modules`);
   check(!/C172K|N\d{3,5}[A-Z]{0,2}\b/.test(body), `${label} no tail number or type assumed in course copy`);
   await noHScroll('course home');
@@ -349,6 +350,59 @@ async function run(viewport, live) {
   await btn('Back to course').last().click();
   await page.getByRole('heading', { name: 'Ground school', exact: true }).waitFor();
   check(/\b\d+ of \d+ lessons flown/.test(await main()), `${label} course home back after 6.1`);
+  // Lesson 9.1, the mock oral, end to end
+  const lesson91 = page.getByRole('button', { name: /9\.1 Mock oral: a weekend trip/ });
+  if (!(await lesson91.isVisible())) await page.locator('.module summary').filter({ hasText: 'The oral and the flight review' }).click();
+  await lesson91.click();
+  await page.getByRole('heading', { name: 'The examiner sets the scene' }).waitFor();
+  check(/Quill Valley/.test(await main()) && (await page.locator('.sectional svg').count()) > 0, `${label} 9.1 opens on the trip with the practice sectional`);
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'Are you current?' }).waitFor();
+  await page.getByLabel(/Takeoffs and landings in the 90 days/).fill('2');
+  await btn('No').click();
+  await btn('Check my numbers').click();
+  check((await page.getByText(/Right\./).count()) === 2, `${label} 9.1 currency counted by code`);
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'The first leg, worked' }).waitFor();
+  check((await page.locator('table.navlog').count()) > 0, `${label} 9.1 shows the nav log`);
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'The rest of the route' }).waitFor();
+  await page.getByLabel(/Total distance/).fill('63');
+  await page.getByLabel(/Time en route/).fill('39');
+  await page.getByLabel(/Fuel required/).fill('12');
+  await btn('Check my numbers').click();
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'Altitude and airspace' }).waitFor();
+  await page.locator('.blank').filter({ hasText: 'Cruising altitude' }).getByRole('button').nth(1).click();
+  await btn('E').click();
+  await btn('Check my numbers').click();
+  check(/even thousands plus 500/.test(await main()), `${label} 9.1 explains the cruising altitude rule`);
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'Weigh it' }).waitFor();
+  await page.getByLabel(/Takeoff weight/).fill('2370');
+  await page.getByLabel(/Over maximum gross/).fill('70');
+  await btn('Check my numbers').click();
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'Make it fit' }).waitFor();
+  await page.getByRole('button', { name: /the most that fits/ }).click();
+  await btn('Commit').click();
+  check(/Best call/.test(await main()), `${label} 9.1 trading fuel for people grades best`);
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'Sunday afternoon' }).waitFor();
+  check((await page.locator('.metar').count()) > 0, `${label} 9.1 shows the forecast for home`);
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'When do you leave?' }).waitFor();
+  await page.getByRole('button', { name: /Leave now, ahead of the rain/ }).click();
+  await btn('Commit').click();
+  await btn('Debrief').click();
+  await page.getByRole('heading', { name: 'Debrief', exact: true }).waitFor();
+  body = await main();
+  check(/Best call/.test(body) && /PA\.I\.D/.test(body) && /14 CFR 61\.57/.test(body), `${label} 9.1 debrief shows the grade, ACS and references`);
+  const stored9 = await page.evaluate(() => JSON.parse(localStorage.getItem('downwind.course.v1') ?? '{}'));
+  check(stored9['9.1']?.lastGrade === 'best', `${label} lesson 9.1 recorded in course progress`);
+  await noHScroll('lesson 9.1 debrief');
+  await btn('Back to course').click();
+  await page.getByRole('heading', { name: 'Ground school', exact: true }).waitFor();
 
   // Daily flight: the sheet
   await page.getByRole('button', { name: new RegExp(`Today's real conditions at ${icao}`) }).click();
@@ -388,6 +442,8 @@ async function run(viewport, live) {
   check(/2\.1 Reading the METAR/.test(body) && /1 attempt/.test(body), `${label} logbook lists the lesson flown`);
   check(/, Go\b/.test(body) && !/% sure/.test(body), `${label} logbook lists the filed briefing`);
   check(/Review readiness/.test(body), `${label} readiness folded into the logbook`);
+  check(await page.getByRole('heading', { name: 'Flight review summary' }).isVisible() && /Lessons flown, \d+ of \d+/.test(body), `${label} flight review summary counts the lessons flown`);
+  check(/Ask your CFI/.test(body), `${label} summary says what to ask the CFI`);
   await noHScroll('logbook');
 
   // Tools
