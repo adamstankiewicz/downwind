@@ -9,6 +9,8 @@ import { resolvesToSource } from '../../refs/resolve';
 import { askContext, askRequest, citableRefs, parseReply, systemPrompt, userMessage, MAX_QUESTION } from '../context';
 import { handleAsk } from '../../../worker/ask';
 import type Anthropic from '@anthropic-ai/sdk';
+import { askInstructor, askedToday, DAILY_LIMIT } from '../client';
+import { afterEach, vi } from 'vitest';
 
 const NOW = new Date(Date.UTC(2026, 9, 24, 16, 20));
 const mins = defaultPilot.minimums;
@@ -23,7 +25,7 @@ describe.each(contexts)('ask context: %s', (_name, ctx) => {
     for (const step of lesson.build(ctx)) {
       const hidden = JSON.stringify(askContext(lesson, step, ctx, emptyAnswers(), false));
       expect(hidden).not.toMatch(/"grade"|"answer"|"bestCalls"|"instructorWhy"|"consequence"/);
-      expect(hidden.length).toBeLessThan(12_000);
+      expect(hidden.length).toBeLessThan(6_000);
     }
   });
 });
@@ -53,7 +55,7 @@ describe('ask context', () => {
     const turns = Array.from({ length: 6 }, (_, i) => ({ question: `q${i}`, answer: `a${i}` }));
     const r = askRequest(`  ${'x'.repeat(MAX_QUESTION + 50)} `, turns, askContext(lesson, lesson.build(ctx)[0], ctx, emptyAnswers(), false));
     expect(r.question.length).toBe(MAX_QUESTION);
-    expect(r.earlier.map((t) => t.question)).toEqual(['q3', 'q4', 'q5']);
+    expect(r.earlier.map((t) => t.question)).toEqual(['q4', 'q5']);
     expect(userMessage(r)).toContain("Pilot's question:");
   });
 });
@@ -89,8 +91,8 @@ describe('worker /api/ask', () => {
   const lesson = lessons[0];
   const body = JSON.stringify(askRequest('Why does the gust matter?', [], askContext(lesson, lesson.build(ctx)[0], ctx, emptyAnswers(), false)));
   const post = (b = body) => new Request('https://w/api/ask', { method: 'POST', body: b, headers: { 'Content-Type': 'application/json' } });
-  const reply = (text: string, stop: Anthropic.Beta.BetaMessage['stop_reason'] = 'end_turn') =>
-    ({ content: [{ type: 'text', text, citations: null }], stop_reason: stop } as unknown as Anthropic.Beta.BetaMessage);
+  const reply = (text: string, stop: Anthropic.Message['stop_reason'] = 'end_turn') =>
+    ({ content: [{ type: 'text', text, citations: null }], stop_reason: stop } as unknown as Anthropic.Message);
 
   it('says it is off and refuses questions without a key', async () => {
     expect(await (await handleAsk(new Request('https://w/api/ask'), {})).json()).toEqual({ available: false });
@@ -98,18 +100,24 @@ describe('worker /api/ask', () => {
   });
 
   it('answers with a cached system prompt and filtered refs', async () => {
-    let sent: Anthropic.Beta.MessageCreateParamsNonStreaming | null = null;
+    let sent: Anthropic.MessageCreateParamsNonStreaming | null = null;
     const res = await handleAsk(post(), { ANTHROPIC_API_KEY: 'k' }, async (p) => {
       sent = p;
       return reply(JSON.stringify({ answer: 'Because the spread is what you fly in the flare.', refs: ['AIM 7-1', 'made up'] }));
     });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ answer: 'Because the spread is what you fly in the flare.', refs: ['AIM 7-1'] });
-    const p = sent as unknown as Anthropic.Beta.MessageCreateParamsNonStreaming;
-    expect(p.model).toBe('claude-opus-5-5');
-    expect(p.max_tokens).toBeLessThanOrEqual(1024);
+    const p = sent as unknown as Anthropic.MessageCreateParamsNonStreaming;
+    expect(p.model).toBe('claude-haiku-5-5');
+    expect(p.max_tokens).toBeLessThanOrEqual(400);
+    expect(p.thinking).toEqual({ type: 'disabled' });
     expect(p.system).toEqual([{ type: 'text', text: systemPrompt(), cache_control: { type: 'ephemeral' } }]);
     expect(p.output_config?.effort).toBe('low');
+  });
+
+  it('limits bursts from one address when the rate limit is bound', async () => {
+    const key = { ANTHROPIC_API_KEY: 'k', ASK_LIMIT: { limit: async () => ({ success: false }) } };
+    expect((await handleAsk(post(), key, async () => { throw new Error('should not call'); })).status).toBe(429);
   });
 
   it('rejects junk, long questions and refusals without crashing', async () => {
@@ -121,5 +129,33 @@ describe('worker /api/ask', () => {
     expect(refused.status).toBe(200);
     expect((await refused.json() as { refs: string[] }).refs).toEqual([]);
     expect((await handleAsk(post(), key, async () => reply('not json'))).status).toBe(502);
+  });
+});
+
+describe('daily limit on this device', () => {
+  const store = new Map<string, string>();
+  afterEach(() => { vi.unstubAllGlobals(); store.clear(); });
+  const stub = (ok = true) => {
+    vi.stubGlobal('localStorage', { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v) });
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ answer: 'Look at the spread.', refs: [] }), { status: ok ? 200 : 500 }));
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  };
+  const req = { question: 'Why?', earlier: [], context: {} as never };
+
+  it('counts answered questions and stops at the limit without calling the worker', async () => {
+    const f = stub();
+    for (let i = 0; i < DAILY_LIMIT; i++) expect((await askInstructor(req)).ok).toBe(true);
+    expect(askedToday()).toBe(DAILY_LIMIT);
+    expect(await askInstructor(req)).toEqual({ ok: false, reason: 'limit' });
+    expect(f).toHaveBeenCalledTimes(DAILY_LIMIT);
+  });
+
+  it('does not count a question that failed, and starts over the next day', async () => {
+    stub(false);
+    expect((await askInstructor(req)).ok).toBe(false);
+    expect(askedToday()).toBe(0);
+    store.set('downwind.ask.count.v1', JSON.stringify({ day: '2000-01-01', n: DAILY_LIMIT }));
+    expect(askedToday()).toBe(0);
   });
 });
