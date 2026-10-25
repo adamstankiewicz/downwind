@@ -2,7 +2,8 @@
 //   npm run build && npx vite preview --port 4173 &
 //   node e2e/smoke.mjs [http://localhost:4173]
 // Weather and airport requests are stubbed, so it runs offline and exercises
-// both the live path and the practice-weather fallback. Covers onboarding,
+// both the live path and the practice-weather fallback. Ask the instructor is
+// stubbed too: on in the live runs, with no API key in the offline ones. Covers onboarding,
 // the course home, lessons 1.1 and 2.1 to 9.1 end to
 // end, the start of 2.2, the daily flight through filing, and every rail
 // screen, at desktop and phone widths.
@@ -41,12 +42,21 @@ async function open(viewport, live) {
     if (u.pathname.endsWith('/airport')) return r.fulfill({ contentType: 'application/json', body: JSON.stringify(AIRPORT) });
     return r.fulfill({ status: 404, body: '' });
   });
-  return { browser, page, errors };
+  // Ask the instructor: the worker has a key in live runs and none offline.
+  const asks = [];
+  await page.route('**/api/ask', async (r) => {
+    if (r.request().method() === 'GET') return r.fulfill({ contentType: 'application/json', body: JSON.stringify({ available: live }) });
+    if (!live) return r.fulfill({ status: 503, contentType: 'application/json', body: '{}' });
+    asks.push(JSON.parse(r.request().postData() ?? '{}'));
+    await new Promise((done) => setTimeout(done, 150));
+    return r.fulfill({ contentType: 'application/json', body: JSON.stringify({ answer: 'Count back to the **third most recent** takeoff and landing.', refs: ['14 CFR 61.57(a)', 'Not a real source'] }) });
+  });
+  return { browser, page, errors, asks };
 }
 
 async function run(viewport, live) {
   const label = `[${viewport.width}px ${live ? 'live' : 'offline'}]`;
-  const { browser, page, errors } = await open(viewport, live);
+  const { browser, page, errors, asks } = await open(viewport, live);
   const noHScroll = async (where) => {
     const w = await page.evaluate(() => document.documentElement.scrollWidth);
     check(w <= viewport.width, `${label} no horizontal scroll on ${where} (${w}px)`);
@@ -94,6 +104,20 @@ async function run(viewport, live) {
   await page.getByRole('heading', { name: 'A friend wants to come along' }).waitFor();
   check((await page.locator('.records.logbook').count()) === 1 && /made-up logbook page/.test(await main()), `${label} 1.1 shows the logbook page, labeled made up`);
   await noHScroll('lesson 1.1 brief');
+  const askRegion = page.getByRole('region', { name: 'Ask the instructor' });
+  if (live) {
+    await btn('Ask the instructor').click();
+    await page.getByLabel('Your question').fill('Which landings count for this?');
+    await askRegion.getByRole('button', { name: 'Ask', exact: true }).click();
+    await askRegion.getByText(/third most recent/).waitFor();
+    const askText = await askRegion.innerText();
+    check(/61\.57/.test(askText) && !/Not a real source/.test(askText), `${label} 1.1 instructor answers with only refs that resolve`);
+    check(asks.length === 1 && asks[0].context?.lesson?.id === '1.1' && asks[0].question === 'Which landings count for this?', `${label} ask sends the lesson and the typed question`);
+    await noHScroll('lesson 1.1 ask');
+  } else {
+    await page.waitForTimeout(200);
+    check(await btn('Ask the instructor').count() === 0 && await askRegion.count() === 0, `${label} Ask the instructor hidden without a key`);
+  }
   await btn('Continue').click();
   await page.getByRole('heading', { name: 'Day currency, worked' }).waitFor();
   check(/Third most recent/.test(await main()), `${label} 1.1 worked example counts back to the third landing`);
@@ -107,6 +131,14 @@ async function run(viewport, live) {
   check((body.match(/Right\./g) ?? []).length === 3 && /40 minutes after sunset/.test(body), `${label} 1.1 turn checks all three answers right`);
   await btn('Continue').click();
   await page.getByRole('heading', { name: /^The plan for / }).waitFor();
+  if (live) {
+    await btn('Ask the instructor').click();
+    await page.getByLabel('Your question').fill('What should I weigh here?');
+    await page.getByLabel('Your question').press('Enter');
+    await page.getByRole('region', { name: 'Ask the instructor' }).getByText(/third most recent/).waitFor();
+    const before = JSON.stringify(asks.at(-1)?.context ?? {});
+    check(asks.length === 2 && asks[1].context?.step?.kind === 'decide' && !/"grade"|"bestCalls"|"consequence"/.test(before), `${label} ask before commit sends no grades or best call`);
+  }
   await page.getByRole('button', { name: /Leave 45 minutes earlier/ }).click();
   await btn('Commit').click();
   check(/Best call/.test(await main()) && /day currency covers it/i.test(await main()), `${label} 1.1 decision graded with its consequence`);

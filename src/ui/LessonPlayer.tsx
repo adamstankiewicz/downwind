@@ -17,6 +17,8 @@ import { RefChips } from '../refs/RefViewer';
 import { arrange, nextVariant, variantCount } from '../course/variant';
 import { lessonOutcomes } from '../review/lessonCards';
 import { enrollLesson } from '../review/scheduler';
+import { askContext } from '../ask/context';
+import { AskInstructor, type AskEntry } from './AskInstructor';
 
 const freshSeed = () => Math.floor(Math.random() * 2 ** 31);
 
@@ -42,6 +44,8 @@ export function LessonPlayer({ lesson, ctx, progress, setProgress, onExit, onNex
   const [answers, setAnswers] = useState<LessonAnswers>(emptyAnswers);
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [committed, setCommitted] = useState<Record<string, boolean>>({});
+  // Questions asked of the instructor, by step; a new attempt starts clean.
+  const [asked, setAsked] = useState<Record<string, AskEntry[]>>({});
   const [idx, setIdx] = useState(0);
   const [result, setResult] = useState<LessonResult | null>(null);
   const level = useRef(coachLevel(progress, lesson)).current;
@@ -66,6 +70,7 @@ export function LessonPlayer({ lesson, ctx, progress, setProgress, onExit, onNex
     setAnswers(emptyAnswers());
     setChecked({});
     setCommitted({});
+    setAsked({});
     setIdx(0);
     setResult(null);
     window.scrollTo({ top: 0 });
@@ -85,6 +90,10 @@ export function LessonPlayer({ lesson, ctx, progress, setProgress, onExit, onNex
     })),
     { id: 'debrief', label: 'Debrief', state: result ? 'now' : 'todo' },
   ];
+
+  // The figure in the drawer: this step's, or the last one still open.
+  const openFigure = step.figure ?? shown.slice(0, idx + 1).filter((s) => s.figure).at(-1)?.figure;
+  const revealed = step.kind === 'turn' ? Boolean(checked[step.id]) : step.kind === 'decide' ? Boolean(committed[step.id]) : false;
 
   return (
     <>
@@ -114,6 +123,14 @@ export function LessonPlayer({ lesson, ctx, progress, setProgress, onExit, onNex
               onCheck={() => setChecked((c) => ({ ...c, [step.id]: true }))}
               committed={Boolean(committed[step.id])}
               onCommit={() => setCommitted((c) => ({ ...c, [step.id]: true }))}
+            />
+            <AskInstructor
+              key={`ask-${step.id}`}
+              step={step}
+              context={askContext(lesson, step, ctx, answers, revealed, openFigure)}
+              revealed={revealed}
+              thread={asked[step.id] ?? []}
+              onAnswer={(entry) => setAsked((a) => ({ ...a, [step.id]: [...(a[step.id] ?? []), entry] }))}
             />
             <div className="step-nav">
               {idx > 0 && <button type="button" className="btn quiet" onClick={() => go(idx - 1)}>Back</button>}

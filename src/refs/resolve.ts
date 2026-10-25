@@ -80,6 +80,15 @@ const PASSAGES: Record<string, RefLink[]> = {
   'PHAK, night vision': [doc('PHAK, night vision', 'phak-17', ['Night Vision'])],
 };
 
+/** The handbook passage labels the resolver knows, for anything that has to pick one. */
+export const passageLabels = (): string[] => Object.keys(PASSAGES);
+
+/** True when a label opens something: a regulation, an AIM section or a handbook passage. */
+export const resolvesToSource = (label: string): boolean => {
+  const links = resolveRef(label);
+  return links.length > 0 && links.every((l) => l.kind !== 'text');
+};
+
 /** Every handbook passage the course cites, for the live check against the FAA files. */
 export function citedPassages(): Extract<RefLink, { kind: 'doc' }>[] {
   return Object.values(PASSAGES).flat().filter((l): l is Extract<RefLink, { kind: 'doc' }> => l.kind === 'doc');
