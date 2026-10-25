@@ -3,6 +3,7 @@
 // chart with the reading marked, a nav log, or the glide circle. Every lesson
 // figure is practice material built for the lesson, and says so.
 
+import type { AirportSign } from '../lib/airportOps';
 import type { Figure as FigureModel, PerfChartId, RecordColumn, RecordRow, RecordsVariant } from '../course/types';
 import { practiceRegion, withVolumes } from '../chart/practiceRegion';
 import { readTable, type Performance, type PerfTable } from '../lib/perf';
@@ -121,6 +122,22 @@ export function Figure({ figure, practiceField }: { figure: FigureModel; practic
         <figcaption>
           Glide range from {fmt(figure.heightAglFt)} ft above the ground: about {figure.rangeNm} nm, true north up.{wind} Filled fields are the ones you reach with a pattern in hand; open ones you do not.
         </figcaption>
+      </figure>
+    );
+  }
+  if (figure.kind === 'loadFactor') {
+    return (
+      <figure className="fig">
+        <LoadFactorChart {...figure} />
+        <figcaption>Stall speed rises with bank in a level turn: clean, and with the flaps down, against your approach speed. The dot is the bank in this step. {figure.sample ? 'Sample trainer speeds for teaching; use your POH.' : 'From your airplane\'s speeds.'}</figcaption>
+      </figure>
+    );
+  }
+  if (figure.kind === 'signs') {
+    return (
+      <figure className="fig">
+        <SignsFigure signs={figure.signs} marking={figure.marking} />
+        <figcaption>{figure.caption}</figcaption>
       </figure>
     );
   }
@@ -513,3 +530,81 @@ export function GlideDiagram({ heightAglFt, rangeNm, windFromTrue, windKt, field
     </div>
   );
 }
+
+const SIGN_LABEL: Record<AirportSign['kind'], string> = {
+  mandatory: 'Mandatory instruction sign',
+  location: 'Location sign',
+  direction: 'Direction sign',
+  destination: 'Destination sign',
+  ils: 'ILS critical area sign',
+  'no-entry': 'No entry sign',
+};
+
+/** Signs drawn in their regulation colors, which are part of what they mean, with the marking on the pavement below. */
+function SignsFigure({ signs, marking }: { signs: AirportSign[]; marking?: 'runway-hold' | 'ils-hold' }) {
+  return (
+    <div className="signs">
+      <div className="signs-row" role="list">
+        {signs.map((s, i) => (
+          <span key={i} role="listitem" className={`sign sign-${s.kind}`} aria-label={`${SIGN_LABEL[s.kind]}: ${s.text}`}>
+            {s.arrowDeg !== undefined && s.arrowDeg < 0 && <span className="sign-arrow" style={{ transform: `rotate(${s.arrowDeg}deg)` }} aria-hidden="true">↑</span>}
+            <span className="sign-text">{s.text}</span>
+            {s.arrowDeg !== undefined && s.arrowDeg >= 0 && <span className="sign-arrow" style={{ transform: `rotate(${s.arrowDeg}deg)` }} aria-hidden="true">↑</span>}
+          </span>
+        ))}
+      </div>
+      {marking && (
+        <svg className="signs-marking" viewBox="0 0 320 44" role="img" aria-label={marking === 'runway-hold' ? 'Runway holding position marking: two solid lines on your side, two dashed lines on the runway side' : 'ILS critical area holding position marking: a yellow ladder across the taxiway'}>
+          <rect x="0" y="0" width="320" height="44" className="pave" />
+          {marking === 'runway-hold' ? (
+            <g className="paint">
+              <rect x="8" y="30" width="304" height="3" />
+              <rect x="8" y="24" width="304" height="3" />
+              {Array.from({ length: 13 }, (_, i) => <rect key={`a${i}`} x={8 + i * 24} y="15" width="14" height="3" />)}
+              {Array.from({ length: 13 }, (_, i) => <rect key={`b${i}`} x={8 + i * 24} y="9" width="14" height="3" />)}
+            </g>
+          ) : (
+            <g className="paint">
+              <rect x="8" y="12" width="304" height="3" />
+              <rect x="8" y="29" width="304" height="3" />
+              {Array.from({ length: 16 }, (_, i) => <rect key={i} x={10 + i * 19.5} y="15" width="3" height="14" />)}
+            </g>
+          )}
+          <text x="316" y="41" textAnchor="end" className="dir">your side ↓</text>
+        </svg>
+      )}
+    </div>
+  );
+}
+
+/** Stall speed against bank, drawn from 1 / cos(bank) and its square root. */
+function LoadFactorChart({ bankDeg, vs0Kias, vs1Kias, approachKias }: { bankDeg: number; vs0Kias: number; vs1Kias: number; approachKias: number; sample: boolean }) {
+  const W = 320, H = 186, L = 36, R = 10, T = 20, B = 28;
+  const maxBank = 75;
+  const vmax = Math.ceil((Math.max(vs1Kias / Math.sqrt(Math.cos((maxBank * Math.PI) / 180)), approachKias) + 5) / 10) * 10;
+  const vmin = Math.floor((vs0Kias - 5) / 10) * 10;
+  const x = (b: number) => L + (b / maxBank) * (W - L - R);
+  const y = (v: number) => T + (1 - (v - vmin) / (vmax - vmin)) * (H - T - B);
+  const stall = (vs: number, b: number) => vs / Math.sqrt(Math.cos((b * Math.PI) / 180));
+  const path = (vs: number) => Array.from({ length: maxBank + 1 }, (_, b) => `${b === 0 ? 'M' : 'L'}${x(b).toFixed(1)},${y(Math.min(vmax, stall(vs, b))).toFixed(1)}`).join(' ');
+  const ticks = [0, 15, 30, 45, 60, 75];
+  const vticks: number[] = [];
+  for (let v = vmin; v <= vmax; v += 10) vticks.push(v);
+  const dot = stall(vs0Kias, bankDeg);
+  return (
+    <svg className="lf-chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Stall speed against bank angle. At ${bankDeg} degrees the flaps-down stall speed is ${Math.round(dot)} knots against a ${approachKias} knot approach speed.`}>
+      {vticks.map((v) => <g key={v}><line x1={L} x2={W - R} y1={y(v)} y2={y(v)} className="grid" /><text x={L - 4} y={y(v) + 3} textAnchor="end" className="tick">{v}</text></g>)}
+      {ticks.map((b) => <text key={b} x={x(b)} y={H - B + 14} textAnchor="middle" className="tick">{b}°</text>)}
+      <text x={W - R} y={H - 2} textAnchor="end" className="axis">bank</text>
+      <text x={L - 4} y={8} textAnchor="end" className="axis">kt</text>
+      <line x1={L} x2={W - R} y1={y(approachKias)} y2={y(approachKias)} className="approach" />
+      <text x={L + 4} y={y(approachKias) - 4} className="lbl">approach {approachKias}</text>
+      <path d={path(vs1Kias)} className="clean" />
+      <path d={path(vs0Kias)} className="flaps" />
+      <text x={x(20)} y={y(stall(vs1Kias, 20)) - 5} className="lbl">clean</text>
+      <text x={x(20)} y={y(stall(vs0Kias, 20)) + 13} className="lbl">flaps down</text>
+      {dot <= vmax && <circle cx={x(bankDeg)} cy={y(dot)} r={5} className="dot" />}
+    </svg>
+  );
+}
+

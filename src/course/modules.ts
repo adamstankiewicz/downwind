@@ -1,4 +1,4 @@
-// The syllabus: nine modules in ACS order (FAA-S-ACS-6C, Private Pilot
+// The syllabus: the modules in ACS order, with the oral last (FAA-S-ACS-6C, Private Pilot
 // Airplane). Written modules carry their lessons; the rest show their planned
 // lessons so the pilot can see the whole course from day one.
 
@@ -12,6 +12,8 @@ import { crossCountryLessons } from './crossCountry';
 import { humanFactorsLessons } from './human';
 import { airspaceLessons } from './airspace';
 import { performanceLessons } from './performance';
+import { airportOpsLessons } from './airportOps';
+import { aeroLessons } from './aero';
 
 export const modules: Module[] = [
   {
@@ -63,7 +65,19 @@ export const modules: Module[] = [
     outline: [],
   },
   {
-    n: 9, title: 'The oral and the flight review', acsAreas: ['I', 'XI'],
+    n: 9, title: 'Airport operations', acsAreas: ['II.D', 'III', 'IV'],
+    summary: 'Signs, runway crossings, the light gun, right of way and wake turbulence: the ground and the pattern, where it gets crowded.',
+    lessons: airportOpsLessons,
+    outline: [],
+  },
+  {
+    n: 10, title: 'Aerodynamics', acsAreas: ['IV', 'V', 'VII'],
+    summary: 'Load factor, maneuvering speed, stalls, spins and ground effect, where they show up: the turn to final, rough air and the ends of the runway.',
+    lessons: aeroLessons,
+    outline: [],
+  },
+  {
+    n: 11, title: 'The oral and the flight review', acsAreas: ['I', 'XI'],
     summary: 'A scenario-based oral across the whole course, and a record your CFI can use for the 61.56 review.',
     lessons: oralLessons,
     outline: [],

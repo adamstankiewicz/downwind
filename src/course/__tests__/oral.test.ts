@@ -56,7 +56,7 @@ describe('calendar rules', () => {
   });
 });
 
-describe('module 9 checks', () => {
+describe('module 11 checks', () => {
   const plane = oralAirplane(sampleC172K);
   const trip = { climbMin: 8, cruiseMin: 40, night: false };
 
@@ -131,7 +131,7 @@ describe('module 9 checks', () => {
   });
 });
 
-describe.each(contexts)('module 9 lessons: %s', (_name, ctx) => {
+describe.each(contexts)('module 11 lessons: %s', (_name, ctx) => {
   it.each(oralLessons.map((l) => [l.id, l] as const))('%s builds valid steps', (_id, lesson) => {
     const steps = lesson.build(ctx);
     expect(steps.length).toBeGreaterThan(3);
@@ -163,9 +163,9 @@ describe.each(contexts)('module 9 lessons: %s', (_name, ctx) => {
   });
 });
 
-describe('module 9 teaches what it says', () => {
+describe('module 11 teaches what it says', () => {
   for (const [name, ctx] of contexts) {
-    it(`9.1 needs one more landing, keeps the gear to the placard, and leaves before the rain (${name})`, () => {
+    it(`11.1 needs one more landing, keeps the gear to the placard, and leaves before the rain (${name})`, () => {
       const steps = oralLessons[0].build(ctx);
       expect(blank(steps, 't1', 'count').answer).toBe(2);
       expect(blank(steps, 't1', 'current').answer).toBe('No');
@@ -185,7 +185,7 @@ describe('module 9 teaches what it says', () => {
       expect(decide(steps, 'd2').grades).toMatchObject({ 'leave-now': 'best', 'leave-late': 'unsafe', 'under-it': 'unsafe', stay: 'acceptable' });
     });
 
-    it(`9.2 lapses the ELT, logs the bulb, grounds the gauge, and leaves uphill into the wind (${name})`, () => {
+    it(`11.2 lapses the ELT, logs the bulb, grounds the gauge, and leaves uphill into the wind (${name})`, () => {
       const steps = oralLessons[1].build(ctx);
       const dates = inspectionDates(ctx.now);
       expect(dates.annualStatus.current).toBe(true);
@@ -201,7 +201,7 @@ describe('module 9 teaches what it says', () => {
       expect(decide(steps, 'd3').grades).toMatchObject({ 'up-wind': 'best', 'down-slope': 'marginal', 'wait-dry': 'marginal', 'leave-it': 'acceptable' });
     });
 
-    it(`9.3 counts the review to month end (${name})`, () => {
+    it(`11.3 counts the review to month end (${name})`, () => {
       const steps = oralLessons[2].build(ctx);
       const ex = exampleReview(ctx.now);
       expect(ex.status.current).toBe(true);
@@ -212,7 +212,7 @@ describe('module 9 teaches what it says', () => {
     });
   }
 
-  it('scores a full run of 9.1 by the worst decision', () => {
+  it('scores a full run of 11.1 by the worst decision', () => {
     const ctx = contexts[0][1];
     const steps = oralLessons[0].build(ctx);
     const answers = { blanks: {}, decisions: { d1: { choice: 'trim-bags' }, d2: { choice: 'leave-late' } } };
@@ -220,9 +220,9 @@ describe('module 9 teaches what it says', () => {
     expect(scoreLesson(steps, { blanks: {}, decisions: { d1: { choice: 'trim-bags' }, d2: { choice: 'leave-now' } } }).grade).toBe('best');
   });
 
-  it('writes module 9 with no outline left', () => {
-    const m = modules.find((x) => x.n === 9)!;
-    expect(m.lessons.map((l) => l.id)).toEqual(['9.1', '9.2', '9.3']);
+  it('writes module 11 with no outline left', () => {
+    const m = modules.find((x) => x.n === 11)!;
+    expect(m.lessons.map((l) => l.id)).toEqual(['11.1', '11.2', '11.3']);
     expect(m.outline).toEqual([]);
   });
 });
@@ -246,7 +246,7 @@ describe('flight review summary', () => {
       { id: '2', filedAt: NOW.toISOString(), station: 'KXYZ', source: 'sample' as const, departure: NOW.toISOString(), choice: 'cancel' as const, grade: 'best' as const, readingsRight: 1, readingsTotal: 1,
         findings: [{ title: 'Crosswind above your personal minimum', severity: 'personal' as const }] },
     ];
-    const s = reviewSummary({ '2.1': done('best'), '2.2': done('unsafe'), '9.1': done('marginal') }, log, '2024-10-03', NOW);
+    const s = reviewSummary({ '2.1': done('best'), '2.2': done('unsafe'), '11.1': done('marginal') }, log, '2024-10-03', NOW);
     expect(s.review?.daysLeft).toBe(7);
     expect(s.lessonsFlown).toBe(3);
     expect(s.modules.find((m) => m.n === 2)!.toRefly.map((r) => r.id)).toEqual(['2.2']);

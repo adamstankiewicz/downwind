@@ -5,7 +5,7 @@ import type { Grade } from '../scenarios/goNoGo';
 import { allLessons, modules } from './modules';
 import type { Blank, Coach, DialValues, Lesson, Module, OptionId, Step } from './types';
 
-export const COURSE_KEY = 'downwind.course.v1';
+export const COURSE_KEY = 'downwind.course.v2';
 
 export type Lcg = 'Explain' | 'Practice' | 'Perform' | 'Manage/Decide';
 

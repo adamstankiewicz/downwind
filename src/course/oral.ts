@@ -1,4 +1,4 @@
-// Module 9, the oral and the flight review. Two mock orals the way an
+// Module 11, the oral and the flight review. Two mock orals the way an
 // examiner runs them, one scenario that pulls in every area, then the record
 // a pilot takes to a 61.56 review. The trip flies on the practice sectional;
 // the airplane is the pilot's own when its numbers are in, the sample trainer
@@ -99,7 +99,7 @@ export function weekendTrip(ctx: LessonContext) {
   return { plane, home, dest, pts, mef, magCourse, legal, cruiseMsl, log, climbFpm, climbMin, trip, load, full, loading, fit, bags, destCls: destPos.cls };
 }
 
-/** 9.1 d1 with a placarded baggage area: two limits, and only one of them trades with fuel. */
+/** 11.1 d1 with a placarded baggage area: two limits, and only one of them trades with fuel. */
 function bagDecision(t: ReturnType<typeof weekendTrip>, note: string): Step {
   const { plane, dest, load, full, fit } = t;
   const bags = t.bags!;
@@ -131,7 +131,7 @@ function bagDecision(t: ReturnType<typeof weekendTrip>, note: string): Step {
 }
 
 const weekendOral: Lesson = {
-  id: '9.1', module: 9, minutes: 30,
+  id: '11.1', module: 11, minutes: 30,
   title: 'Mock oral: a weekend trip',
   summary: 'An examiner hands you a weekend trip with three friends and asks you to plan it out loud: currency, route, fuel, airspace, loading and the weather home.',
   acs: ['PA.I.A', 'PA.I.C', 'PA.I.D', 'PA.I.E', 'PA.I.F'],
@@ -380,7 +380,7 @@ export function grassStrip(ctx: LessonContext) {
 }
 
 const airplaneOral: Lesson = {
-  id: '9.2', module: 9, minutes: 25,
+  id: '11.2', module: 11, minutes: 25,
   title: 'Mock oral: the airplane',
   summary: 'The examiner walks around your airplane: the documents, the inspections, a burnt-out bulb you may fix yourself, a gauge you may not, and which way to leave a wet, sloping grass strip.',
   acs: ['PA.I.B', 'PA.I.F', 'PA.I.G'],
@@ -493,7 +493,7 @@ const airplaneOral: Lesson = {
   },
 };
 
-// ---------------------------------------------------------------- 9.3
+// ---------------------------------------------------------------- 11.3
 
 /** A review signed on the 3rd, 24 months back from this month: still good, but only through month end. */
 export function exampleReview(now: Date) {
@@ -503,7 +503,7 @@ export function exampleReview(now: Date) {
 }
 
 const reviewLesson: Lesson = {
-  id: '9.3', module: 9, minutes: 12,
+  id: '11.3', module: 11, minutes: 12,
   title: 'Your flight review summary',
   summary: 'What 61.56 asks for, when yours runs out, what to do when it has, and the record to bring your CFI.',
   acs: ['PA.I.A'],

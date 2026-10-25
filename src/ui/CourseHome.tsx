@@ -1,4 +1,4 @@
-// Course home: where you are in the nine modules, the next lesson introduced
+// Course home: where you are in the modules, the next lesson introduced
 // in the instructor's voice, today's real conditions as a standing flight,
 // lessons worth flying again, and the whole syllabus as a taxiway: a yellow
 // centerline from module sign to module sign, with a hoop for every lesson.
@@ -23,7 +23,7 @@ export function CourseHome({ progress, airport, hasAircraft, onStart, onDaily, o
   const next = nextLesson(progress);
   const refly = toRefly(progress).filter((l) => l.id !== next?.id);
   const total = courseProgress(progress);
-  const currentModule = next ? next.module : modules.find((m) => moduleProgress(progress, m).done < moduleProgress(progress, m).total)?.n ?? 9;
+  const currentModule = next ? next.module : modules.find((m) => moduleProgress(progress, m).done < moduleProgress(progress, m).total)?.n ?? modules[modules.length - 1].n;
   const points = modules.map((m) => {
     const p = moduleProgress(progress, m);
     const state = m.lessons.length > 0 && p.done === p.total ? 'done' : m.n === currentModule ? 'now' : 'todo';
@@ -36,7 +36,7 @@ export function CourseHome({ progress, airport, hasAircraft, onStart, onDaily, o
       <div className="strip-head">
         <div className="strip-title">
           <h1>Ground school</h1>
-          <span className="muted">{total.done} of {total.total} lessons flown. Module {currentModule} of 9.</span>
+          <span className="muted">{total.done} of {total.total} lessons flown. Module {currentModule} of {modules.length}.</span>
         </div>
         <Strip points={points} label="Modules" />
       </div>
