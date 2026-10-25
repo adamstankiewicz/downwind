@@ -9,9 +9,11 @@
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc -b",
-    "smoke": "node e2e/smoke.mjs"
+    "smoke": "node e2e/smoke.mjs",
+    "check-docs": "CHECK_DOCS=1 vitest run src/refs/__tests__/docs.live.test.ts"
   },
   "dependencies": {
+    "pdfjs-dist": "^4.10.38",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "ts-fsrs": "^5.2.1"

@@ -14,6 +14,7 @@ import { GRADE_LABEL } from './common';
 import { Figure } from './Figure';
 import { Strip, type StripPoint } from './Strip';
 import { Rich } from './text';
+import { RefChips } from '../refs/RefViewer';
 
 const KEYS = ['A', 'B', 'C', 'D'];
 const KIND_LABEL: Record<Step['kind'], string> = { brief: 'Brief', example: 'Worked example', turn: 'Your turn', decide: 'Decide' };
@@ -308,7 +309,7 @@ function Debrief({ lesson, steps, answers, result, progress, onAgain, onNext, on
         <h2>Standards and references</h2>
         <div className="refs">
           {lesson.acs.map((a) => <span key={a} className="chip acs">{a}</span>)}
-          {lesson.refs.map((r) => <span key={r} className="chip">{r}</span>)}
+          <RefChips refs={lesson.refs} />
         </div>
       </section>
 

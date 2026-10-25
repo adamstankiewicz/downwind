@@ -6,6 +6,7 @@
 // the course home, lesson 2.1 end to end, the start of 2.2, the daily flight
 // through filing, and every rail screen, at desktop and phone widths.
 import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
 
 // Plain require so a globally installed Playwright (NODE_PATH) also works.
 const { chromium } = createRequire(import.meta.url)('playwright');
@@ -14,6 +15,8 @@ const BASE = process.argv[2] ?? 'http://localhost:4173';
 const METAR = 'METAR KPSM 241656Z 32008KT 10SM FEW045 16/02 A3008 RMK AO2';
 const TAF = 'TAF KPSM 241720Z 2418/2518 32010KT P6SM FEW050 FM250000 VRB03KT P6SM SKC';
 const AIRPORT = [{ icaoId: 'KPSM', name: 'PORTSMOUTH INTL AT PEASE', state: 'NH', elev: 30, magdec: '15W', runways: [{ id: '16/34', alignment: '160' }] }];
+
+const HANDBOOK = readFileSync(new URL('./fixtures/handbook.pdf', import.meta.url));
 
 const failures = [];
 const check = (ok, msg) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${msg}`); if (!ok) failures.push(msg); };
@@ -27,6 +30,8 @@ async function open(viewport, live) {
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource|net::ERR/.test(m.text())) errors.push(m.text()); });
   await page.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
+  // Every handbook request gets the same small test PDF.
+  await page.route('**/api/docs/**', (r) => r.fulfill({ contentType: 'application/pdf', body: HANDBOOK }));
   await page.route('**/api/awc/**', (r) => {
     if (!live) return r.fulfill({ status: 500, body: 'down' });
     const u = new URL(r.request().url());
@@ -119,10 +124,25 @@ async function run(viewport, live) {
   body = await main();
   check(/Manage\/Decide/.test(body), `${label} debrief shows the LCG level`);
   check(/2 of 3/.test(body), `${label} debrief counts blanks right`);
-  check(/PA\.I\.C/.test(body) && /FAA-H-8083-28/.test(body), `${label} debrief shows ACS code and reference`);
+  check(/PA\.I\.C/.test(body) && /Aviation Weather Handbook, METAR/.test(body), `${label} debrief shows ACS code and reference`);
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('downwind.course.v1') ?? '{}'));
   check(stored['2.1']?.attempts === 1 && stored['2.1']?.lastGrade === 'best', `${label} lesson 2.1 recorded in course progress`);
   await noHScroll('lesson debrief');
+
+  // References: regulations and the AIM link out; a handbook opens in the viewer at the passage.
+  const aimHref = await page.getByRole('link', { name: /AIM 7-1/ }).first().getAttribute('href');
+  check(/aim_html\/chap7_section_1\.html$/.test(aimHref ?? ''), `${label} AIM reference links to its section`);
+  await page.getByRole('button', { name: 'Aviation Weather Handbook, METAR' }).click();
+  const viewer = page.getByRole('dialog', { name: 'Aviation Weather Handbook' });
+  await viewer.waitFor();
+  await viewer.locator('.textLayer .hit').first().waitFor({ timeout: 15000 });
+  check(/Page 3 of 3/.test(await viewer.innerText()), `${label} viewer skips the contents page and opens at the passage`);
+  check((await viewer.locator('canvas').count()) === 1, `${label} viewer renders the page`);
+  check(/FAA-H-8083-28B/.test(await viewer.innerText()), `${label} viewer names the edition`);
+  await noHScroll('handbook viewer');
+  await page.keyboard.press('Escape');
+  await viewer.waitFor({ state: 'detached' });
+  check(await page.getByRole('button', { name: 'Aviation Weather Handbook, METAR' }).evaluate((el) => el === document.activeElement), `${label} closing the viewer returns focus to the reference`);
 
   // Start 2.2 from the debrief
   await page.getByRole('button', { name: /^Next lesson: 2\.2/ }).click();

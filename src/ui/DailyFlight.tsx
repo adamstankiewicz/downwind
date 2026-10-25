@@ -17,6 +17,7 @@ import { TafTimeline } from './TafTimeline';
 import { Strip, type StripPoint } from './Strip';
 import { Rich } from './text';
 import { fmtZ, nextWholeHour, templateLabel, toLocalInput, wbFor, type Loading } from './state';
+import { RefChips } from '../refs/RefViewer';
 
 const KEYS = ['A', 'B', 'C', 'D'];
 
@@ -399,7 +400,7 @@ function FindingRow({ f, note, taughtBy, covered }: { f: Finding; note: boolean;
           <p className="voice">{f.detail} {covered ? `You did this in ${taughtBy}.` : `${taughtBy} teaches this; it is marked here anyway, because safety does not wait for the syllabus.`}</p>
           <div className="refs">
             {f.acs.map((a) => <span key={a} className="chip acs">{a}</span>)}
-            {f.refs.map((r) => <span key={r} className="chip">{r}</span>)}
+            <RefChips refs={f.refs} />
           </div>
         </>
       )}

@@ -1,10 +1,11 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { DOCS } from './src/refs/catalog';
 
-// In development, /api/awc/* is proxied to aviationweather.gov so the browser
-// never has to deal with CORS. In production the same path is served by the
-// edge worker in /worker.
+// In development, /api/awc/* is proxied to aviationweather.gov and
+// /api/docs/<id> to the FAA handbook PDFs, so the browser never has to deal
+// with CORS. In production the same paths are served by the edge worker in /worker.
 export default defineConfig({
   plugins: [
     react(),
@@ -25,11 +26,19 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // .mjs too, so the PDF viewer's worker is on the device before the first handbook opens.
+        globPatterns: ['**/*.{js,mjs,css,html,svg,png}'],
         runtimeCaching: [
           {
             urlPattern: ({ url }) => url.pathname.startsWith('/api/awc/'),
             handler: 'NetworkFirst',
             options: { cacheName: 'weather', expiration: { maxAgeSeconds: 6 * 60 * 60 } },
+          },
+          {
+            // A handbook opened once stays readable offline.
+            urlPattern: ({ url }) => url.pathname.startsWith('/api/docs/'),
+            handler: 'CacheFirst',
+            options: { cacheName: 'handbooks', expiration: { maxEntries: 20 }, cacheableResponse: { statuses: [200] } },
           },
         ],
       },
@@ -41,6 +50,11 @@ export default defineConfig({
         target: 'https://aviationweather.gov',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/awc/, '/api/data'),
+      },
+      '/api/docs': {
+        target: 'https://www.faa.gov',
+        changeOrigin: true,
+        rewrite: (path) => DOCS[path.replace(/^\/api\/docs\//, '')]?.path ?? '/404',
       },
     },
   },
