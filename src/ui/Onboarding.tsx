@@ -8,7 +8,7 @@ import type { PilotProfile } from '../data/pilot';
 import { lookupAirport, manualAirport, normalizeIdent } from '../lib/airportLookup';
 import { fetchWeather, type WeatherBundle } from '../lib/weather';
 import type { RunwayEnd } from '../lib/wind';
-import { Card, Field, Mark, Notice, NumInput } from './common';
+import { Card, Field, Mark, Notice, NumInput, Voice } from './common';
 import { RawReport } from './MetarBlock';
 import { flightReviewDue, type OnboardingState } from './state';
 
@@ -405,7 +405,7 @@ function DoneStep({ airport, aircraft, pilot, onBack, onFinish }: { airport: Air
       {aircraft.sampleValues && (
         <Notice label="Sample airplane">Weight and balance and crosswind results are practice only until you enter your POH numbers under Tools, Airplane.</Notice>
       )}
-      <p className="voice">{airport && airport.runways.length ? `Lessons will fly from ${airport.icao} with your runways and minimums.` : 'Without a home field with runways, lessons fly from a practice field and say so. You can add one any time.'} The first lesson is a METAR read before you drive out.</p>
+      <Voice>{airport && airport.runways.length ? `Lessons will fly from ${airport.icao} with your runways and minimums.` : 'Without a home field with runways, lessons fly from a practice field and say so. You can add one any time.'} The first lesson is a METAR read before you drive out.</Voice>
       <StepNav onBack={onBack} onNext={onFinish} nextLabel="Start the course" />
     </div>
   );

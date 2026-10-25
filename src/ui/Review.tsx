@@ -151,8 +151,8 @@ export function Review() {
 export function EmptyGlyph() {
   return (
     <svg viewBox="0 0 96 96" aria-hidden="true">
-      <circle cx="48" cy="48" r="40" fill="var(--chart)" stroke="var(--rule)" />
-      <circle cx="48" cy="48" r="26" fill="none" stroke="var(--classb)" strokeWidth="2" strokeDasharray="6 4" />
+      <circle cx="48" cy="48" r="40" fill="var(--apron)" stroke="var(--line)" />
+      <circle cx="48" cy="48" r="26" fill="none" stroke="var(--sky-ink)" strokeWidth="2" strokeDasharray="6 4" />
       <g transform="translate(48 48)">
         <rect x="-4" y="-18" width="8" height="36" fill="var(--ink)" transform="rotate(-35)" />
       </g>

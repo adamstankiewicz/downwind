@@ -105,7 +105,7 @@ export function Airplane({ aircraft, setAircraft, loading, setLoading }: {
                           )}
                           <div className="muted" style={{ fontSize: '0.72rem' }}>{isFuel ? `gal × ${FUEL_LB_PER_GAL}` : 'lb'}</div>
                         </td>
-                        <td className="num" style={over ? { color: 'var(--ifr)' } : undefined}>{lb.toLocaleString()}</td>
+                        <td className="num" style={over ? { color: 'var(--unsafe)' } : undefined}>{lb.toLocaleString()}</td>
                         <td className="num">{Math.round(lb * s.armIn).toLocaleString()}</td>
                       </tr>
                     );
@@ -114,7 +114,7 @@ export function Airplane({ aircraft, setAircraft, loading, setLoading }: {
                     <td>Total</td>
                     <td className="num">{wb.cgIn}</td>
                     <td className="num"></td>
-                    <td className="num" style={wb.overGross ? { color: 'var(--ifr)' } : undefined}>{wb.totalLb.toLocaleString()}</td>
+                    <td className="num" style={wb.overGross ? { color: 'var(--unsafe)' } : undefined}>{wb.totalLb.toLocaleString()}</td>
                     <td className="num">{wb.momentLbIn.toLocaleString()}</td>
                   </tr>
                 </tbody>

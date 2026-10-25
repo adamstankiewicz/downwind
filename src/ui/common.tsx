@@ -71,7 +71,7 @@ export const SEVERITY_LABEL: Record<Severity, string> = {
 
 export const GRADE_LABEL: Record<Grade, string> = {
   best: 'Best call',
-  acceptable: 'Acceptable',
+  acceptable: 'Sound',
   marginal: 'Marginal',
   unsafe: 'Unsafe',
 };
@@ -106,19 +106,30 @@ export function NumInput({ value, onChange, step = 1, min, max, ariaLabel, class
   );
 }
 
-/** The app mark: the sectional chart's non-towered airport symbol, in chart
- *  magenta, with the runway drawn in. Colors come from the theme tokens so it
- *  sits on light and dark paper alike. */
+/** The windsock mark: three sock-orange bands and an ink hoop. The bands are
+ *  always sock; the hoop follows the theme's ink so the mark sits on Day and
+ *  Night surfaces alike. Never recoloured, never set on sock or taxi. */
 export function Mark() {
   return (
-    <svg viewBox="0 0 64 64" aria-hidden="true">
-      <circle cx="32" cy="32" r="19" fill="none" stroke="var(--brand)" strokeWidth="3.2" />
-      <g stroke="var(--brand)" strokeWidth="2.2" strokeLinecap="round">
-        <path d="M32 4 V9" /><path d="M32 55 V60" /><path d="M4 32 H9" /><path d="M55 32 H60" />
+    <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+      <g fill="var(--sock)">
+        <path d="M12 17 L13.5 17.23 L14.98 17.49 L16.47 17.76 L17.95 18.05 L19.42 18.36 L20.88 18.69 L22.34 19.03 L23.79 19.4 L25.24 19.78 L26.68 20.18 L24.2 39.54 L22.95 39.62 L21.71 39.71 L20.47 39.81 L19.25 39.94 L18.02 40.07 L16.81 40.23 L15.6 40.4 L14.39 40.58 L13.19 40.78 L12 41Z" />
+        <path d="M31.78 21.76 L33.14 22.23 L34.5 22.71 L35.85 23.21 L37.19 23.72 L38.53 24.25 L39.86 24.79 L41.19 25.35 L42.51 25.93 L43.83 26.52 L45.14 27.13 L41.26 40.16 L39.98 40.02 L38.7 39.88 L37.43 39.77 L36.17 39.67 L34.91 39.59 L33.66 39.52 L32.41 39.47 L31.17 39.44 L29.93 39.42 L28.7 39.42Z" />
+        <path d="M49.95 29.51 L51.14 30.14 L52.33 30.78 L53.51 31.44 L54.69 32.1 L55.86 32.78 L57.03 33.47 L58.2 34.18 L59.36 34.89 L60.51 35.62 L61.67 36.36 L58.33 43.64 L57.09 43.29 L55.84 42.96 L54.6 42.65 L53.37 42.35 L52.14 42.06 L50.91 41.79 L49.69 41.54 L48.47 41.3 L47.26 41.07 L46.05 40.86Z" />
       </g>
-      <rect x="29" y="14" width="6" height="36" rx="1" fill="var(--ink)" transform="rotate(60 32 32)" />
-      <circle cx="32" cy="32" r="2.2" fill="var(--paper)" />
+      <ellipse cx="12" cy="29" rx="4.5" ry="14" fill="var(--ink)" />
     </svg>
+  );
+}
+
+/** The instructor's voice: the windsock, then the line. `faded` is the
+ *  one-line caption form for a line the pilot has already earned. */
+export function Voice({ children, className, faded }: { children: ReactNode; className?: string; faded?: boolean }) {
+  return (
+    <p className={`voice ${faded ? 'faded' : ''} ${className ?? ''}`}>
+      <span className="voice-m" aria-hidden="true"><Mark /></span>
+      <span className="voice-t">{children}</span>
+    </p>
   );
 }
 
