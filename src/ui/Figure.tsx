@@ -31,6 +31,7 @@ export function Figure({ figure, practiceField }: { figure: FigureModel; practic
       </figure>
     );
   }
+  if (figure.kind !== 'wind') return null; // chart, perf, navlog and glide figures: see the course engine PR
   const { airport, windMag, speedKt, gustKt, runwayId } = figure;
   const runway = airport.runways.find((r) => r.id === runwayId) ?? airport.runways[0];
   const wind = { dirTrue: norm(windMag + airport.magneticVariationDeg) || 360, speedKt, gustKt, variable: false, rangeTrue: null };

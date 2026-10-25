@@ -1,4 +1,5 @@
 import type { Envelope, Station } from '../lib/wb';
+import { sampleTrainerPerformance, type Performance } from '../lib/perf';
 
 export interface AircraftProfile {
   id: string;
@@ -12,6 +13,8 @@ export interface AircraftProfile {
   demonstratedCrosswindKt: number;
   stations: Station[];
   envelope: Envelope;
+  /** POH performance charts. Lessons fall back to labeled sample charts without them. */
+  performance?: Performance;
   /**
    * True until the owner replaces the sample numbers with values from their
    * own POH and weight and balance record. The UI says so on every screen
@@ -74,6 +77,7 @@ export const sampleC172K: AircraftProfile = {
     [47.3, 2300],
     [47.3, 1500],
   ],
+  performance: sampleTrainerPerformance(),
   sampleValues: true,
 };
 
