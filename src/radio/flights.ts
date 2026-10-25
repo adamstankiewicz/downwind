@@ -150,6 +150,7 @@ const NOTICES = [
   'Parachute jumping 10 miles west of the field, surface to 10,000',
   'Read back all runway hold short instructions',
 ];
+const ABBREV: Partial<Record<Compass, string>> = { northeast: 'ne', southeast: 'se', southwest: 'sw', northwest: 'nw' };
 const TRAFFIC = ['a Cherokee', 'a Skylane', 'a Bonanza', 'a Diamond', 'an Archer', 'a Mooney'];
 
 const p2 = (n: number) => String(n).padStart(2, '0');
@@ -711,7 +712,7 @@ function buildArrive(b: Built) {
       T(cs, false, tower.name),
       {
         id: 'where', part: 'where', need: 'must', label: `Where you are: ${nm} miles ${from}`,
-        check: { k: 'all', of: [{ k: 'number', value: String(nm) }, { k: 'phrase', any: [from, `${from} of`] }] },
+        check: { k: 'all', of: [{ k: 'number', value: String(nm) }, { k: 'phrase', any: [from, ...(ABBREV[from] ? [ABBREV[from]] : [])] }] },
         fix: `${cs.sayFull}, ${tower.name}, say position.`,
       },
       { id: 'alt', part: 'where', need: 'should', label: `Your altitude: ${alt.toLocaleString('en-US')}`, check: { k: 'number', value: String(alt) } },

@@ -6,7 +6,8 @@
 // stubbed too: on in the live runs, with no API key in the offline ones. Covers onboarding,
 // the course home, lessons 1.1 and 2.1 to 9.1 end to
 // end, 2.2 through its dials, the daily flight through filing, Trip and its
-// planning lesson, and every rail screen, at desktop and phone widths.
+// planning lesson, every rail screen, and a radio practice flight, at desktop
+// and phone widths.
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 
@@ -741,7 +742,93 @@ async function runSkip() {
   await browser.close();
 }
 
+// Radio practice, a whole flight: the ATIS copy pad, initial calls that leave
+// things out (so the controller's correction shows), readbacks that echo the
+// controller, the decisions, and the debrief. Flights are random, so the loop
+// reads each step from the page.
+async function runRadio(viewport) {
+  const label = `[radio ${viewport.width}px]`;
+  const { browser, page, errors } = await open(viewport, false);
+  const btn = (name) => page.getByRole('button', { name, exact: true });
+  const main = () => page.locator('main').innerText();
+  const noHScroll = async (where) => {
+    const w = await page.evaluate(() => document.documentElement.scrollWidth);
+    check(w <= viewport.width, `${label} no horizontal scroll on ${where} (${w}px)`);
+  };
+  await page.goto(BASE);
+  await btn('Skip setup for now').click();
+  await page.getByRole('heading', { name: 'Ground school', exact: true }).waitFor();
+  await page.getByRole('button', { name: /Radio practice at the practice field/ }).click();
+  await page.getByRole('heading', { name: 'Radio practice', exact: true }).waitFor();
+  let body = await main();
+  check(/not a real airport/i.test(body) && /52XY/.test(body), `${label} radio home says practice field and practice tail`);
+  check(!/KASH|Nashua|KPSM/.test(body), `${label} radio home assumes no real airport`);
+  check((await page.getByRole('button', { name: /microphone|speak|record/i }).count()) === 0, `${label} no microphone control`);
+  await noHScroll('radio home');
+  await page.getByRole('button', { name: /Pattern work/ }).first().click();
+
+  let fixes = 0;
+  let echoes = 0;
+  let echoClean = 0;
+  let steps = 0;
+  let noLeak = true;
+  for (; steps < 40; steps++) {
+    if (await page.getByRole('heading', { name: 'Debrief', exact: true }).isVisible()) break;
+    const call = page.getByLabel('Your call');
+    if (await btn('Check my copy').isVisible()) {
+      await page.getByLabel('Information', { exact: true }).fill('Delta');
+      await page.getByLabel('Wind', { exact: true }).fill('240 at 8');
+      await page.getByLabel('Altimeter', { exact: true }).fill('29.92');
+      await btn('24').click();
+      await btn('Check my copy').click();
+      if (steps === 0) await noHScroll('ATIS');
+    } else if (await call.isVisible()) {
+      noLeak &&= !(await page.locator('.gradechip').count());
+      const atc = page.locator('.tape > .xmit.atc .say').first();
+      if (await atc.count()) {
+        const said = (await atc.innerText()).replace(/^November 2XY,\s*/, '').replace(/\.$/, '');
+        await call.fill(`${said}, November 2XY`);
+        await btn('Transmit').click();
+        echoes++;
+        if (!(await call.isVisible())) echoClean++;
+      } else {
+        await call.fill('November 52XY');
+        await call.press('Enter');
+        if (await call.isVisible()) {
+          fixes++;
+          if (fixes === 1) await noHScroll('controller correction');
+          await call.fill('November 52XY');
+          await btn('Transmit').click();
+        }
+      }
+      check(await page.getByText('A good call').first().isVisible(), `${label} step ${steps}: a good call shown after transmitting`);
+    } else if (await btn('Commit').isVisible()) {
+      await page.locator('.choices .choice').first().click();
+      await btn('Commit').click();
+    }
+    const next = (await btn('Debrief').isVisible()) ? btn('Debrief') : btn('Continue');
+    await next.click();
+  }
+  check(steps > 8, `${label} a pattern flight has more than eight steps (${steps})`);
+  check(fixes > 0, `${label} an incomplete call gets the controller's correction (${fixes})`);
+  check(echoes > 3 && echoClean === echoes, `${label} reading back the controller's words is accepted every time (${echoClean} of ${echoes})`);
+  check(noLeak, `${label} no grade shown before a call is transmitted`);
+  await page.getByRole('heading', { name: 'Debrief', exact: true }).waitFor();
+  body = await main();
+  check(/AIM 4-3-18/.test(body) && /PA\.III\.A/.test(body), `${label} debrief cites the AIM and the ACS`);
+  const log = await page.evaluate(() => JSON.parse(localStorage.getItem('downwind.radio.v1') ?? '[]'));
+  check(log.length === 1 && log[0].mission === 'pattern', `${label} flight recorded in the radio log`);
+  await noHScroll('radio debrief');
+  await btn('New flight').click();
+  check(await btn('Check my copy').isVisible(), `${label} a new flight starts at the ATIS`);
+  check(errors.length === 0, `${label} no console or page errors${errors.length ? ': ' + errors.join(' | ') : ''}`);
+  await browser.close();
+}
+
 try { await runSkip(); } catch (e) { check(false, `[skip setup] crashed: ${e.message.split('\n')[0]}`); }
+for (const vp of [{ width: 1280, height: 860 }, { width: 390, height: 844 }]) {
+  try { await runRadio(vp); } catch (e) { check(false, `[radio ${vp.width}px] crashed: ${e.message.split('\n')[0]}`); }
+}
 for (const vp of [{ width: 1280, height: 860 }, { width: 390, height: 844 }]) {
   for (const live of [true, false]) {
     try { await run(vp, live); } catch (e) { check(false, `[${vp.width}px ${live ? 'live' : 'offline'}] crashed: ${e.message.split('\n')[0]}`); }

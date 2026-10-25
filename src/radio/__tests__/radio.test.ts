@@ -179,3 +179,58 @@ describe('grading what pilots actually say', () => {
     expect(r.fix).toMatch(/is current/);
   });
 });
+
+describe('scoring a radio flight', () => {
+  it('grades a call on the first try, and allows one more after a correction', async () => {
+    const { emptyRadioAnswers, eventDone, scoreRadio, transmitState } = await import('../session');
+    const f = flightWith('pattern', (x) => !find(x, 'taxi-readback')!.atc!.includes('cross'));
+    const e = find(f, 'taxi-readback')!;
+    const bad = `Runway ${f.atis.runway}, ${f.callsign.sayShort}`;
+    expect(transmitState(f, e, [bad])).toBe('retry');
+    expect(transmitState(f, e, [bad, bad])).toBe('done');
+    expect(transmitState(f, e, [bad, e.model])).toBe('done');
+    const a = emptyRadioAnswers();
+    a.calls[e.id] = [bad, e.model];
+    expect(eventDone(f, e, a)).toBe(true);
+    const s = scoreRadio(f, a);
+    expect(s.calls).toHaveLength(1);
+    expect(s.calls[0]).toMatchObject({ grade: 'marginal', tries: 2 });
+    expect(s.calls[0].last.grade).toBe('best');
+    expect(s.grade).toBe('marginal');
+  });
+
+  it('a flight flown with the model calls and the best decisions grades best', async () => {
+    const { emptyRadioAnswers, scoreRadio } = await import('../session');
+    for (const m of MISSIONS) {
+      const f = buildRadioFlight(m.id, 42, owned, NOW);
+      const a = emptyRadioAnswers();
+      for (const e of f.events) {
+        if (e.kind === 'transmit') a.calls[e.id] = [e.model];
+        if (e.kind === 'decide') a.decisions[e.id] = Object.entries(e.grades).find(([, g]) => g === 'best')![0];
+        if (e.kind === 'atis') for (const x of e.fields) a.copy[x.id] = x.answer;
+      }
+      const s = scoreRadio(f, a);
+      expect(s.grade).toBe('best');
+      expect(s.copyRight).toBe(s.copyTotal);
+      expect(s.clean).toBe(s.calls.length);
+    }
+  });
+});
+
+describe('the way pilots really type', () => {
+  const f = flightWith('pattern', (x) => x.ramp.id === 'main' && x.atis.runway === '24' && !find(x, 'taxi-readback')!.atc!.includes('cross'));
+  const g = (id: string, text: string) => gradeCall(text, find(f, id)!.items, f.callsign);
+  it('reads shorthand readbacks', () => {
+    expect(g('taxi-readback', '24 via alpha, hold short 24 at alpha 4, 2xy').grade).toBe('best');
+    expect(g('taxi-readback', 'Hold short of runway two four at Alpha four, via Alpha, November two X-ray Yankee').grade).toBe('best');
+    expect(g('taxi-readback', 'rwy 24 via A hold short @ A4 N2XY').grade).toBe('best');
+  });
+  it('reads a ready call that names the spot instead of saying holding short', () => {
+    expect(g('tower-ready', `Practice Tower, N52XY, at Alpha 4 for runway 24, ready for take-off, closed traffic`).grade).toBe('best');
+  });
+  it('flags a taxiway that was not in the clearance', () => {
+    const r = g('taxi-readback', 'Runway 24 via Bravo, hold short 24 at Alpha 4, 2XY');
+    expect(r.items.find((x) => x.item.id === 'route')!.outcome).toBe('wrong');
+    expect(r.grade).toBe('marginal');
+  });
+});
