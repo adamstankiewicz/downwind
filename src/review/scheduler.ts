@@ -7,6 +7,7 @@
 
 import { createEmptyCard, fsrs, Rating, type Card, type Grade } from 'ts-fsrs';
 import { reviewItems, type ReviewItem } from './items';
+import { parseLessonCard, lessonCardId, type StepOutcome } from './lessonCards';
 import { load, save } from '../lib/storage';
 
 const KEY = 'downwind.review.v1';
@@ -54,14 +55,45 @@ export function ratingFor(s: AnswerSignal): Grade {
 
 export const wordsIn = (item: ReviewItem) => [item.prompt, ...item.options].join(' ').split(/\s+/).length;
 
-/** Items due now, oldest due first, then new items. */
-export function dueItems(now = new Date(), limit = 10): ReviewItem[] {
+/** A card in a review session: a question from the bank, or a step from a lesson already flown. */
+export type DueCard = { kind: 'bank'; id: string; item: ReviewItem } | { kind: 'lesson'; id: string };
+
+/**
+ * Cards due now, oldest due first, then bank items never seen. Lesson cards
+ * join the deck when their lesson is flown (enrollLesson), so they are never "new" here.
+ */
+export function dueCards(now = new Date(), limit = 10): DueCard[] {
   const s = read();
-  const due = reviewItems
-    .filter((i) => s.cards[i.id] && s.cards[i.id].due <= now)
-    .sort((a, b) => +s.cards[a.id].due - +s.cards[b.id].due);
-  const fresh = reviewItems.filter((i) => !s.cards[i.id]);
+  const bank = new Map(reviewItems.map((i) => [i.id, i]));
+  const toCard = (id: string): DueCard | null => {
+    const item = bank.get(id);
+    if (item) return { kind: 'bank', id, item };
+    return parseLessonCard(id) ? { kind: 'lesson', id } : null;
+  };
+  const due = Object.keys(s.cards)
+    .filter((id) => s.cards[id].due <= now)
+    .sort((a, b) => +s.cards[a].due - +s.cards[b].due)
+    .map(toCard)
+    .filter((c): c is DueCard => c !== null);
+  const fresh = reviewItems.filter((i) => !s.cards[i.id]).map((item): DueCard => ({ kind: 'bank', id: item.id, item }));
   return [...due, ...fresh].slice(0, limit);
+}
+
+/** Bank items due now, oldest due first, then new items. */
+export function dueItems(now = new Date(), limit = 10): ReviewItem[] {
+  return dueCards(now, Infinity)
+    .flatMap((c) => (c.kind === 'bank' ? [c.item] : []))
+    .slice(0, limit);
+}
+
+/**
+ * Put a finished lesson's decisions and worked numbers into the deck, rated
+ * from how they went in the lesson. Flying the lesson again counts as a review.
+ */
+export function enrollLesson(lessonId: string, outcomes: StepOutcome[], now = new Date()): void {
+  for (const o of outcomes) {
+    recordAnswer(lessonCardId(lessonId, o.stepId), { correct: o.correct, usedHelp: o.partial, unsafe: o.unsafe, seconds: 10, words: 0 }, now);
+  }
 }
 
 export function recordAnswer(itemId: string, signal: AnswerSignal, now = new Date()): Card {
@@ -85,15 +117,20 @@ export function masteryByTask(): TaskMastery[] {
   const s = read();
   const byTask = new Map<string, { w: number; c: number; n: number }>();
   const items = new Map(reviewItems.map((i) => [i.id, i]));
+  const tasksOf = (id: string): string[] => {
+    const item = items.get(id);
+    if (item) return [item.acs];
+    return parseLessonCard(id)?.lesson.acs ?? [];
+  };
   s.history.forEach((h, idx) => {
-    const item = items.get(h.id);
-    if (!item) return;
     const weight = 0.5 + (idx + 1) / s.history.length / 2;
-    const t = byTask.get(item.acs) ?? { w: 0, c: 0, n: 0 };
-    t.w += weight;
-    if (h.correct) t.c += weight;
-    t.n++;
-    byTask.set(item.acs, t);
+    for (const acs of tasksOf(h.id)) {
+      const t = byTask.get(acs) ?? { w: 0, c: 0, n: 0 };
+      t.w += weight;
+      if (h.correct) t.c += weight;
+      t.n++;
+      byTask.set(acs, t);
+    }
   });
   return [...byTask.entries()]
     .map(([acs, t]) => ({ acs, answered: t.n, correctRate: t.c / t.w }))

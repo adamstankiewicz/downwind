@@ -12,10 +12,11 @@ import { Icons, Notice } from './common';
 import { MetarLegend, RawReport } from './MetarBlock';
 import { Review } from './Review';
 import type { Loading } from './state';
+import type { LessonContext } from '../course/types';
 
 export type Tool = 'airplane' | 'weather' | 'chart' | 'review';
 
-export function Tools({ tool, setTool, airport, aircraft, setAircraft, loading, setLoading, epoch, onSetup }: {
+export function Tools({ tool, setTool, airport, aircraft, setAircraft, loading, setLoading, epoch, onSetup, ctx }: {
   tool: Tool;
   setTool: (t: Tool) => void;
   airport: Airport | null;
@@ -25,6 +26,8 @@ export function Tools({ tool, setTool, airport, aircraft, setAircraft, loading, 
   setLoading: (l: Loading) => void;
   epoch: number;
   onSetup: () => void;
+  /** For review cards built from lessons. */
+  ctx: LessonContext;
 }) {
   return (
     <>
@@ -50,7 +53,7 @@ export function Tools({ tool, setTool, airport, aircraft, setAircraft, loading, 
         </div>
       ))}
       {tool === 'chart' && <ChartTool aircraft={aircraft} />}
-      {tool === 'review' && <Review key={epoch} />}
+      {tool === 'review' && <Review key={epoch} ctx={ctx} />}
     </>
   );
 }

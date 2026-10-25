@@ -27,6 +27,11 @@ export interface LessonContext {
   now: Date;
   /** The pilot's last flight review (ISO date), when they have entered it. */
   lastFlightReview?: string | null;
+  /**
+   * Which of the lesson's situations to build, from 0 to `variants - 1`
+   * (course/variant.ts picks one the pilot hasn't seen). Missing means 0.
+   */
+  variant?: number;
 }
 
 /** What the instructor says, at two levels. `short` is used once the pilot has the idea. */
@@ -170,6 +175,8 @@ export type Step =
       why: string;
       /** Engine brief behind the grades, when there is one. */
       brief?: Brief;
+      /** Options read as a sequence (altitudes, times), so they are never shuffled. */
+      keepOrder?: boolean;
       showIf?: Condition;
     };
 
@@ -183,6 +190,11 @@ export interface Lesson {
   /** ACS task codes, FAA-S-ACS-6C. Element-level codes come with the ACS import. */
   acs: string[];
   refs: string[];
+  /**
+   * How many different situations `build` can write, chosen by `ctx.variant`.
+   * Step ids stay the same in every situation so review cards can find them.
+   */
+  variants?: number;
   build(ctx: LessonContext): Step[];
 }
 

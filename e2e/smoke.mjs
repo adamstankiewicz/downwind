@@ -488,7 +488,22 @@ async function run(viewport, live) {
   await page.getByRole('tab', { name: 'Weather now' }).click();
   await page.locator('.metar').first().waitFor();
   check(new RegExp(`METAR ${icao}`).test(await main()), `${label} weather tool shows the raw METAR`);
+  // Lessons flown join the deck. Make 2.1's decision due now and the rest later,
+  // so the session opens with it, rebuilt as a fresh situation.
+  await page.evaluate(() => {
+    const s = JSON.parse(localStorage.getItem('downwind.review.v1') ?? '{"cards":{},"history":[]}');
+    for (const id of Object.keys(s.cards)) if (id.startsWith('L:')) s.cards[id].due = id === 'L:2.1:d1' ? '2000-01-01T00:00:00.000Z' : '2999-01-01T00:00:00.000Z';
+    localStorage.setItem('downwind.review.v1', JSON.stringify(s));
+  });
   await page.getByRole('tab', { name: 'Review deck' }).click();
+  await page.getByText(/From lesson 2\.1/).waitFor();
+  check(await page.getByRole('heading', { name: 'Do you drive out?' }).isVisible(), `${label} review deck opens with a lesson decision that is due`);
+  await page.getByRole('group', { name: 'Options' }).getByRole('button').first().click();
+  await btn('Commit').click();
+  check(/PA\.I\.C/.test(await main()), `${label} lesson card graded and shows its ACS task`);
+  await noHScroll('review lesson card');
+  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/review-lesson-card-${viewport.width}.png`, fullPage: true });
+  await btn('Next').click();
   await page.getByRole('group', { name: 'Options' }).getByRole('button').first().click();
   await btn('Reveal').click();
   check(await page.getByText(/14 CFR|PHAK|AIM/).first().isVisible(), `${label} review deck shows a reference after reveal`);

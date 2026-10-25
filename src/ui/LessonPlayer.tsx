@@ -14,6 +14,11 @@ import { Figure } from './Figure';
 import { Strip, type StripPoint } from './Strip';
 import { Rich } from './text';
 import { RefChips } from '../refs/RefViewer';
+import { arrange, nextVariant, variantCount } from '../course/variant';
+import { lessonOutcomes } from '../review/lessonCards';
+import { enrollLesson } from '../review/scheduler';
+
+const freshSeed = () => Math.floor(Math.random() * 2 ** 31);
 
 const KEYS = ['A', 'B', 'C', 'D'];
 const KIND_LABEL: Record<Step['kind'], string> = { brief: 'Brief', example: 'Worked example', turn: 'Your turn', decide: 'Decide' };
@@ -27,8 +32,13 @@ export function LessonPlayer({ lesson, ctx, progress, setProgress, onExit, onNex
   onNext: (l: Lesson) => void;
 }) {
   const [attempt, setAttempt] = useState(0);
-  // Built once per attempt so the practice weather holds still while the pilot works.
-  const steps = useMemo(() => lesson.build(ctx), [lesson, ctx, attempt]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Built once per attempt so the practice weather holds still while the pilot
+  // works. Each attempt flies a situation not yet seen, options freshly ordered.
+  const { steps, variant } = useMemo(() => {
+    const seed = freshSeed();
+    const variant = nextVariant(lesson, progress[lesson.id], seed);
+    return { steps: arrange(lesson.build({ ...ctx, variant }), seed), variant };
+  }, [lesson, ctx, attempt]); // eslint-disable-line react-hooks/exhaustive-deps
   const [answers, setAnswers] = useState<LessonAnswers>(emptyAnswers);
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [committed, setCommitted] = useState<Record<string, boolean>>({});
@@ -47,7 +57,8 @@ export function LessonPlayer({ lesson, ctx, progress, setProgress, onExit, onNex
   const finish = () => {
     const r = scoreLesson(steps, answers);
     setResult(r);
-    setProgress((p) => recordLesson(p, lesson.id, r));
+    setProgress((p) => recordLesson(p, lesson.id, r, new Date(), variant));
+    enrollLesson(lesson.id, lessonOutcomes(steps, answers));
     window.scrollTo({ top: 0 });
   };
   const again = () => {
@@ -81,7 +92,7 @@ export function LessonPlayer({ lesson, ctx, progress, setProgress, onExit, onNex
         <div className="strip-title">
           <div>
             <h1><span className="lid">{lesson.id}</span> {lesson.title}</h1>
-            <span className="muted">Module {m.n}, {m.title}. Lesson {lessonNo} of {m.lessons.length}. {lesson.acs.join(', ')}.{ctx.practiceField ? ' Practice field, not a real airport.' : ''}</span>
+            <span className="muted">Module {m.n}, {m.title}. Lesson {lessonNo} of {m.lessons.length}. {lesson.acs.join(', ')}.{variantCount(lesson) > 1 ? ` Situation ${variant + 1} of ${variantCount(lesson)}.` : ''}{ctx.practiceField ? ' Practice field, not a real airport.' : ''}</span>
           </div>
           <button type="button" className="btn quiet" onClick={onExit}>{result ? 'Back to course' : 'Leave lesson'}</button>
         </div>
@@ -127,7 +138,7 @@ export function LessonPlayer({ lesson, ctx, progress, setProgress, onExit, onNex
   );
 }
 
-function StepView({ step, level, answers, setAnswers, checked, onCheck, committed, onCommit }: {
+export function StepView({ step, level, answers, setAnswers, checked, onCheck, committed, onCommit }: {
   step: Step;
   level: 'full' | 'short';
   answers: LessonAnswers;
@@ -311,7 +322,7 @@ function Debrief({ lesson, steps, answers, result, progress, onAgain, onNext, on
       </section>
 
       <div className="step-nav">
-        <button type="button" className="btn quiet" onClick={onAgain}>Fly it again</button>
+        <button type="button" className="btn quiet" onClick={onAgain}>{variantCount(lesson) > 1 ? 'Fly another situation' : 'Fly it again'}</button>
         <span style={{ flex: 1 }} />
         {next && next.id !== lesson.id
           ? <button type="button" className="btn primary" onClick={() => onNext(next)}>Next lesson: {next.id} {next.title}</button>
