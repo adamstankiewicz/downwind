@@ -93,8 +93,8 @@ describe('91.213(d)', () => {
 describe.each(contexts)('module 1 lessons: %s', (_name, base) => {
   for (const now of dates) {
     const ctx = { ...base, now };
-    it.each(pilotAirplaneLessons.map((l) => [l.id, l] as const))(`%s builds valid steps on ${toDay(now)}`, (_id, l) => {
-      const steps = l.build(ctx);
+    it.each(pilotAirplaneLessons.flatMap((l) => [...Array(l.variants ?? 1).keys()].map((v) => [`${l.id} situation ${v}`, l, v] as const)))(`%s builds valid steps on ${toDay(now)}`, (_id, l, variant) => {
+      const steps = l.build({ ...ctx, variant });
       expect(steps.length).toBeGreaterThan(2);
       expect(new Set(steps.map((s) => s.id)).size).toBe(steps.length);
       for (const s of steps) {
@@ -138,6 +138,23 @@ describe.each(contexts)('module 1 lessons: %s', (_name, base) => {
       expect(turn(lesson('1.2').build(ctx)).blanks.find((b) => b.id === 'today')!.answer).toBe('No');
       expect(turn(lesson('1.3').build(ctx)).blanks.find((b) => b.id === 'hours')!.answer).toBe(2.3);
       expect(turn(lesson('1.5').build(ctx)).blanks.find((b) => b.id === 'trip')!.answer).toBe('No');
+    });
+
+    it(`changes the right call with the situation on ${toDay(now)}`, () => {
+      const g = (id: string, variant: number) => decide(lesson(id).build({ ...ctx, variant })).grades;
+      // Night current today, not on the day: the same trap as situation 0.
+      expect(g('1.1', 1).go).toBe('unsafe');
+      expect(turn(lesson('1.1').build({ ...ctx, variant: 2 })).blanks.find((b) => b.id === 'current')!.answer).toBe('Yes');
+      expect(g('1.1', 2)).toMatchObject({ go: 'best', cancel: 'marginal' });
+      expect(g('1.1', 3)).toMatchObject({ go: 'best', 'get-current': 'acceptable', cancel: 'marginal' });
+      expect(g('1.2', 1)).toEqual({ go: 'unsafe', solo: 'unsafe', cfi: 'best', cancel: 'acceptable' });
+      expect(g('1.2', 2)).toEqual({ go: 'unsafe', photo: 'unsafe', fetch: 'best', cancel: 'acceptable' });
+      expect(g('1.3', 1)).toMatchObject({ go: 'unsafe', 'with-ap': 'unsafe', swap: 'best' });
+      expect(g('1.3', 2)).toMatchObject({ go: 'best', cancel: 'marginal' });
+      expect(g('1.4', 1)).toMatchObject({ go: 'unsafe', placard: 'unsafe', fix: 'best' });
+      expect(g('1.4', 2)).toEqual({ go: 'unsafe', placard: 'best', wait: 'acceptable', cancel: 'marginal' });
+      expect(g('1.5', 1)).toMatchObject({ go: 'best', cancel: 'marginal' });
+      expect(g('1.5', 2)).toMatchObject({ go: 'unsafe', cfi: 'best', solo: 'best' });
     });
   }
 });

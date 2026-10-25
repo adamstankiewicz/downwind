@@ -201,3 +201,15 @@ describe('daily sheet airplane line', () => {
     expect(dailySheet(brief, {}, mins).find((s) => s.id === 'airplane')!.taughtBy).toBe('Lesson 3.2');
   });
 });
+
+describe.each(contexts.slice(0, 2))('module 3 situations: %s', (_name, ctx) => {
+  const g = (id: string, variant: number, step = 'd1') => decide(performanceLessons.find((l) => l.id === id)!.build({ ...ctx, variant }), step).grades;
+  it('rewards the plan as asked when the numbers allow it', () => {
+    expect(g('3.1', 1)).toMatchObject({ 'as-loaded': 'best', 'less-fuel': 'acceptable', 'one-friend': 'acceptable' });
+    expect(g('3.2', 1)['straight-out']).toBe('best');
+    expect(g('3.3', 1)).toMatchObject({ 'go-now': 'best', 'go-evening': 'acceptable', 'go-morning': 'acceptable' });
+    expect(g('3.3', 2)).toMatchObject({ 'go-evening': 'best', 'go-morning': 'acceptable' });
+    expect(g('3.3', 2)['go-now']).not.toBe('best');
+    expect(g('3.4', 1)).toMatchObject({ go: 'best', 'top-off': 'acceptable', cancel: 'marginal' });
+  });
+});

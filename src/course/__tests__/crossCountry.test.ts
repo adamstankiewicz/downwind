@@ -254,3 +254,17 @@ describe('module 5 teaches what it says', () => {
     for (const l of m.lessons) expect(l.acs.every((a) => /^PA\.[IVX]+\.[A-Z]$/.test(a))).toBe(true);
   });
 });
+
+describe('module 5 situations', () => {
+  const ctx = lessonContext(null, blankAircraft, defaultPilot.minimums, new Date(Date.UTC(2026, 9, 24, 16, 20)));
+  const g = (id: string, variant: number) => (crossCountryLessons.find((l) => l.id === id)!.build({ ...ctx, variant }).find((s) => s.kind === 'decide') as Extract<Step, { kind: 'decide' }>).grades;
+  it('the right call follows what is true on the day', () => {
+    expect(g('5.1', 1)['fuel-stop']).toBe('unsafe');
+    expect(g('5.2', 1)['alt-6500']).toBe('best');
+    expect(g('5.2', 0)['alt-6500']).not.toBe('best');
+    expect(g('5.3', 1)['turn-now']).toBe('best');
+    expect(g('5.3', 0)['turn-now']).toBe('marginal');
+    expect(g('5.4', 1)).toMatchObject({ home: 'best', ridgeback: 'unsafe' });
+    expect(g('5.5', 1)['climb-call']).toBe('best');
+  });
+});

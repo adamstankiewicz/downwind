@@ -84,19 +84,25 @@ const chartAroundField: Lesson = {
   summary: 'Decode an airport data block, the airspace drawn around it, and the maximum elevation figure, then pick a cruising altitude over rising ground.',
   acs: ['PA.I.D', 'PA.I.E'],
   refs: ['PHAK ch. 16', 'PHAK ch. 15', '14 CFR 91.159', '14 CFR 91.119'],
+  variants: 3,
   build(ctx) {
     const home = airport('KXYZ');
     const mill = airport('2X5');
-    const lake = checkpoint('long-lake');
+    // The sightseeing trip: out to Long Lake, home from it, or the short hop to Harlow.
+    const v = ctx.variant ?? 0;
+    const lake = checkpoint(v === 2 ? 'harlow' : 'long-lake');
+    const homeward = v === 1;
+    const from = homeward ? lake.pos : home.pos;
+    const to = homeward ? home.pos : lake.pos;
     const d = volume('xyz-d');
     const dTop = ceilingMsl(d);
     const millMef = maxElevationFigure(R, { lat: Math.floor(mill.pos.lat * 2) / 2, lon: Math.floor(mill.pos.lon * 2) / 2 }, { lat: Math.floor(mill.pos.lat * 2) / 2 + 0.5, lon: Math.floor(mill.pos.lon * 2) / 2 + 0.5 });
     const overMill = classAt(mill.pos, 2500);
-    const tc = Math.round(trueCourse(home.pos, lake.pos));
+    const tc = Math.round(trueCourse(from, to));
     const mc = Math.round(trueToMagnetic(tc, R.variationDeg));
 
-    // The highest maximum elevation figure the trip to Long Lake crosses.
-    const tripMef = Math.max(...samplePlan({ id: 'x', start: home.pos, startAltMsl: 0, legs: [{ to: lake.pos, altMsl: 0 }], cleared: [], transponder: true }, R.variationDeg)
+    // The highest maximum elevation figure the trip crosses.
+    const tripMef = Math.max(...samplePlan({ id: 'x', start: from, startAltMsl: 0, legs: [{ to, altMsl: 0 }], cleared: [], transponder: true }, R.variationDeg)
       .map((s) => {
         const lat = Math.floor(s.pos.lat * 2) / 2;
         const lon = Math.floor(s.pos.lon * 2) / 2;
@@ -104,7 +110,8 @@ const chartAroundField: Lesson = {
       }));
     const westbound = mc >= 180;
     const alts = [2500, 3500, 4500, 5500];
-    const trip = (alt: number): Omit<Plan, 'id'> => ({ start: home.pos, startAltMsl: alt, legs: [{ to: lake.pos, altMsl: alt }], cleared: ['xyz-d'], transponder: true });
+    const trip = (alt: number): Omit<Plan, 'id'> => ({ start: from, startAltMsl: alt, legs: [{ to, altMsl: alt }], cleared: ['xyz-d'], transponder: true });
+    const tripNm = Math.round(distanceNm(from, to));
 
     return [
       {
@@ -150,9 +157,9 @@ const chartAroundField: Lesson = {
               : `Nothing is drawn around ${mill.id}, but 2,500 MSL is more than 1,200 ft above the ground there, so it is Class ${overMill.cls}.` },
         ],
       },
-      planDecision('d1', 'How high to Long Lake?',
-        `Long Lake is ${Math.round(distanceNm(home.pos, lake.pos))} nm away, true course ${pad3(tc)}, magnetic ${pad3(mc)}: ${westbound ? 'westbound' : 'eastbound'}. The squares you cross have maximum elevation figures up to ${fmt(tripMef)} ft.`,
-        { kind: 'chart', route: ['KXYZ', 'long-lake'], highlight: ['KXYZ', 'long-lake', 'tower-1749'] },
+      planDecision('d1', homeward ? `How high back to ${home.id}?` : `How high to ${lake.name}?`,
+        `${homeward ? `Done circling ${lake.name}, you head home: ${home.id} is` : `${lake.name} is`} ${tripNm} nm away, true course ${pad3(tc)}, magnetic ${pad3(mc)}: ${westbound ? 'westbound' : 'eastbound'}. The squares you cross have maximum elevation figures up to ${fmt(tripMef)} ft.`,
+        { kind: 'chart', route: ['KXYZ', lake.id], highlight: ['KXYZ', lake.id, 'tower-1749'] },
         alts.map((alt) => ({
           id: `alt-${alt}`,
           label: `${fmt(alt)} ft`,
@@ -160,7 +167,7 @@ const chartAroundField: Lesson = {
           then: (c) => c.violations.some((v) => v.id === 'hemispheric')
             ? `High enough, but ${fmt(alt)} is an ${westbound ? 'eastbound' : 'westbound'} altitude, and over most of this route you are more than 3,000 ft above the ground. Opposite-direction traffic is flying it.`
             : c.mefMarginFt < 0
-              ? `Over the hills near the lake you are ${fmt(-c.mefMarginFt)} ft below the highest figure on your route. Legal where the ground is low, with no margin for a tower you missed.`
+              ? `Over the highest ground on the way you are ${fmt(-c.mefMarginFt)} ft below the highest figure on your route. Legal where the ground is low, with no margin for a tower you missed.`
               : c.mefMarginFt < 1000
                 ? `Clear of everything charted, but only ${fmt(c.mefMarginFt)} ft over the highest square.`
                 : `${fmt(c.mefMarginFt)} ft over the highest square, and a legal cruising altitude for a ${westbound ? 'westbound' : 'eastbound'} course.`,
@@ -183,6 +190,7 @@ const classD: Lesson = {
   summary: 'Know when radio contact with a tower is established, and what to do when it isn\'t yet.',
   acs: ['PA.I.E', 'PA.III.A'],
   refs: ['14 CFR 91.129', 'AIM 3-2-5', 'PHAK ch. 15'],
+  variants: 3,
   build(ctx) {
     const home = airport('KXYZ');
     const mill = airport('2X5');
@@ -203,7 +211,12 @@ const classD: Lesson = {
     const climbTo = Math.ceil((dTop + 1) / 500) * 500;
     const arc = [330, 30, 90].map((b) => ({ to: destination(home.pos, b, r + 3.5), altMsl: cruise }));
     const direct = distanceNm(here, area);
-    const holdMin = 2;
+    // What the tower actually says back: no call sign, your call sign, or your call sign and "remain clear".
+    const v = ctx.variant ?? 0;
+    const busy = `${sign}, ${tower}, remain clear of the Class Delta, I have five in the pattern. Expect fifteen minutes.`;
+    const heard = [badReply, goodReply, busy][v];
+    const inbound = replyPermits(heard, sign, 'D');
+    const holdMin = v === 2 ? 15 : v === 1 ? 6 : 2;
 
     return [
       {
@@ -244,20 +257,30 @@ const classD: Lesson = {
         ],
       },
       planDecision('d1', `${nm1(2.5)} nm from the line`,
-        `You call ${tower} at ${fmt(cruise)} ft. The reply is: "${badReply}" The boundary is ${nm1(2.5)} nm ahead.`,
+        `You call ${tower} at ${fmt(cruise)} ft. The reply is: "${heard}" The boundary is ${nm1(2.5)} nm ahead.`,
         { kind: 'profile', start: here, startAltMsl: cruise, legs: [{ to: area, altMsl: cruise }], marks: [{ atNm: 0, label: 'You' }, { atNm: distanceNm(here, home.pos), label: home.id }], airplaneAtNm: 0 },
         [
-          { id: 'continue', label: 'Continue in. They know you are out there.', plan: { start: here, startAltMsl: cruise, legs: [{ to: area, altMsl: cruise }], cleared: [], transponder: true },
-            then: 'You cross the line before anyone has said your call sign. The tower was busy with traffic in the pattern, and now there is an airplane in their airspace they never talked to.' },
+          { id: 'continue', label: 'Continue in. They know you are out there.', plan: { start: here, startAltMsl: cruise, legs: [{ to: area, altMsl: cruise }], cleared: inbound ? ['xyz-d'] : [], transponder: true },
+            then: inbound
+              ? `They said your call sign, so communication is established. You cross the line, keep your eyes on the pattern traffic, and a minute later hear: "${sign}, report clear to the east."`
+              : v === 2
+                ? 'They said your call sign and, in the same breath, told you to remain clear. Hearing your name is not permission when the rest of the sentence says no.'
+                : 'You cross the line before anyone has said your call sign. The tower was busy with traffic in the pattern, and now there is an airplane in their airspace they never talked to.' },
           { id: 'hold', label: 'Turn away and circle outside until they call you by name.', plan: { start: here, startAltMsl: cruise, legs: [{ to: area, altMsl: cruise }], cleared: ['xyz-d'], transponder: true, delayMin: holdMin },
-            then: `${holdMin} minutes later: "${sign}, ${tower}, enter Class Delta, report clear to the east." Now you have it, and the tower knows exactly where you are.` },
+            then: inbound
+              ? `You had what you needed already. ${holdMin} minutes of circling, then you go in on the same words you heard the first time.`
+              : `${holdMin} minutes later: "${sign}, ${tower}, enter Class Delta, report clear to the east." Now you have it, and the tower knows exactly where you are.` },
           { id: 'over', label: `Climb to ${fmt(climbTo)} and pass over the top.`, plan: { start: here, startAltMsl: cruise, legs: [{ to: along(here, area, 1.5), altMsl: climbTo }, { to: area, altMsl: climbTo }], cleared: [], transponder: true },
             then: `Legal: ${fmt(climbTo)} is over a ${fmt(dTop)} ceiling. It is also only ${fmt(climbTo - dTop)} ft above the airspace, right where the tower's departures climb out.` },
           { id: 'around', label: 'Swing north around the circle, a few miles clear.', plan: { start: here, startAltMsl: cruise, legs: [...arc, { to: area, altMsl: cruise }], cleared: [], transponder: true },
             then: (c) => `No airspace to enter and nobody to wait for, for ${Math.round(c.distanceNm - direct)} extra miles.` },
         ],
         [],
-        'Communication is established by the tower saying your call sign, not by you saying theirs. Until then the boundary is a wall. Waiting, or going around with room to spare, both keep you out of it.',
+        inbound
+          ? 'Communication is established the moment the tower answers with your call sign, even if all they say is "stand by". You may enter. Waiting longer or flying around costs time and buys nothing.'
+          : v === 2
+            ? 'Your call sign plus "remain clear" means stay out. With fifteen minutes to wait, going around with room to spare is quicker than circling, and keeps you out of a busy pattern.'
+            : 'Communication is established by the tower saying your call sign, not by you saying theirs. Until then the boundary is a wall. Waiting, or going around with room to spare, both keep you out of it.',
       ),
     ];
   },
@@ -271,6 +294,7 @@ const classC: Lesson = {
   summary: 'Read the inner ring and the shelf, and know what "remain outside" means on the way into a Class C field.',
   acs: ['PA.I.E', 'PA.III.A'],
   refs: ['14 CFR 91.130', 'AIM 3-2-4', '14 CFR 91.215'],
+  variants: 2,
   build(ctx) {
     const home = airport('KXYZ');
     const qc = airport('KXQC');
@@ -289,6 +313,36 @@ const classC: Lesson = {
     const here = along(home.pos, qc.pos, tripNm - (outer + 3));
     const atDam = classAt(dam.pos, cruise);
     const damNm = distanceNm(dam.pos, qc.pos);
+    // The reply on the day: "remain outside", or just your call sign and a code.
+    const v = ctx.variant ?? 0;
+    const heard = v === 1 ? `${sign}, ${approach}, squawk 0421, stand by.` : reply;
+    const inbound = replyPermits(heard, sign, 'C');
+    const cleared = inbound ? ['xqc-c1', 'xqc-c2'] : [];
+    const holdMin = inbound ? 8 : 4;
+    const d1 = planDecision('d1', `${outer + 3} nm out`,
+        `You call ${approach} ${outer + 3} nm south at ${fmt(cruise)} ft and hear: "${heard}"`,
+        { kind: 'profile', start: here, startAltMsl: cruise, legs: [{ to: along(here, qc.pos, 1), altMsl: cruise }, { to: qc.pos, altMsl: qc.elevationFt }], marks: [{ atNm: 0, label: 'You' }, { atNm: 3, label: `${outer} nm` }, { atNm: distanceNm(here, qc.pos), label: qc.id }], airplaneAtNm: 0 },
+        [
+          { id: 'continue', label: 'Keep going. They know who you are.', plan: { start: here, startAltMsl: cruise, legs: [{ to: along(here, qc.pos, 1), altMsl: cruise }, { to: qc.pos, altMsl: qc.elevationFt }], cleared, transponder: true },
+            then: inbound
+              ? `They said your call sign and nothing about staying out, so you are in. You set 0421, keep listening, and a minute later: "${sign}, radar contact, enter left downwind runway 35."`
+              : '"Remain outside" was the instruction. You are inside the shelf two minutes later with approach still sequencing the airplanes they had already let in.' },
+          { id: 'hold', label: `Turn and hold outside ${outer} nm until they clear you in.`, plan: { start: here, startAltMsl: cruise, legs: [{ to: along(here, qc.pos, 1), altMsl: cruise }, { to: qc.pos, altMsl: qc.elevationFt }], cleared: ['xqc-c1', 'xqc-c2'], transponder: true, delayMin: holdMin },
+            then: inbound
+              ? `${holdMin} minutes of circling for a clearance Class C doesn't need. Communication was established the moment they said your call sign.`
+              : `A few minutes of circling over the fields, then: "${sign}, proceed inbound, enter left downwind runway 35." Lunch is a little later and entirely legal.` },
+          { id: 'under', label: 'Duck under the shelf and head for the field.', plan: { start: here, startAltMsl: cruise, legs: [{ to: along(here, qc.pos, 2), altMsl: shelfFloor - 200 }, { to: along(here, qc.pos, distanceNm(here, qc.pos) - 2), altMsl: shelfFloor - 200 }, { to: qc.pos, altMsl: qc.elevationFt }], cleared, transponder: true },
+            then: inbound
+              ? `You were already talking to them, so there was nothing to duck under. Down at ${fmt(shelfFloor - 200)} the rising ground on the way comes up to meet you.`
+              : 'The shelf has a floor; the inner ring does not. You can sneak under the first and still have to fly into the second to land.' },
+          { id: 'elsewhere', label: `Give up on ${qc.id} and land at ${mill.name} instead.`, plan: { start: here, startAltMsl: cruise, legs: [{ to: along(here, mill.pos, distanceNm(here, mill.pos) - 3), altMsl: cruise }, { to: mill.pos, altMsl: mill.elevationFt }], cleared: [], transponder: true, reachesGoal: false },
+            then: `Legal and calm, but ${mill.name} has no fuel. A short wait at ${qc.id} would have got you what you came for.` },
+        ],
+        [],
+        inbound
+          ? 'Class C needs two-way communication, not a clearance. Your call sign back, with no "remain outside", establishes it. A squawk code and "stand by" are normal; keep going at your altitude and listen for your sequence.'
+          : '"Remain outside" is an instruction, and it wins over hearing your call sign. Holding outside the shelf costs a few minutes; the alternatives either break 91.130 or give up the trip.',
+      );
 
     return [
       {
@@ -330,22 +384,7 @@ const classC: Lesson = {
             explain: 'No. They said your call sign, but "remain outside" overrides it.' },
         ],
       },
-      planDecision('d1', `${outer + 3} nm out`,
-        `You call ${approach} ${outer + 3} nm south at ${fmt(cruise)} ft and hear: "${reply}"`,
-        { kind: 'profile', start: here, startAltMsl: cruise, legs: [{ to: along(here, qc.pos, 1), altMsl: cruise }, { to: qc.pos, altMsl: qc.elevationFt }], marks: [{ atNm: 0, label: 'You' }, { atNm: 3, label: `${outer} nm` }, { atNm: distanceNm(here, qc.pos), label: qc.id }], airplaneAtNm: 0 },
-        [
-          { id: 'continue', label: 'Keep going. They know who you are.', plan: { start: here, startAltMsl: cruise, legs: [{ to: along(here, qc.pos, 1), altMsl: cruise }, { to: qc.pos, altMsl: qc.elevationFt }], cleared: [], transponder: true },
-            then: '"Remain outside" was the instruction. You are inside the shelf two minutes later with approach still sequencing the airplanes they had already let in.' },
-          { id: 'hold', label: `Turn and hold outside ${outer} nm until they clear you in.`, plan: { start: here, startAltMsl: cruise, legs: [{ to: along(here, qc.pos, 1), altMsl: cruise }, { to: qc.pos, altMsl: qc.elevationFt }], cleared: ['xqc-c1', 'xqc-c2'], transponder: true, delayMin: 4 },
-            then: `A few minutes of circling over the fields, then: "${sign}, proceed inbound, enter left downwind runway 35." Lunch is a little later and entirely legal.` },
-          { id: 'under', label: 'Duck under the shelf and head for the field.', plan: { start: here, startAltMsl: cruise, legs: [{ to: along(here, qc.pos, 2), altMsl: shelfFloor - 200 }, { to: along(here, qc.pos, distanceNm(here, qc.pos) - 2), altMsl: shelfFloor - 200 }, { to: qc.pos, altMsl: qc.elevationFt }], cleared: [], transponder: true },
-            then: 'The shelf has a floor; the inner ring does not. You can sneak under the first and still have to fly into the second to land.' },
-          { id: 'elsewhere', label: `Give up on ${qc.id} and land at ${mill.name} instead.`, plan: { start: here, startAltMsl: cruise, legs: [{ to: along(here, mill.pos, distanceNm(here, mill.pos) - 3), altMsl: cruise }, { to: mill.pos, altMsl: mill.elevationFt }], cleared: [], transponder: true, reachesGoal: false },
-            then: `Legal and calm, but ${mill.name} has no fuel. A short wait at ${qc.id} would have got you what you came for.` },
-        ],
-        [],
-        '"Remain outside" is an instruction, and it wins over hearing your call sign. Holding outside the shelf costs a few minutes; the alternatives either break 91.130 or give up the trip.',
-      ),
+      d1,
     ];
   },
 };
@@ -358,6 +397,7 @@ const classB: Lesson = {
   summary: 'Read the upside-down wedding cake, find the floor where you are, and know the difference between a squawk code and a clearance.',
   acs: ['PA.I.E'],
   refs: ['14 CFR 91.131', '14 CFR 91.215, 91.225', 'AIM 3-2-3'],
+  variants: 2,
   build(ctx) {
     const home = airport('KXYZ');
     const bb = airport('KXBB');
@@ -387,6 +427,16 @@ const classB: Lesson = {
 
     const path = (alt: number) => [{ to: before, altMsl: alt }, { to: plant.pos, altMsl: alt }];
     const allB = rings.map((v) => v.id);
+    // The reply on the day: a squawk code only, or the clearance itself.
+    const variant = ctx.variant ?? 0;
+    const heard = variant === 1 ? `${sign}, ${approach}, squawk 0412. ${sign}, radar contact, cleared into the Class Bravo airspace, maintain 3,500.` : reply;
+    const inbound = replyPermits(heard, sign, 'B');
+    // The plan check knows airspace, not assigned altitudes: once told to maintain the
+    // cruise altitude, leaving it without telling approach breaks 91.123 wherever the floor is.
+    const holdAltitude = (s: Step): Step => {
+      if (inbound && s.kind === 'decide') for (const id of ['below', 'squeeze']) s.grades[id] = 'unsafe';
+      return s;
+    };
 
     return [
       {
@@ -423,22 +473,32 @@ const classB: Lesson = {
             explain: `No. A squawk code is not a clearance. You need to hear something like "${ok}"` },
         ],
       },
-      planDecision('d1', 'Four miles from the step',
-        `You are at ${fmt(cruise)}, ${nm1(4)} nm from where the floor drops to ${fmt(plantFloor)}. You called ${approach} and heard: "${reply}" You set the code.`,
+      holdAltitude(planDecision('d1', 'Four miles from the step',
+        `You are at ${fmt(cruise)}, ${nm1(4)} nm from where the floor drops to ${fmt(plantFloor)}. You called ${approach} and heard: "${heard}" You set the code${inbound ? ' and read the clearance back' : ''}.`,
         { kind: 'profile', start: here, startAltMsl: cruise, legs: [{ to: plant.pos, altMsl: cruise }], marks: [{ atNm: 0, label: 'You' }, { atNm: 4, label: `${nm1(ringNm)} nm` }, { atNm: distanceNm(here, plant.pos), label: 'Plant' }], airplaneAtNm: 0 },
         [
-          { id: 'continue', label: `Continue at ${fmt(cruise)}. They have you on radar.`, plan: { start: here, startAltMsl: cruise, legs: path(cruise), cleared: [], transponder: true },
-            then: `Two minutes later: "${sign}, you appear to be inside the Class Bravo without a clearance. Advise when ready to copy a phone number."` },
-          { id: 'ask', label: 'Ask for a Class B clearance, and stay outside until you hear it.', plan: { start: here, startAltMsl: cruise, legs: path(cruise), cleared: allB, transponder: true, delayMin: 2 },
-            then: `"${ok}" You cross the step with the words in hand.` },
+          { id: 'continue', label: `Continue at ${fmt(cruise)}. They have you on radar.`, plan: { start: here, startAltMsl: cruise, legs: path(cruise), cleared: inbound ? allB : [], transponder: true },
+            then: inbound
+              ? `You heard "cleared into the Class Bravo" and read it back. You cross the step at ${fmt(cruise)}, circle the plant, and approach points out a departing jet well above you.`
+              : `Two minutes later: "${sign}, you appear to be inside the Class Bravo without a clearance. Advise when ready to copy a phone number."` },
+          { id: 'ask', label: 'Ask for a Class B clearance, and stay outside until you hear it.', plan: { start: here, startAltMsl: cruise, legs: path(cruise), cleared: allB, transponder: true, delayMin: inbound ? 6 : 2 },
+            then: inbound
+              ? '"Say again your request?" You already had it. Listen to the whole call before you key the mic: the clearance came after the squawk code.'
+              : `"${ok}" You cross the step with the words in hand.` },
           { id: 'below', label: `Descend to ${fmt(below)} before the step and stay under the shelf.`, plan: { start: here, startAltMsl: cruise, legs: path(below), cleared: [], transponder: true },
-            then: `${fmt(below)} keeps ${fmt(plantFloor - below)} ft under the floor all the way to the plant. No clearance needed.` },
+            then: inbound
+              ? `Approach told you to maintain ${fmt(cruise)}. Leaving it without a word puts you where they were not expecting you, under their arrivals. Leaving an assigned altitude without telling ATC breaks the instruction (14 CFR 91.123).`
+              : `${fmt(below)} keeps ${fmt(plantFloor - below)} ft under the floor all the way to the plant. No clearance needed.` },
           { id: 'squeeze', label: `Descend to ${fmt(squeeze)}, just under the floor.`, plan: { start: here, startAltMsl: cruise, legs: path(squeeze), cleared: [], transponder: true },
-            then: `Legal on paper, but ${fmt(plantFloor - squeeze)} ft is one bump of turbulence or one glance at the plant away from a violation, and Bayport's arrivals descend to that floor right above you.` },
+            then: inbound
+              ? `You were cleared at ${fmt(cruise)} and told to maintain it. Ducking to ${fmt(squeeze)} without a word leaves the altitude approach is protecting for you (14 CFR 91.123).`
+              : `Legal on paper, but ${fmt(plantFloor - squeeze)} ft is one bump of turbulence or one glance at the plant away from a violation, and Bayport's arrivals descend to that floor right above you.` },
         ],
         [],
-        `Only "cleared into the Class Bravo" lets you in. Without it, stay at least 500 ft under the floor where you are, which here means ${fmt(below)} or lower.`,
-      ),
+        inbound
+          ? `This time the words came, tucked in after the squawk code. Once you hear "cleared into the Class Bravo" and read it back, fly the altitude you were given. A clearance to ${fmt(cruise)} is an instruction to stay there.`
+          : `Only "cleared into the Class Bravo" lets you in. Without it, stay at least 500 ft under the floor where you are, which here means ${fmt(below)} or lower.`,
+      )),
     ];
   },
 };
@@ -456,7 +516,11 @@ const tfrSua: Lesson = {
   summary: 'Find the restrictions that aren\'t printed on the chart, tell a MOA from a restricted area, and route around both.',
   acs: ['PA.I.E', 'PA.I.D'],
   refs: ['14 CFR 91.137', '14 CFR 91.133', 'AIM 3-4-3', 'AIM 3-4-5', 'AIM 3-5-3', 'AIM 5-1-3', '14 CFR 91.103'],
+  variants: 3,
   build(ctx) {
+    // What the briefing says on the day: the restricted area hot, the restricted area cold, or a taller TFR.
+    const v = ctx.variant ?? 0;
+    const cold = v === 1;
     const home = airport('KXYZ');
     const rb = airport('KXRB');
     const moa = volume('granite-moa');
@@ -465,7 +529,7 @@ const tfrSua: Lesson = {
     const tc = trueCourse(home.pos, rb.pos);
     const center = destination(home.pos, tc, tripNm / 2);
     const radius = 5;
-    const tfrTop = 4000;
+    const tfrTop = v === 2 ? 5000 : 4000;
     const tfr: Volume = {
       id: 'tfr-fire', name: 'TFR (practice NOTAM)', cls: 'TFR',
       shape: { kind: 'polygon', points: circle(center, radius) },
@@ -473,7 +537,9 @@ const tfrSua: Lesson = {
       note: 'Firefighting, 91.137(a)(2). Practice NOTAM written for this lesson.',
     };
     const extra = [tfr];
+    // The blanks ask about each area while it is active; the decision flies today's briefing.
     const active = ['tfr-fire', rArea.id];
+    const today = cold ? ['tfr-fire'] : active;
     const cruise = 3500;
     const over = 4500;
     const mc = trueToMagnetic(tc, R.variationDeg);
@@ -518,7 +584,7 @@ const tfrSua: Lesson = {
           { label: 'Radius', value: `${radius} nm` },
           { label: 'Altitudes', value: `SFC to ${fmt(tfrTop)} MSL` },
           { label: 'Your direct route', value: `Through it`, note: `The center is right on your course` },
-          { label: rArea.name, value: 'Active today', note: rArea.note },
+          { label: rArea.name, value: cold ? 'Not active today' : 'Active today', note: cold ? `No NOTAM activating it for your departure time. ${rArea.note ?? ''}`.trim() : rArea.note },
         ],
       },
       {
@@ -535,7 +601,7 @@ const tfrSua: Lesson = {
         ],
       },
       planDecision('d1', 'Planning the way around',
-        `The TFR sits on your direct course at ${fmt(cruise)} ft. ${rArea.name} is active east of it. Which way do you plan?`,
+        `The TFR sits on your direct course at ${fmt(cruise)} ft. ${rArea.name} is east of it, ${cold ? 'and no NOTAM activates it for your departure time' : 'active today'}. Which way do you plan?`,
         chartFig,
         [
           { id: 'direct', label: `Direct at ${fmt(cruise)}. Firefighting is down low.`, plan: trip([near(cruise), land]),
@@ -543,12 +609,20 @@ const tfrSua: Lesson = {
           { id: 'west', label: 'Dogleg west, a few miles clear of the circle.', plan: trip([{ to: west, altMsl: cruise }, near(cruise), land]),
             then: 'A few extra miles, clear of the TFR, and clear of the restricted area.' },
           { id: 'east', label: 'Dogleg east, a few miles clear of the circle.', plan: trip([{ to: east, altMsl: cruise }, near(cruise), land]),
-            then: `Clear of the fire, straight into ${rArea.name}, which is active today. Avoiding one restriction is how pilots end up in the next one.` },
+            then: cold
+              ? `Clear of the fire, and ${rArea.name} is cold today, so you may fly through it. Check again before you leave: the times can change by NOTAM, and Bayport Approach can tell you in the air.`
+              : `Clear of the fire, straight into ${rArea.name}, which is active today. Avoiding one restriction is how pilots end up in the next one.` },
           { id: 'over', label: `Climb to ${fmt(over)} and fly over it.`, plan: trip([{ to: destination(home.pos, tc, 8), altMsl: over }, near(over), land]),
-            then: `${fmt(over)} clears the ${fmt(tfrTop)} ft ceiling by ${fmt(over - tfrTop)} ft and is a legal altitude for a magnetic course of ${pad3(mc)}. Expect smoke over a fire.` },
+            then: over > tfrTop
+              ? `${fmt(over)} clears the ${fmt(tfrTop)} ft ceiling by ${fmt(over - tfrTop)} ft and is a legal altitude for a magnetic course of ${pad3(mc)}. Expect smoke over a fire.`
+              : `This TFR goes up to ${fmt(tfrTop)}. At ${fmt(over)} you are inside it, with the spotter plane circling over the fire. Read the altitudes in the NOTAM every time; they change.` },
         ],
-        active,
-        'A TFR is a wall up to its ceiling. Around it, keep a couple of miles, and check what the detour runs into. Over it, keep 500 ft and the right cruising altitude.',
+        today,
+        cold
+          ? `A TFR is a wall up to its ceiling. Around it, keep a couple of miles. With ${rArea.name} cold, either dogleg works; the briefing is what told you so.`
+          : v === 2
+            ? `A TFR is a wall up to its ceiling, and this one reaches ${fmt(tfrTop)}. Your planned ${fmt(over)} is inside it, not over it. Around it, keep a couple of miles and check what the detour runs into.`
+            : 'A TFR is a wall up to its ceiling. Around it, keep a couple of miles, and check what the detour runs into. Over it, keep 500 ft and the right cruising altitude.',
         {},
         extra,
       ),

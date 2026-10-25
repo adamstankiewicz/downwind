@@ -3,6 +3,11 @@
 // and from the practice trainer when they haven't; the sample charts are
 // labeled sample wherever they appear. Every number and every grade below is
 // computed (course/airplane.ts and lib/), and the copy reads them back.
+//
+// Each lesson has more than one situation (ctx.variant): a load that fits, a
+// cooler afternoon, a longer strip, tanks that were already enough. When the
+// plan as asked works, the alternatives that give something up are capped at
+// acceptable, so the lesson rewards reading the numbers, not caution alone.
 
 import { isaTempC, pressureAltitudeFt } from '../lib/density';
 import { climbRate, takeoffDistance, type DistanceResult, type RunwayConditions } from '../lib/perf';
@@ -99,16 +104,21 @@ const passengers: Lesson = {
   summary: 'Load the airplane with two friends and a bag, find the weight and CG, and decide what stays on the ground.',
   acs: ['PA.I.F'],
   refs: ['PHAK ch. 10', '14 CFR 91.9, 91.103', 'POH section 6, weight and balance'],
+  variants: 2,
   build(ctx) {
+    // 0: full tanks put the load a little over gross. 1: lighter friends, and it fits.
+    const v = ctx.variant ?? 0;
     const ap = lessonAirplane(ctx.aircraft);
     const a = ap.profile;
     const full = a.usableFuelGal;
     const bag = ap.bag ? Math.min(40, ap.bag.maxLb ?? 40) : 0;
-    // Two friends in the back, sized so full tanks land a little over gross.
-    const rear = clamp(round5(a.maxGrossLb + 80 - a.emptyWeightLb - FRONT_LB - bag - full * 6), 150, 400);
+    // Two friends in the back, sized so full tanks land a little over gross (or under it).
+    const rear = clamp(round5(a.maxGrossLb + (v === 1 ? -60 : 80) - a.emptyWeightLb - FRONT_LB - bag - full * 6), 150, 400);
     const pair: Loading = { frontLb: FRONT_LB, rearLb: 0, bagLb: 0, fuelGal: full };
     const asked: Loading = { frontLb: FRONT_LB, rearLb: rear, bagLb: bag, fuelGal: full };
-    const lessFuel = fuelToGross(ap, asked);
+    const fits = loadingGrade(ap, asked, LUNCH_TRIP) === 'best';
+    // When it all fits, "less fuel" is a hedge, so make it a real cut.
+    const lessFuel = fits ? Math.round(full * 0.6) : fuelToGross(ap, asked);
     const loads: Record<string, Loading> = {
       'as-loaded': asked,
       ...(bag > 0 ? { 'bag-out': { ...asked, bagLb: 0 } } : {}),
@@ -118,7 +128,8 @@ const passengers: Lesson = {
     const grades: Record<string, Grade> = {};
     for (const [id, l] of Object.entries(loads)) {
       const g = loadingGrade(ap, l, LUNCH_TRIP);
-      grades[id] = id === 'one-friend' ? capGrade(g, 'acceptable') : g;
+      // When everything fits, leaving something behind is a cost with nothing bought.
+      grades[id] = id === 'one-friend' || (fits && id !== 'as-loaded') ? capGrade(g, 'acceptable') : g;
     }
     const wbPair = loadWb(ap, pair);
     const wb = loadWb(ap, asked);
@@ -128,7 +139,7 @@ const passengers: Lesson = {
     const options: Option[] = [
       { id: 'as-loaded', label: diff > 0 ? `Go as loaded. ${fmt(diff)} pounds is a few percent, and the airplane will fly.` : 'Go as loaded.' },
       ...(bag > 0 ? [{ id: 'bag-out', label: `Leave the ${bag} lb bag in the car.` }] : []),
-      { id: 'less-fuel', label: `Take ${lessFuel} gallons instead of full tanks.` },
+      { id: 'less-fuel', label: fits ? 'Take less fuel, to be on the safe side.' : `Take ${lessFuel} gallons instead of full tanks.` },
       { id: 'one-friend', label: 'Take one friend now and come back for the other.' },
     ];
     const label = (id: string) => options.find((o) => o.id === id)!.label;
@@ -147,6 +158,8 @@ const passengers: Lesson = {
       },
       acceptable: {
         'one-friend': 'Safe and legal, at the cost of a second trip and a friend waiting.',
+        'bag-out': 'Legal, and the bag did not need to stay behind: the airplane carries it.',
+        'less-fuel': 'Legal, and you gave up fuel the airplane could carry. Fuel you leave behind is the one reserve you can\'t get back in the air.',
       },
       best: {
         'as-loaded': 'Inside every limit as loaded.',
@@ -214,7 +227,11 @@ const hotAfternoon: Lesson = {
   summary: 'Work pressure and density altitude from the report, see what the heat takes from the climb, and plan a departure that respects it.',
   acs: ['PA.I.F', 'PA.I.C'],
   refs: ['PHAK ch. 4 and 11', 'POH section 5, performance'],
+  variants: 2,
   build(ctx) {
+    // 0: a hot afternoon, and the climb won't clear the ridge straight out.
+    // 1: a warm one, a lower ridge, and the straight-out climb is enough.
+    const v = ctx.variant ?? 0;
     const f = ctx.airport;
     const rwy = mainRunway(f);
     const ap = lessonAirplane(ctx.aircraft);
@@ -226,7 +243,7 @@ const hotAfternoon: Lesson = {
     const amAlt = 30.1;
     const pmAlt = 29.82;
     const amT = Math.round(isaTempC(pressureAltitudeFt(elev, amAlt)));
-    const pmT = Math.round(isaTempC(pressureAltitudeFt(elev, pmAlt)) + 20);
+    const pmT = Math.round(isaTempC(pressureAltitudeFt(elev, pmAlt)) + (v === 1 ? 10 : 20));
     const am: Air = { fieldElevFt: elev, altimeterInHg: amAlt, oatC: amT };
     const pm: Air = { fieldElevFt: elev, altimeterInHg: pmAlt, oatC: pmT };
     const amA = airAt(am);
@@ -248,7 +265,9 @@ const hotAfternoon: Lesson = {
     const gainAm = climbGainFt(p, am, RIDGE_NM);
     const gainPm = climbGainFt(p, pm, RIDGE_NM);
     // The ridge sits where the morning climb clears it and the afternoon one does not.
-    const need = Math.max(round100((gainAm + gainPm) / 2), RIDGE_CLEAR_FT + 200);
+    const need = v === 1
+      ? Math.max(Math.floor((gainPm - 100) / 100) * 100, RIDGE_CLEAR_FT + 100)
+      : Math.max(round100((gainAm + gainPm) / 2), RIDGE_CLEAR_FT + 200);
     const ridge = need - RIDGE_CLEAR_FT;
     const topMsl = Math.ceil((elev + need) / 100) * 100;
     const topPa = pmA.paFt + need;
@@ -258,13 +277,13 @@ const hotAfternoon: Lesson = {
     const pct = (a: number, b: number) => Math.round((b / a - 1) * 100);
 
     const grades: Record<string, Grade> = {
-      'straight-out': gainPm >= need ? 'acceptable' : 'unsafe',
+      'straight-out': gainPm >= need ? 'best' : 'unsafe',
       'climb-overhead': climbTop >= 100 ? 'best' : 'marginal',
       'wait-morning': capGrade(gainAm >= need ? 'best' : 'marginal', 'acceptable'),
     };
     const consequence: Record<string, string> = {
       'straight-out': gainPm >= need
-        ? `By the chart you cross the ridge about ${fmt(gainPm - ridge)} feet over it, ${fmt(need - gainPm)} feet inside the margin you wanted. It works, with nothing left for a downdraft on the lee side.`
+        ? `By the chart you cross the ridge about ${fmt(gainPm - ridge)} feet over it, more than the ${RIDGE_CLEAR_FT} you wanted. The warm day took some climb, not all of it, and the numbers say so.`
         : `At the ridge you are about ${fmt(gainPm)} feet above the field: ${gainPm < ridge ? `${fmt(ridge - gainPm)} feet below the ridge line` : `only ${fmt(gainPm - ridge)} feet over it`}. You turn away late, in a climb that has nothing left to give, with trees filling the windscreen.`,
       'climb-overhead': climbTop >= 100
         ? `Circling over the field takes about ${circleMin} minutes, every one of them within reach of a runway. You cross the ridge at ${fmt(topMsl)} feet with the margin you planned.`
@@ -277,7 +296,7 @@ const hotAfternoon: Lesson = {
     return [
       {
         kind: 'brief', id: 'b1', title: 'The same field, a different airplane',
-        scene: `A hot afternoon at ${fieldName(ctx)}. You flew this morning and the airplane leapt off. ${airplaneNote(ap)}`,
+        scene: `A ${v === 1 ? 'warm' : 'hot'} afternoon at ${fieldName(ctx)}. You flew this morning and the airplane leapt off. ${airplaneNote(ap)}`,
         say: {
           full: 'The airplane doesn\'t know the field elevation. It feels the **density altitude**: how high the air acts, given its pressure and temperature. Start with **pressure altitude**: field elevation plus 1,000 feet for every inch the altimeter setting is below 29.92. Then compare the temperature with **standard** at that altitude, 15°C at sea level minus 2° per 1,000 feet. Every degree above standard adds about **120 feet**. Hot, high and low pressure all push it up, and the wing, the propeller and the engine all feel it.',
           short: 'Pressure altitude first, then 120 feet per degree above standard.',
@@ -330,13 +349,15 @@ const hotAfternoon: Lesson = {
         kind: 'decide', id: 'd1', title: 'Toward the ridge',
         situation: `It's ${local(pmAt)} and ${pmT}°C. For this lesson, picture a ridge ${RIDGE_NM} miles off the end of runway ${rwy.id}, ${fmt(ridge)} feet above the field, right on your course. You want ${RIDGE_CLEAR_FT} feet over it.`,
         options: [
-          { id: 'straight-out', label: 'Take off and climb straight out on course at Vy.' },
-          { id: 'climb-overhead', label: `Climb over the field to ${fmt(topMsl)} feet, then head for the ridge.` },
-          { id: 'wait-morning', label: 'Put it off to tomorrow morning, when it is cool.' },
+          { id: 'straight-out', label: 'Take off and climb straight out on course at Vy, the best rate.' },
+          { id: 'climb-overhead', label: `Climb over the field to ${fmt(topMsl)} feet, then head out.` },
+          { id: 'wait-morning', label: 'Put it off to tomorrow morning, when the air is cool.' },
         ],
         grades,
         consequence,
-        why: `You need ${fmt(need)} feet by the ridge. This afternoon the chart gives about ${fmt(gainPm)} in ${RIDGE_NM} miles, this morning it gave ${fmt(gainAm)}. Climbing over the field turns a race with the terrain into a climb with a runway underneath.`,
+        why: gainPm >= need
+          ? `You need ${fmt(need)} feet by the ridge, and this afternoon the chart gives about ${fmt(gainPm)} in ${RIDGE_NM} miles. Density altitude always costs something; the question is whether what is left is enough, and here it is.`
+          : `You need ${fmt(need)} feet by the ridge. This afternoon the chart gives about ${fmt(gainPm)} in ${RIDGE_NM} miles, this morning it gave ${fmt(gainAm)}. Climbing over the field turns a race with the terrain into a climb with a runway underneath.`,
       },
     ];
   },
@@ -356,7 +377,11 @@ const shortStrip: Lesson = {
   summary: 'Read the takeoff chart for a short grass strip, apply the wind and surface notes, add a margin, and pick the hour you leave.',
   acs: ['PA.I.F', 'PA.IV.C'],
   refs: ['PHAK ch. 11', 'POH section 5, performance', 'AFH, crosswind takeoff and landing'],
+  variants: 3,
   build(ctx) {
+    // The strip's length decides the hour. 0: only a cool morning works.
+    // 1: long enough for now. 2: long enough once the evening cools it.
+    const v = ctx.variant ?? 0;
     const ap = lessonAirplane(ctx.aircraft);
     const p = ap.perf;
     const n = p.takeoff.notes;
@@ -370,27 +395,31 @@ const shortStrip: Lesson = {
     const am = takeoffDistance(p, cond(amT, 0));
     const ev = takeoffDistance(p, cond(evT, 0));
     const pm = takeoffDistance(p, cond(pmT, STRIP_HEADWIND_KT));
-    // The strip is as long as the cool-morning departure needs with the margin.
-    const runway = ceil100(am.over50Ft * RUNWAY_MARGIN);
+    // The strip is as long as the cool-morning departure needs with the margin
+    // (or this afternoon's, or this evening's).
+    const runway = ceil100((v === 1 ? pm : v === 2 ? ev : am).over50Ft * RUNWAY_MARGIN);
     const needed = round5(pm.over50Ft * RUNWAY_MARGIN);
     const chartPm = pm.steps[0];
     const evAt = nextLocalHour(ctx.now, 19);
 
+    // Waiting is the cost; once an earlier departure has the margin, a later one buys nothing.
+    const now = runwayGrade(pm.over50Ft, runway);
+    const evening = runwayGrade(ev.over50Ft, runway);
     const grades: Record<string, Grade> = {
-      'go-now': runwayGrade(pm.over50Ft, runway),
-      'go-evening': runwayGrade(ev.over50Ft, runway),
-      'go-morning': runwayGrade(am.over50Ft, runway),
+      'go-now': now,
+      'go-evening': now === 'best' ? capGrade(evening, 'acceptable') : evening,
+      'go-morning': now === 'best' || evening === 'best' ? capGrade(runwayGrade(am.over50Ft, runway), 'acceptable') : runwayGrade(am.over50Ft, runway),
     };
     const outcome = (d: DistanceResult, g: Grade) =>
       g === 'unsafe'
         ? `The book puts you over the 50 foot trees at ${fmt(d.over50Ft)} feet, past the end of a ${fmt(runway)} foot strip. There is no technique that makes that up.`
         : g === 'marginal'
           ? `The book clears the trees at ${fmt(d.over50Ft)} feet with ${fmt(runway - d.over50Ft)} feet to spare. That spare is all there is for a soft spot, a tired engine or a technique that isn't perfect, and you'd want ${fmt(round5(d.over50Ft * RUNWAY_MARGIN))}.`
-          : `The book clears the trees at ${fmt(d.over50Ft)} feet, inside the margin, with ${fmt(runway - d.over50Ft)} feet to spare.`;
+          : `The book clears the trees at ${fmt(d.over50Ft)} feet, inside the margin, with ${fmt(runway - d.over50Ft)} feet to spare.${g === 'acceptable' ? ' An earlier departure had the margin too, so the wait bought nothing.' : ''}`;
     const consequence: Record<string, string> = {
       'go-now': outcome(pm, grades['go-now']),
       'go-evening': `At ${evT}°C: ${outcome(ev, grades['go-evening'])}`,
-      'go-morning': `At ${amT}°C: ${outcome(am, grades['go-morning'])}${grades['go-morning'] === 'best' ? ' A night away from home, and a departure the numbers are happy with.' : ''}`,
+      'go-morning': `At ${amT}°C: ${outcome(am, grades['go-morning'])}${grades['go-morning'] === 'best' ? ' A night away from home, and a departure the numbers are happy with.' : grades['go-morning'] === 'acceptable' ? ' And a night away from home you did not need.' : ''}`,
     };
 
     return [
@@ -448,7 +477,7 @@ const shortStrip: Lesson = {
         ],
         grades,
         consequence,
-        why: `With half again on the book distance you want ${fmt(needed)} feet now, ${fmt(round5(ev.over50Ft * RUNWAY_MARGIN))} this evening and ${fmt(round5(am.over50Ft * RUNWAY_MARGIN))} at sunrise, against ${fmt(runway)} feet. The book number is what a new airplane does on a good day; the margin is for yours.`,
+        why: `With half again on the book distance you want ${fmt(needed)} feet now, ${fmt(round5(ev.over50Ft * RUNWAY_MARGIN))} this evening and ${fmt(round5(am.over50Ft * RUNWAY_MARGIN))} at sunrise, against ${fmt(runway)} feet. ${now === 'best' ? 'Today the strip has room for all of them, so there is no reason to wait.' : 'The book number is what a new airplane does on a good day; the margin is for yours.'}`,
       },
     ];
   },
@@ -471,7 +500,10 @@ const fuelReserve: Lesson = {
   summary: 'Plan the fuel for a cross-country into a headwind, see the gap between the legal reserve and a real one, and act on it in the air.',
   acs: ['PA.I.D', 'PA.I.F', 'PA.VI.B'],
   refs: ['14 CFR 91.151, 91.103', 'PHAK ch. 11', 'POH section 5, performance'],
+  variants: 2,
   build(ctx) {
+    // 0: the tanks cover the legal reserve but not a real one. 1: they cover both.
+    const v = ctx.variant ?? 0;
     const ap = lessonAirplane(ctx.aircraft);
     const p = ap.perf;
     const R = practiceRegion;
@@ -486,15 +518,17 @@ const fuelReserve: Lesson = {
     const plan = (cruiseMin: number, onBoardGal: number) => tripFuel(p, { climbMin: CLIMB_MIN, cruiseMin, night: false, onBoardGal });
     const stillPlan = plan(still.totalMin, 0).legal;
     const req = plan(fc.totalMin, 0);
-    const onBoard = Math.min(ap.profile.usableFuelGal, Math.ceil(req.legal.requiredGal + 1.5));
+    const onBoard = Math.min(ap.profile.usableFuelGal, Math.ceil(v === 1 ? req.real.requiredGal + 2 : req.legal.requiredGal + 1.5));
     const t = plan(fc.totalMin, onBoard);
 
     // d1: go as is, top off, or not today.
     const topOff: Loading = { frontLb: FRONT_LB, rearLb: 0, bagLb: 0, fuelGal: ap.profile.usableFuelGal };
+    const enough = fuelGrade(t) === 'best';
     const grades1: Record<string, Grade> = {
       go: fuelGrade(t),
-      'top-off': loadingGrade(ap, topOff, { climbMin: CLIMB_MIN, cruiseMin: fc.totalMin, night: false }),
-      cancel: 'acceptable',
+      // With a real reserve already aboard, the wait buys nothing and calling it off is a needless loss.
+      'top-off': enough ? capGrade(loadingGrade(ap, topOff, { climbMin: CLIMB_MIN, cruiseMin: fc.totalMin, night: false }), 'acceptable') : loadingGrade(ap, topOff, { climbMin: CLIMB_MIN, cruiseMin: fc.totalMin, night: false }),
+      cancel: enough ? 'marginal' : 'acceptable',
     };
     const plannedLand = landingFuel(p, onBoard, req.legal.taxiGal + req.legal.climbGal + req.legal.cruiseGal);
     const fullLand = landingFuel(p, ap.profile.usableFuelGal, req.legal.taxiGal + req.legal.climbGal + req.legal.cruiseGal);
@@ -520,7 +554,8 @@ const fuelReserve: Lesson = {
     const grades2: Record<string, Grade> = {
       continue: reserveGrade(onward.land.min),
       // Once the fuel is behind plan, landing for more is the call, as long as you get there legal.
-      divert: fuelStop.land.min >= 30 ? 'best' : 'marginal',
+      // With a real reserve still in hand at the destination, it is a cost with nothing bought.
+      divert: fuelStop.land.min < 30 ? 'marginal' : reserveGrade(onward.land.min) === 'best' ? 'acceptable' : 'best',
       'land-near': capGrade(reserveGrade(noFuel.land.min), 'acceptable'),
     };
     const landLine = (x: { land: { gal: number; min: number } }) => `${r1(x.land.gal)} gallons, about ${x.land.min} minutes`;
@@ -576,13 +611,21 @@ const fuelReserve: Lesson = {
         consequence: {
           go: grades1.go === 'unsafe'
             ? `${onBoard} gallons doesn't cover the legal reserve. You land with ${landLine({ land: plannedLand })} if the forecast holds, which is less than the law allows you to plan.`
-            : `Legal on paper: you'd land with ${landLine({ land: plannedLand })} if the forecast wind and the book burn both hold. Neither has to.`,
+            : enough
+              ? `You'd land with ${landLine({ land: plannedLand })}, more than the hour you plan for, and you keep checking it against the clock on the way.`
+              : `Legal on paper: you'd land with ${landLine({ land: plannedLand })} if the forecast wind and the book burn both hold. Neither has to.`,
           'top-off': grades1['top-off'] === 'best'
             ? `Fifteen minutes for the truck. You land with ${landLine({ land: fullLand })}, more than the hour you plan for, and you're inside gross with two aboard.`
-            : `Full tanks with two aboard doesn't work in ${ap.name}: ${loadStatus(ap, topOff)}`,
-          cancel: 'Safe, but the fix was fifteen minutes and a fuel truck. Canceling a trip you could make well teaches the wrong lesson about what a reserve is for.',
+            : enough && loadWb(ap, topOff).withinEnvelope && !loadWb(ap, topOff).overGross
+              ? `Fine, and fifteen minutes later for fuel you already had: ${onBoard} gallons covered the hour you plan to land with.`
+              : `Full tanks with two aboard doesn't work in ${ap.name}: ${loadStatus(ap, topOff)}`,
+          cancel: enough
+            ? `There was nothing to fix: ${onBoard} gallons covers the trip and an hour on top.`
+            : 'Safe, but the fix was fifteen minutes and a fuel truck. Canceling a trip you could make well teaches the wrong lesson about what a reserve is for.',
         },
-        why: `Legal needs ${req.legal.requiredGal} gallons and you have ${onBoard}. A real reserve needs ${req.real.requiredGal}. The gap between them is the margin for a stronger wind, a richer mixture or a go-around, and it costs only a wait for the truck.`,
+        why: enough
+          ? `Legal needs ${req.legal.requiredGal} gallons, a real reserve ${req.real.requiredGal}, and you have ${onBoard}. Plan the fuel, then trust the plan, and keep checking it against the clock in the air.`
+          : `Legal needs ${req.legal.requiredGal} gallons and you have ${onBoard}. A real reserve needs ${req.real.requiredGal}. The gap between them is the margin for a stronger wind, a richer mixture or a go-around, and it costs only a wait for the truck.`,
       },
       {
         kind: 'brief', id: 'b2', title: 'Halfway',
@@ -608,7 +651,9 @@ const fuelReserve: Lesson = {
         consequence: {
           continue: grades2.continue === 'unsafe'
             ? `You land at ${to.name} with ${landLine(onward)}, under the legal reserve, and only if nothing else goes wrong. A go-around or a busy pattern and it is a forced landing.`
-            : `You land at ${to.name} with ${landLine(onward)}. It worked, with less than you planned to keep.`,
+            : grades2.continue === 'best'
+              ? `You land at ${to.name} with ${landLine(onward)}, still more than the hour you plan to keep. The extra fuel at the truck is what bought you this choice.`
+              : `You land at ${to.name} with ${landLine(onward)}. It worked, with less than you planned to keep.`,
           divert: `${fuelStop.id === from.id ? 'You turn back with the wind behind you' : 'You divert'} and land at ${stopName} with ${landLine(fuelStop)}. Fill up, call ahead, and try again with the real wind in the plan.`,
           'land-near': `You land at ${noFuel.name} with ${landLine(noFuel)}. Safe on the ground, but with no fuel there the airplane stays until someone brings some.`,
         },

@@ -77,6 +77,8 @@ const PASSAGES: Record<string, RefLink[]> = {
   'PHAK, hypoxia': [doc('PHAK, hypoxia', 'phak-17', ['Hypoxia'])],
   'PHAK, fatigue': [doc('PHAK, fatigue', 'phak-17', ['Fatigue'])],
   'PHAK, drugs': [doc('PHAK, drugs and dosing intervals', 'phak-17', ['maximal dosing', 'Drugs'])],
+  '14 CFR 43 appendix A': [{ kind: 'web', text: '14 CFR 43 appendix A, preventive maintenance', href: 'https://www.ecfr.gov/current/title-14/part-43/appendix-Appendix%20A%20to%20Part%2043' }],
+  'UK CAA SafetySense 9, weight, balance and performance': [{ kind: 'web', text: 'UK CAA SafetySense 9, weight, balance and performance', href: 'https://www.caa.co.uk/media/wcebqozv/ssl09-caa-safety-sense-weight-balance-and-performance.pdf' }],
   'PHAK, night vision': [doc('PHAK, night vision', 'phak-17', ['Night Vision'])],
 };
 

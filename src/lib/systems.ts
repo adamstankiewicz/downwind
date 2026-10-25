@@ -171,8 +171,13 @@ export type InstrumentChoice = 'trust-attitude' | 'cover-land' | 'cover-continue
  * met, finishing the trip is fine; in haze below it, land at the nearest good
  * field while you can still see.
  */
-export function gradeGyroFailure(o: { visibilitySm: number; minimumSm: number }): Record<InstrumentChoice, Grade> {
+export function gradeGyroFailure(o: { visibilitySm: number; minimumSm: number; failure?: 'vacuum' | 'electric' }): Record<InstrumentChoice, Grade> {
   const clear = o.visibilitySm >= o.minimumSm;
+  // With the electric turn coordinator the one lying, the vacuum gyros are the good ones:
+  // the attitude indicator is right, and covering it to fly the dead instrument is the mistake.
+  if (o.failure === 'electric') {
+    return { 'trust-attitude': 'best', 'cover-land': 'unsafe', 'cover-continue': 'unsafe', 'climb-clear': clear ? 'acceptable' : 'marginal' };
+  }
   return {
     'trust-attitude': 'unsafe',
     'cover-land': 'best',

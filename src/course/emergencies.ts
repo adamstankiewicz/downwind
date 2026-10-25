@@ -68,7 +68,10 @@ const afterTakeoff: Lesson = {
   summary: 'Work out what a turn back actually costs in your airplane, then make the call in the seconds you have.',
   acs: ['PA.IX.B'],
   refs: ['Airplane Flying Handbook (FAA-H-8083-3), engine failure after takeoff', 'POH, emergency procedures'],
+  variants: 2,
   build(ctx) {
+    // The second situation: a new subdivision fills the ground ahead, and the open field is off the left wing.
+    const builtUp = ctx.variant === 1;
     const f = ctx.airport;
     const { perf, sample, source } = airplane(ctx);
     const rwy = mainRunway(f);
@@ -96,10 +99,11 @@ const afterTakeoff: Lesson = {
     const sideTurn = glidingTurn(perf, 30, 90);
     const sideBrg = norm(rwyTrue - 90);
     const sideLeft = glideFt - sideTurn.altitudeLostFt;
-    const sideField = reach(perf, sideLeft, sideBrg, Math.max(0.3, aheadReachNm * 0.9), windFrom, windKt, 0);
+    const sideReachNm = reach(perf, Math.max(0, sideLeft), sideBrg, 0, windFrom, windKt, 0).reachNm;
+    const sideField = reach(perf, sideLeft, sideBrg, builtUp ? Math.max(0.15, sideReachNm * 0.7) : Math.max(0.3, aheadReachNm * 0.9), windFrom, windKt, 0);
     const runwayNm = tb.outFt / 6076;
     const runwayReachable = tb.turnCompletes && tb.heightAfterTurnFt >= tb.glideBackNeedFt;
-    const grades = gradeAfterTakeoff({ turnCompletes: tb.turnCompletes, aheadReachable: ahead.reachable, sideReachable: sideField.reachable });
+    const grades = gradeAfterTakeoff({ turnCompletes: tb.turnCompletes, aheadReachable: ahead.reachable, sideReachable: sideField.reachable, aheadBuiltUp: builtUp });
 
     const h2 = h + 200;
     const tb2 = turnback(perf, { failureAglFt: h2, climbFpm, headwindKt: head });
@@ -107,7 +111,7 @@ const afterTakeoff: Lesson = {
     const glideFig: Figure = {
       kind: 'glide', heightAglFt: h, rangeNm: glideReachNm(perf, glideFt, 0, 0, 0), windFromTrue: windFrom, windKt,
       fields: [
-        { name: 'Field ahead', bearingTrue: ahead.bearingTrue, distanceNm: ahead.distanceNm, reachable: ahead.reachable },
+        { name: builtUp ? 'Houses ahead' : 'Field ahead', bearingTrue: ahead.bearingTrue, distanceNm: ahead.distanceNm, reachable: ahead.reachable && !builtUp },
         { name: 'Big field', bearingTrue: sideField.bearingTrue, distanceNm: sideField.distanceNm, reachable: sideField.reachable },
         { name: `Runway ${rwy.id}`, bearingTrue: Math.round(norm(rwyTrue + 180)), distanceNm: Math.round(runwayNm * 10) / 10, reachable: runwayReachable },
       ],
@@ -151,28 +155,36 @@ const afterTakeoff: Lesson = {
       },
       {
         kind: 'decide', id: 'd1', title: `${fmt(h)} feet, and quiet`,
-        situation: `Climbing through ${fmt(h)} feet above the ground, the engine stops. The runway is ${nm1(runwayNm)} nm behind you. A mown field sits ${nm1(ahead.distanceNm)} nm ahead, just ${side(rwyTrue, aheadBrg)} of the nose. Off your left wing, ${nm1(sideField.distanceNm)} nm away, is a bigger one.`,
+        situation: builtUp
+          ? `Climbing through ${fmt(h)} feet above the ground, the engine stops. The runway is ${nm1(runwayNm)} nm behind you. Ahead is a new subdivision: roofs, driveways and a road with wires along it. Off your left wing, ${nm1(sideField.distanceNm)} nm away, is a long cut field.`
+          : `Climbing through ${fmt(h)} feet above the ground, the engine stops. The runway is ${nm1(runwayNm)} nm behind you. A mown field sits ${nm1(ahead.distanceNm)} nm ahead, just ${side(rwyTrue, aheadBrg)} of the nose. Off your left wing, ${nm1(sideField.distanceNm)} nm away, is a bigger one.`,
         figure: glideFig,
         options: [
-          { id: 'land-ahead', label: 'Nose down, and land in the field ahead.' },
+          { id: 'land-ahead', label: builtUp ? 'Nose down, and land straight ahead as best you can.' : 'Nose down, and land in the field ahead.' },
           { id: 'turn-back', label: 'Turn back for the runway.' },
-          { id: 'side-field', label: 'Turn 90° left for the bigger field.' },
+          { id: 'side-field', label: builtUp ? 'Nose down, and turn 90° left for the cut field.' : 'Turn 90° left for the bigger field.' },
           { id: 'restart-first', label: 'Hold the attitude and try a restart first.' },
         ],
         grades,
         consequence: {
-          'land-ahead': ahead.reachable
+          'land-ahead': builtUp
+            ? 'Straight ahead is the rule because it costs no height, but here it means a street between houses, with wires across it. Pilots who have survived this aimed for the gaps; with a field in reach, you did not have to.'
+            : ahead.reachable
             ? `You lower the nose and the airspeed settles at ${perf.bestGlideKias} knots. You have about ${seconds} seconds: fuel and mixture off, flaps as you need them, door unlatched, master off before touchdown. You touch down into the wind, at the slowest groundspeed you can have. The airplane may be bent. You walk away.`
             : `The field is ${nm1(ahead.distanceNm)} nm and your glide reaches ${nm1(ahead.reachNm)} that way. You touch down short of it, but under control and into the wind, which is still the landing you want.`,
           'turn-back': tb.turnCompletes
             ? `You make it around with ${fmt(tb.heightAfterTurnFt)} feet left and the runway ${nm1(runwayNm)} nm away, downwind. Gliding back to where you lifted off takes about ${fmt(tb.glideBackNeedFt)}. Pilots who practice this in their own airplane with an instructor sometimes make it. Untrained, on the day, most do not.`
             : `The reaction and the turn cost ${fmt(tb.reactionLossFt + t45.altitudeLostFt)} feet and you have ${fmt(h)}. Partway around, steeply banked and slow, you run out of height. This is the accident the AFH calls "the impossible turn".`,
-          'side-field': sideField.reachable
+          'side-field': sideField.reachable && builtUp
+            ? `Nose down first, then a 90° turn at a shallow 30° bank: it costs ${fmt(sideTurn.altitudeLostFt)} feet and leaves the field inside your glide. You land crosswind on cut grass and roll to a stop. The 30° rule of thumb is a starting point, not a wall: a modest turn to open ground beats a straight line into houses.`
+            : sideField.reachable
             ? `A 90° turn at 30° bank costs ${fmt(sideTurn.altitudeLostFt)} feet, and the field is just inside what is left. You make it, crosswind and with no margin. The field ahead asked for less.`
             : `A 90° turn at 30° bank costs ${fmt(sideTurn.altitudeLostFt)} feet, leaving ${fmt(Math.max(0, sideLeft))} feet and ${nm1(sideField.reachNm)} nm of glide. The field is ${nm1(sideField.distanceNm)} nm away. You land short, crosswind, in whatever is between.`,
           'restart-first': `Without the engine, the climb attitude is a stall attitude. In the few seconds you spend on the mixture and the key, the airspeed falls toward the stall at a height with no room to recover. Nose down first. A restart, if there is time, happens on the way down.`,
         },
-        why: `At ${fmt(h)} feet the reaction and a 45° turn back cost ${fmt(tb.reactionLossFt + t45.altitudeLostFt)} feet${tb.turnCompletes ? '' : ', more than you have'}. Ahead is a landing under control, into the wind and slow over the ground. Know your own airplane's turn back height before you need it, and practice it only with an instructor, at altitude.`,
+        why: builtUp
+          ? `At ${fmt(h)} feet a turn back costs ${fmt(tb.reactionLossFt + t45.altitudeLostFt)} feet${tb.turnCompletes ? '' : ', more than you have'}. A 90° turn at a shallow bank costs ${fmt(sideTurn.altitudeLostFt)}, and buys open ground. Know what is off the end of your runway before you take off: the departure briefing is where this decision gets made.`
+          : `At ${fmt(h)} feet the reaction and a 45° turn back cost ${fmt(tb.reactionLossFt + t45.altitudeLostFt)} feet${tb.turnCompletes ? '' : ', more than you have'}. Ahead is a landing under control, into the wind and slow over the ground. Know your own airplane's turn back height before you need it, and practice it only with an instructor, at altitude.`,
       },
     ];
   },
@@ -186,8 +198,11 @@ const atAltitude: Lesson = {
   summary: 'Fly the glide from cruise: best glide, a field you can actually reach with the wind, then the checklist and the call.',
   acs: ['PA.IX.B'],
   refs: ['Airplane Flying Handbook (FAA-H-8083-3), terrain selection', 'AIM 6-3-1', 'AIM 6-2-2', 'POH, emergency procedures'],
+  variants: 2,
   build(ctx) {
     const { perf, source } = airplane(ctx);
+    // The wind up there: on the nose (a westerly), or behind you (an easterly).
+    const easterly = ctx.variant === 1;
     const home = chartAirport('KXYZ')!;
     const mill = chartAirport('2X5')!;
     const course = trueCourse(home.pos, mill.pos);
@@ -195,9 +210,11 @@ const atAltitude: Lesson = {
     const altMsl = 6500;
     const groundFt = practiceRegion.groundFt(pos);
     const agl = altMsl - groundFt;
-    const windFrom = 290;
+    const windFrom = easterly ? 100 : 290;
     const windKt = 20;
     const sink = Math.round(glideSinkFpm(perf));
+    const aheadWind = easterly ? 'with the wind behind you' : 'into the wind';
+    const backWind = easterly ? 'into the wind' : 'with the wind behind you';
 
     const at = (a: typeof home) => ({ a, r: reach(perf, agl, trueCourse(pos, a.pos), distanceNm(pos, a.pos), windFrom, windKt) });
     const ahead = at(mill);
@@ -222,7 +239,7 @@ const atAltitude: Lesson = {
     return [
       {
         kind: 'brief', id: 'b1', title: 'Cruise, then quiet',
-        scene: `Westbound at ${fmt(altMsl)} feet, halfway from KXYZ to ${mill.name} (${mill.id}), a grass strip. The wind up here is from ${deg3(windFrom)} at ${windKt} knots, nearly on the nose. The engine coughs twice and stops. ${PRACTICE_NOTE}`,
+        scene: `Westbound at ${fmt(altMsl)} feet, halfway from KXYZ to ${mill.name} (${mill.id}), a grass strip. The wind up here is from ${deg3(windFrom)} at ${windKt} knots, ${easterly ? 'nearly on the tail' : 'nearly on the nose'}. The engine coughs twice and stops. ${PRACTICE_NOTE}`,
         say: {
           full: `Height is time, and the order is the same every time. **Airspeed**: pitch for best glide, ${perf.bestGlideKias} knots in your airplane, and trim for it. **Best field**: turn toward somewhere you can reach. **Checklist**: the restart flow in your POH, usually fuel selector, mixture, carb heat or alternate air, magnetos, primer. Then **declare**: say "Mayday" on the frequency you are on or 121.5, and squawk 7700. The field comes before the checklist because the field is the part that runs out.`,
           short: 'Airspeed, best field, checklist, then declare.',
@@ -232,7 +249,7 @@ const atAltitude: Lesson = {
       {
         kind: 'example', id: 'e1', title: 'How far, and which way',
         say: {
-          full: `Glide range starts from height above the **ground**, not the altimeter. Keep about 1,000 feet in hand for a pattern at the other end, then multiply what is left by the glide ratio. The wind changes your groundspeed, not how fast you come down, so a headwind shortens the range and a tailwind stretches it by the ratio of groundspeed to airspeed. Here is the way you are pointed, into the wind. ${source}`,
+          full: `Glide range starts from height above the **ground**, not the altimeter. Keep about 1,000 feet in hand for a pattern at the other end, then multiply what is left by the glide ratio. The wind changes your groundspeed, not how fast you come down, so a headwind shortens the range and a tailwind stretches it by the ratio of groundspeed to airspeed. Here is the way you are pointed, ${aheadWind}. ${source}`,
           short: 'Height above the ground, less 1,000, times the glide ratio. Then the wind.',
         },
         figure: { kind: 'chart', route: ['KXYZ', mill.id], marker: { pos, altMsl, label: 'Engine out' } },
@@ -247,10 +264,12 @@ const atAltitude: Lesson = {
       },
       {
         kind: 'turn', id: 't1', title: 'Your turn',
-        prompt: `Now the other way, back toward KXYZ with the wind behind you. KXYZ is ${nm1(behind.r.distanceNm)} nm away.`,
+        prompt: `Now the other way, back toward KXYZ ${backWind}. KXYZ is ${nm1(behind.r.distanceNm)} nm away.`,
         blanks: [
           { id: 'gs', label: 'Groundspeed toward KXYZ', unit: 'kt', answer: Math.round(gsWith), tolerance: 2,
-            explain: `${perf.bestGlideKias} knots plus about ${Math.round(gsWith - perf.bestGlideKias)} of tailwind.` },
+            explain: gsWith >= perf.bestGlideKias
+              ? `${perf.bestGlideKias} knots plus about ${Math.round(gsWith - perf.bestGlideKias)} of tailwind.`
+              : `${perf.bestGlideKias} knots less about ${Math.round(perf.bestGlideKias - gsWith)} of headwind.` },
           { id: 'reach', label: 'Glide reach toward KXYZ', unit: 'nm', answer: behind.r.reachNm, tolerance: 0.3,
             explain: `${nm1(still)} nm in still air × ${Math.round(gsWith)} ÷ ${perf.bestGlideKias} is about ${nm1(behind.r.reachNm)} nm.` },
           { id: 'which', label: 'Which can you reach?', answer: canReach, choices: [`${mill.name} (${mill.id})`, home.id, 'Both', 'Neither'],
@@ -259,7 +278,7 @@ const atAltitude: Lesson = {
       },
       {
         kind: 'decide', id: 'd1', title: 'Which way?',
-        situation: `Trimmed at ${perf.bestGlideKias} knots, ${fmt(agl)} feet above the ground and coming down at about ${fmt(sink)} feet a minute. ${mill.id} is ${nm1(ahead.r.distanceNm)} nm ahead into the wind. KXYZ is ${nm1(behind.r.distanceNm)} nm behind you.`,
+        situation: `Trimmed at ${perf.bestGlideKias} knots, ${fmt(agl)} feet above the ground and coming down at about ${fmt(sink)} feet a minute. ${mill.id} is ${nm1(ahead.r.distanceNm)} nm ahead, ${aheadWind}. KXYZ is ${nm1(behind.r.distanceNm)} nm behind you.`,
         figure: {
           kind: 'glide', heightAglFt: agl, rangeNm: still, windFromTrue: windFrom, windKt,
           fields: [ahead, behind].map((c) => ({ name: c.a.id, bearingTrue: c.r.bearingTrue, distanceNm: c.r.distanceNm, reachable: c.r.reachable })),
@@ -277,7 +296,9 @@ const atAltitude: Lesson = {
           'off-airport': anyReachable
             ? 'A field you pick early is a real option, and the AFH would back you. But a runway you can reach with margin is better: a known surface, a clear approach, and people who can help.'
             : 'With no runway in reach, a field chosen early, while you still have height to look it over, is the right call.',
-          'troubleshoot-first': `A minute on the checklist before turning costs about ${fmt(sink)} feet and carries you ${nm1(gsInto / 60)} nm farther from KXYZ. ${late.reachable ? 'You can still make it, with less in hand.' : 'That is enough to put it out of reach.'} Turn first, then troubleshoot.`,
+          'troubleshoot-first': easterly
+            ? `A minute on the checklist costs about ${fmt(sink)} feet. Carried on toward ${mill.id} with the wind behind you, it costs less distance than it would elsewhere, but the height is gone either way. Point at the field first, then troubleshoot.`
+            : `A minute on the checklist before turning costs about ${fmt(sink)} feet and carries you ${nm1(gsInto / 60)} nm farther from KXYZ. ${late.reachable ? 'You can still make it, with less in hand.' : 'That is enough to put it out of reach.'} Turn first, then troubleshoot.`,
         },
         why: `${mill.id} is ${Math.abs(ahead.r.distanceNm - behind.r.distanceNm) < 0.2 ? 'just as close' : ahead.r.distanceNm < behind.r.distanceNm ? 'closer' : 'farther'}, but the wind decides: toward it you reach ${nm1(ahead.r.reachNm)} nm, toward KXYZ ${nm1(behind.r.reachNm)}. Pick the field by reach, not by distance.`,
       },
@@ -393,13 +414,17 @@ const fieldSelection: Lesson = {
   summary: 'Sort four fields by reach, wind, length and surface, worked from your own landing chart.',
   acs: ['PA.IX.B'],
   refs: ['Airplane Flying Handbook (FAA-H-8083-3), terrain selection', 'Airplane Flying Handbook (FAA-H-8083-3), emergency landings', 'POH, landing distance'],
+  variants: 2,
   build(ctx) {
+    // The second situation is a calm day: the same four fields, and the wind test drops out.
+    const calm = ctx.variant === 1;
     const f = ctx.airport;
     const { perf, sample, source } = airplane(ctx);
     const rwy = mainRunway(f);
     const windFrom = magToTrue(f, rwy.headingMag);
-    const windKt = 12;
+    const windKt = calm ? 0 : 12;
     const height = 2000;
+    const into = calm ? 'long and straight' : 'into the wind';
     const elevationFt = f.elevationFt;
     const oatC = Math.round(isaTempC(elevationFt) + 5);
     const o = { heightAglFt: height, elevationFt, oatC, windFromTrue: windFrom, windKt };
@@ -415,10 +440,10 @@ const fieldSelection: Lesson = {
       return { bearingTrue: Math.round(b), distanceNm: Math.max(0.2, Math.round(reachToward(b) * frac * 10) / 10) };
     };
     const fields: (Field & { what: string })[] = [
-      { ...size({ id: 'hayfield', name: 'Hayfield', ...at(50, 0.55), landingTrue: windFrom, surface: 'mown', obstacleFt: 40 }, 1.3), what: 'mown hay, into the wind, power lines across the approach end' },
-      { ...size({ id: 'pasture', name: 'Pasture', ...at(200, 0.4), landingTrue: norm(windFrom + 180), surface: 'pasture', obstacleFt: 0 }, 1.4), what: 'smooth and long, but woods on three sides mean the only way in is with the wind behind you' },
-      { ...size({ id: 'plowed', name: 'Plowed field', ...at(-70, 0.6), landingTrue: windFrom, surface: 'plowed', obstacleFt: 0 }, 1.8), what: 'freshly plowed, into the wind, furrows running across your path' },
-      { ...size({ id: 'sod-farm', name: 'Sod farm', ...at(5, 1.3), landingTrue: windFrom, surface: 'mown', obstacleFt: 0 }, 2.5), what: 'huge, smooth and flat, straight upwind' },
+      { ...size({ id: 'hayfield', name: 'Hayfield', ...at(50, 0.55), landingTrue: windFrom, surface: 'mown', obstacleFt: 40 }, 1.3), what: `mown hay, ${into}, power lines across the approach end` },
+      { ...size({ id: 'pasture', name: 'Pasture', ...at(200, 0.4), landingTrue: norm(windFrom + 180), surface: 'pasture', obstacleFt: 0 }, 1.4), what: calm ? 'smooth and long, woods on three sides, so the only way in is from the open end' : 'smooth and long, but woods on three sides mean the only way in is with the wind behind you' },
+      { ...size({ id: 'plowed', name: 'Plowed field', ...at(-70, 0.6), landingTrue: windFrom, surface: 'plowed', obstacleFt: 0 }, 1.8), what: `freshly plowed, ${into}, furrows running across your path` },
+      { ...size({ id: 'sod-farm', name: 'Sod farm', ...at(5, 1.3), landingTrue: windFrom, surface: 'mown', obstacleFt: 0 }, 2.5), what: calm ? 'huge, smooth and flat, a long way off the nose' : 'huge, smooth and flat, straight upwind' },
     ];
     const checks: Record<string, FieldCheck> = Object.fromEntries(fields.map((fl) => [fl.id, checkField(perf, fl, o)]));
     const grades = Object.fromEntries(fields.map((fl) => [fl.id, gradeField({ ...checks[fl.id], reachable: checks[fl.id].reach.reachable })]));
@@ -428,17 +453,20 @@ const fieldSelection: Lesson = {
 
     const consequence = (fl: Field & { what: string }): string => {
       const c = checks[fl.id];
-      if (!c.reach.reachable) return `${fl.name} is ${nm1(c.reach.distanceNm)} nm upwind and your glide reaches ${nm1(c.reach.reachNm)} that way, keeping the pattern height. It looks close from ${fmt(height)} feet. You land short of it, downwind of the trees at its edge.`;
+      if (!c.reach.reachable) return `${fl.name} is ${nm1(c.reach.distanceNm)} nm ${calm ? 'away' : 'upwind'} and your glide reaches ${nm1(c.reach.reachNm)} that way, keeping the pattern height. It looks close from ${fmt(height)} feet. You land short of it, downwind of the trees at its edge.`;
       if (!c.fits) return `You need about ${fmt(c.needFt)} feet and ${fl.name.toLowerCase()} has ${fmt(fl.lengthFt)}. You run off the far end at walking pace into whatever is there.`;
       if (c.rough) return `You make it and touch down slowly into the wind, but the furrows across your path catch the nosewheel. The AFH's advice is to land along furrows, not across them, and to keep the nose up as long as you can. Survivable, and the airplane is badly damaged.`;
       if (c.headwindKt < 0) return `It fits, with ${fmt(fl.lengthFt - c.needFt)} feet to spare. But with the wind behind you, your groundspeed at touchdown is ${2 * windKt} knots higher than landing into it, and the energy to get rid of goes with the square of groundspeed. You stop, faster and harder than you needed to.`;
-      return `Over the wires with height to spare, ${fmt(c.needFt)} feet of the ${fmt(fl.lengthFt)} used, into the wind at the slowest groundspeed of the four. You stop in the hay.`;
+      if (fl.obstacleFt === 0) return `Nothing to clear on the way in, ${fmt(c.needFt)} feet of the ${fmt(fl.lengthFt)} used, and a smooth surface under the wheels. With no wind to land into, the field with no wires and the most room is the one you want.`;
+      return calm
+        ? `Over the wires with height to spare, ${fmt(c.needFt)} feet of the ${fmt(fl.lengthFt)} used. You stop in the hay. Fine, though on a calm day the pasture gave you the same room without the wires.`
+        : `Over the wires with height to spare, ${fmt(c.needFt)} feet of the ${fmt(fl.lengthFt)} used, into the wind at the slowest groundspeed of the four. You stop in the hay.`;
     };
 
     return [
       {
         kind: 'brief', id: 'b1', title: 'Four fields',
-        scene: `Engine out at ${fmt(height)} feet above made-up farmland near ${fieldName(ctx)}, wind from ${deg3(windFrom)} at ${windKt} knots. Four fields in sight. None of them are real.`,
+        scene: `Engine out at ${fmt(height)} feet above made-up farmland near ${fieldName(ctx)}, ${calm ? 'the wind calm, smoke from a chimney going straight up' : `wind from ${deg3(windFrom)} at ${windKt} knots`}. Four fields in sight. None of them are real.`,
         say: {
           full: 'The AFH says to pick the general area first, then the spot, and not to change your mind more than once. Sort fields in this order. **Reach**: can you get there with height for a pattern, given the wind? **Wind**: land into it, because the energy you have to get rid of goes with the square of your groundspeed. **Length**: from your own landing chart, over an obstacle if there is one. **Surface**: smooth beats rough, and along furrows beats across them. The first field that fails a test is out.',
           short: 'Reach, wind, length, surface. In that order.',
@@ -468,9 +496,9 @@ const fieldSelection: Lesson = {
         figure: { kind: 'perf', chart: 'landing-roll', performance: perf, paFt: elevationFt, oatC, sample },
         blanks: [
           { id: 'tail', label: 'Tailwind landing in the pasture', unit: 'kt', answer: -checks.pasture.headwindKt, tolerance: 2,
-            explain: `Landing ${deg3(pasture.landingTrue)}° with the wind from ${deg3(windFrom)}° puts all ${windKt} knots behind you.` },
+            explain: calm ? 'None: the wind is calm, so the direction you land in costs nothing today.' : `Landing ${deg3(pasture.landingTrue)}° with the wind from ${deg3(windFrom)}° puts all ${windKt} knots behind you.` },
           { id: 'roll', label: 'Ground roll needed', unit: 'ft', answer: checks.pasture.needFt, tolerance: 60,
-            explain: `The chart, then the tailwind note (${perf.landing.notes.tailwindPct}% per ${perf.landing.notes.tailwindStepKt} knots), then grass: about ${fmt(checks.pasture.needFt)} feet.` },
+            explain: calm ? `The chart, then the grass note: about ${fmt(checks.pasture.needFt)} feet.` : `The chart, then the tailwind note (${perf.landing.notes.tailwindPct}% per ${perf.landing.notes.tailwindStepKt} knots), then grass: about ${fmt(checks.pasture.needFt)} feet.` },
           { id: 'fits', label: 'Does it fit?', answer: checks.pasture.fits ? 'Yes' : 'No', choices: ['Yes', 'No'],
             explain: `${fmt(checks.pasture.needFt)} feet needed, ${fmt(pasture.lengthFt)} available.` },
         ],
@@ -499,10 +527,13 @@ const partialPower: Lesson = {
   summary: 'The engine is still running, just not well. Treat it as the warning it is and use the power while you have it.',
   acs: ['PA.IX.C', 'PA.IX.B'],
   refs: ['Airplane Flying Handbook (FAA-H-8083-3), types of emergency landings', 'POH, emergency procedures'],
+  variants: 2,
   build(ctx) {
     const { perf, source } = airplane(ctx);
     const home = chartAirport('KXYZ')!;
-    const pos = destination(home.pos, 280, 16);
+    // Where it starts running rough: sixteen miles out, or four miles from home with home the closest runway.
+    const nearHome = ctx.variant === 1;
+    const pos = destination(home.pos, 280, nearHome ? 4 : 16);
     const altMsl = 5500;
     const groundFt = practiceRegion.groundFt(pos);
     const agl = altMsl - groundFt;
@@ -574,16 +605,24 @@ const partialPower: Lesson = {
         ],
         grades,
         consequence: {
-          nearest: `You turn, stay high, and keep ${nearest.id} inside the glide the whole way. ${min1(minNear)} minutes later you are on the ${nearest.surface} runway, ${nearest.runwayFt.toLocaleString('en-US')} feet. Later the mechanic finds a cracked intake gasket. It would have kept running, or it would not have: you did not need to find out.`,
-          'press-home': rHome.reachable || homeIsNearest
+          nearest: homeIsNearest
+            ? `You turn away from home for ${nearest.name}, ${min1(minNear)} minutes off, ${rNear.reachable ? 'inside the glide' : 'outside the glide for much of the way'}. It keeps running and you land on ${nearest.runwayFt.toLocaleString('en-US')} feet of ${nearest.surface}. KXYZ was closer${rHome.reachable ? ' and inside the glide' : ''}.`
+            : `You turn, stay high, and keep ${nearest.id} inside the glide the whole way. ${min1(minNear)} minutes later you are on the ${nearest.surface} runway, ${nearest.runwayFt.toLocaleString('en-US')} feet. Later the mechanic finds a cracked intake gasket. It would have kept running, or it would not have: you did not need to find out.`,
+          'press-home': homeIsNearest && rHome.reachable
+            ? `KXYZ is the closest runway and inside your glide the whole way, so pressing on is the diversion. You stay high, run the checklist on the way, and land ${min1(minHome)} minutes later. Nearest suitable sometimes means home.`
+            : rHome.reachable || homeIsNearest
             ? `You make it, and KXYZ was within glide the whole way, so it was a fair bet. ${homeIsNearest ? '' : `${nearest.id} was still closer.`}`
             : `For most of the next ${min1(minHome)} minutes KXYZ is beyond the glide, and the field below is all you have if it quits. It keeps running, this time. You were betting the flight on it.`,
-          'field-now': rNear.reachable
+          'field-now': homeIsNearest && rHome.reachable
+            ? `A precautionary landing while you have power beats a forced one later, but your own runway is ${min1(minHome)} minutes away and inside the glide. That is the better place to put it down.`
+            : rNear.reachable
             ? `A precautionary landing while you have power is better than a forced one later, and the AFH backs it. But a runway inside your glide, ${min1(minNear)} minutes away, was the safer place to put it down.`
             : 'With no runway inside the glide, a precautionary landing while you still have power to fix your mistakes is the right call.',
           circle: 'Circling spends the power you have over a place you have not chosen. The engine does not smooth out, and twenty minutes later you are still over the same woods with less fuel and the same problem.',
         },
-        why: `${nearest.id} is ${min1(minNear)} minutes away and ${rNear.reachable ? 'inside your glide if the engine stops' : 'the closest runway you have'}. KXYZ is ${min1(minHome)} minutes and ${rHome.reachable ? 'inside the glide too' : 'beyond the glide'}. Treat partial power as the start of a failure, and spend the power on getting to a runway.`,
+        why: homeIsNearest
+          ? `KXYZ is the closest runway, ${min1(minHome)} minutes away and ${rHome.reachable ? 'inside your glide if the engine stops' : 'beyond the glide'}. ${nearest.id} is ${min1(minNear)} minutes. "Nearest suitable airport" is a measurement, not a direction: here it is the one you were already heading for.`
+          : `${nearest.id} is ${min1(minNear)} minutes away and ${rNear.reachable ? 'inside your glide if the engine stops' : 'the closest runway you have'}. KXYZ is ${min1(minHome)} minutes and ${rHome.reachable ? 'inside the glide too' : 'beyond the glide'}. Treat partial power as the start of a failure, and spend the power on getting to a runway.`,
       },
     ];
   },

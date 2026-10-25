@@ -126,12 +126,23 @@ describe('module 8 teaches what it says', () => {
     const s = nightScenario(NOW);
     // Give the pilot a third qualifying landing and going as planned becomes legal.
     const current = { ...s, log: [...s.log, { at: new Date(s.sunset.getTime() - 5 * 86_400_000 + 2 * 3_600_000), sunset: new Date(s.sunset.getTime() - 5 * 86_400_000), fullStop: true, days: 5, minAfterSunset: 120 }] };
-    expect(nightGrades(current).go).toBe('acceptable');
+    expect(nightGrades(current)).toMatchObject({ go: 'best', 'land-first': 'acceptable' });
   });
 
   it('scores a lesson by its worst decision', () => {
     const steps = lesson('8.2').build(contexts[1][1]);
     expect(scoreLesson(steps, { blanks: {}, decisions: { d1: { choice: 'tomorrow' } } }).grade).toBe('best');
     expect(scoreLesson(steps, { blanks: {}, decisions: { d1: { choice: 'fly-local' } } }).grade).toBe('unsafe');
+  });
+});
+
+describe('module 8 situations', () => {
+  const ctx = lessonContext(null, blankAircraft, defaultPilot.minimums, NOW);
+  const g = (id: string, variant: number) => (humanFactorsLessons.find((l) => l.id === id)!.build({ ...ctx, variant }).find((s) => s.kind === 'decide') as Extract<Step, { kind: 'decide' }>).grades;
+  it('the call follows the day, the pilot and the weather both ways', () => {
+    expect(g('8.1', 1).go).toBe('best');
+    expect(g('8.2', 1)).toMatchObject({ fly: 'unsafe', afternoon: 'acceptable', tomorrow: 'best' });
+    expect(g('8.3', 1)).toMatchObject({ 'press-on': 'best', 'turn-back': 'marginal' });
+    expect(g('8.4', 1)).toMatchObject({ go: 'best', cancel: 'marginal' });
   });
 });

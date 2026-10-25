@@ -45,6 +45,7 @@ describe('seeded variety', () => {
     }
     expect(new Set(flown.slice(0, 4)).size).toBe(4);
     expect(new Set(flown.slice(4)).size).toBe(4);
+    expect(flown[0]).toBe(0);
     expect(nextVariant(fake(1), undefined, 99)).toBe(0);
   });
 
@@ -76,7 +77,15 @@ describe.each(allLessons.map((l) => [l.id, l] as const))('lesson %s situations',
       for (let v = 0; v < variantCount(lesson); v++) {
         const steps = lesson.build({ ...ctx, variant: v });
         for (const id of reviewable) expect(steps.some((s) => s.id === id), `${lesson.id} v${v} ${id}`).toBe(true);
+        const text = JSON.stringify(steps);
+        expect(text, `${lesson.id} v${v}`).not.toMatch(/NaN|undefined|Invalid Date|—/);
         for (const s of steps) {
+          if (s.kind === 'turn') {
+            for (const b of s.blanks) {
+              if (typeof b.answer === 'number') expect(Number.isFinite(b.answer), `${lesson.id} v${v} ${b.id}`).toBe(true);
+              else expect(b.choices, `${lesson.id} v${v} ${b.id}`).toContain(b.answer);
+            }
+          }
           if (s.kind !== 'decide') continue;
           expect(Object.values(s.grades), `${lesson.id} v${v} ${s.id}`).toContain('best');
           for (const o of s.options) {
@@ -86,5 +95,27 @@ describe.each(allLessons.map((l) => [l.id, l] as const))('lesson %s situations',
         }
       }
     }
+  });
+});
+
+describe('no answer patterns', () => {
+  const decisions = ctxs.flatMap((ctx) => allLessons.flatMap((l) =>
+    Array.from({ length: variantCount(l) }, (_, v) => l.build({ ...ctx, variant: v }).map((s) => ({ l, v, s }))).flat()))
+    .flatMap(({ l, v, s }) => (s.kind === 'decide' ? [{ id: `${l.id} v${v} ${s.id}`, s }] : []));
+
+  it('never gives away the best option by making it much the longest', () => {
+    for (const { id, s } of decisions) {
+      const best = s.options.filter((o) => s.grades[o.id] === 'best');
+      const lens = s.options.map((o) => o.label.length).sort((a, b) => b - a);
+      const standsOut = best.length === 1 && best[0].label.length === lens[0] && lens[0] >= lens[1] * 1.2;
+      expect(standsOut, `${id}: "${best[0]?.label}"`).toBe(false);
+    }
+  });
+
+  it('does not make cancelling the safe bet', () => {
+    const cancels = decisions.filter(({ s }) => s.options.some((o) => o.id === 'cancel'));
+    const cancelBest = cancels.filter(({ s }) => s.grades.cancel === 'best');
+    expect(cancels.length).toBeGreaterThan(20);
+    expect(cancelBest.length / cancels.length).toBeLessThan(0.25);
   });
 });

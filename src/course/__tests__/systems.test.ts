@@ -116,3 +116,16 @@ describe('module 7 scoring', () => {
     expect(r.decisions[0].best).toEqual(['shed-home']);
   });
 });
+
+describe('module 7 situations', () => {
+  const ctx = lessonContext(null, blankAircraft, defaultPilot.minimums, new Date(Date.UTC(2026, 9, 24, 16, 20)));
+  const g = (id: string, variant: number, step = 'd1') => (systemsLessons.find((l) => l.id === id)!.build({ ...ctx, variant }).find((s) => s.id === step) as Extract<Step, { kind: 'decide' }>).grades;
+  it('the right call follows which system failed and what is left', () => {
+    expect(g('7.1', 1)).toMatchObject({ 'shed-nearest': 'best', 'carry-on': 'unsafe' });
+    expect(g('7.1', 1)['shed-home']).not.toBe('best');
+    expect(g('7.2', 0)['trust-attitude']).toBe('unsafe');
+    expect(g('7.2', 1)).toMatchObject({ 'trust-attitude': 'best', 'cover-land': 'unsafe' });
+    expect(g('7.3', 1)).toMatchObject({ nearest: 'best', pilotage: 'unsafe' });
+    expect(g('7.4', 1, 'd2')).toMatchObject({ 'land-now': 'best', 'switch-tank': 'acceptable' });
+  });
+});

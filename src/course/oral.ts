@@ -14,7 +14,7 @@ import { trueToMagnetic } from '../lib/wind';
 import type { Grade } from '../scenarios/goNoGo';
 import { addDays, calendarStatus, dateOnly, daysBetween, endOfCalendarMonth, flightReviewStatus, longDate, passengerCurrency } from './calendar';
 import {
-  gradeInop, gradeLoading, gradeReturn, gradeReviewLapse, gradeRunway, INOP_FUEL_GAUGE, INOP_LANDING_LIGHT, inopRequired, oralAirplane,
+  gradeBags, gradeBulb, gradeInop, gradeLoading, gradeReturn, gradeReviewLapse, gradeRunway, INOP_FUEL_GAUGE, inopRequired, oralAirplane,
   rearForOverload, RUNWAY_MARGIN, weighTrip, type InopItem, type InopOption, type LoadOption, type ReturnOption, type TripLoad,
 } from './oralChecks';
 import { addHours, cloud, wholeHourAfter, windGroup, zDayHour, zTime } from './practice';
@@ -80,19 +80,54 @@ export function weekendTrip(ctx: LessonContext) {
   const climbMin = Math.ceil((cruiseMsl - home.elevationFt) / Math.max(climbFpm, 100));
   const trip = { climbMin, cruiseMin: log.totalMin, night: false };
 
-  // Passengers: the pilot at 170 lb, a friend up front, two more in the back, 40 lb of bags.
+  // Passengers: the pilot at 170 lb, a friend up front, two more in the back, and camping gear.
+  // With a placarded baggage limit the gear comes to 30 lb over it, and trimming it to the
+  // placard puts the airplane just under gross. Without one, 40 lb of bags and a weight problem.
   const frontLb = 170 + 190;
-  const bagsLb = 40;
   const a = plane.aircraft;
   const bagStation = a.stations.some((s) => s.id === 'bag1' && s.armIn > 0) ? 'bag1' : 'rear';
-  const rearLb = rearForOverload(a, frontLb, bagsLb, 70);
+  const bagLimit = bagStation === 'bag1' ? a.stations.find((s) => s.id === 'bag1')?.maxLb ?? null : null;
+  const bagsLb = bagLimit !== null ? bagLimit + 30 : 40;
+  const rearLb = bagLimit !== null ? rearForOverload(a, frontLb, bagLimit, -20) : rearForOverload(a, frontLb, bagsLb, 70);
   const load: TripLoad = { frontLb, rearLb, bagsLb, bagStation };
   const full = weighTrip(a, load, a.usableFuelGal);
   const loading = gradeLoading(plane, load, trip);
   const fit = loading.cases.find((c) => c.id === 'fuel-to-fit')!;
+  const bags = bagLimit !== null ? { limitLb: bagLimit, ...gradeBags(plane, load, bagLimit, trip) } : null;
 
   const destPos = positionAt(practiceRegion.airspace, dest.pos, dest.tpaMsl, dest.elevationFt, practiceRegion.veils);
-  return { plane, home, dest, pts, mef, magCourse, legal, cruiseMsl, log, climbFpm, climbMin, trip, load, full, loading, fit, destCls: destPos.cls };
+  return { plane, home, dest, pts, mef, magCourse, legal, cruiseMsl, log, climbFpm, climbMin, trip, load, full, loading, fit, bags, destCls: destPos.cls };
+}
+
+/** 9.1 d1 with a placarded baggage area: two limits, and only one of them trades with fuel. */
+function bagDecision(t: ReturnType<typeof weekendTrip>, note: string): Step {
+  const { plane, dest, load, full, fit } = t;
+  const bags = t.bags!;
+  const a = plane.aircraft;
+  const extra = load.bagsLb - bags.limitLb;
+  const lessFuel = bags.cases.find((c) => c.id === 'less-fuel')!;
+  const trim = bags.cases.find((c) => c.id === 'trim-bags')!;
+  const over = full.totalLb - a.maxGrossLb;
+  return {
+    kind: 'decide', id: 'd1', title: 'The camping gear',
+    situation: `${fmt(load.bagsLb)} lb of gear against a baggage placard of ${bags.limitLb} lb, and ${fmt(full.totalLb)} lb with full tanks against a ${fmt(a.maxGrossLb)} lb maximum. The trip needs ${gal(fit.fuel.requiredGal)} gallons with the reserve, and ${dest.name} sells fuel.`,
+    options: [
+      { id: 'all-in', label: over > 0 ? `Load it all with full tanks. ${fmt(over)} pounds over is nothing.` : 'Load it all with full tanks. You are under gross.' },
+      { id: 'less-fuel', label: `Load it all and take ${gal(lessFuel.fuelGal)} gallons, so the total is under gross.` },
+      { id: 'trim-bags', label: `Leave ${extra} lb of gear behind and keep full tanks.` },
+      { id: 'cancel', label: 'Call the trip off. The airplane can\'t carry it.' },
+    ],
+    grades: bags.grades,
+    consequence: follow(bags.grades, { 'all-in': 'unsafe', 'less-fuel': 'unsafe', 'trim-bags': 'best', cancel: 'acceptable' }, {
+      'all-in': `Two limits broken at once. The baggage floor and its tie-downs are rated for ${bags.limitLb} lb, and a bump that loads them at 2 g asks them to hold twice the gear. The examiner stops you here.`,
+      'less-fuel': `Under gross now, at ${fmt(lessFuel.wb.totalLb)} lb, but the baggage area still holds ${fmt(load.bagsLb)} lb against a ${bags.limitLb} lb placard. Fuel trades against gross weight, never against a compartment limit.`,
+      'trim-bags': `${fmt(trim.wb.totalLb)} lb at a CG of ${trim.wb.cgIn} in, the gear at its placard, and full tanks leave ${gal(trim.fuel.marginGal)} gallons over the reserve. The tent stays in the car. Next time, ask everyone to weigh their bags at home and pack soft bags.`,
+      cancel: 'Safe, but leaving one bag behind made the trip work. Knowing which limit you are up against is the skill this question is after.',
+    }, (id) => (id === 'cancel'
+      ? (bags.grades.cancel === 'best' ? 'No loading in the options is legal, so staying home is the call.' : 'One of the loadings is legal with fuel to spare, so the trip can still go.')
+      : `That loading grades ${bags.grades[id]} against gross weight, the envelope, the baggage placard and the fuel reserve.`)),
+    why: `Maximum gross weight and the baggage compartment limit are separate limits in the POH, and 91.9 makes both law. Fuel is the load you trade against gross weight; only the gear itself fixes the compartment. Trimming ${extra} lb fixes both and keeps full tanks.${note}`,
+  };
 }
 
 const weekendOral: Lesson = {
@@ -103,7 +138,7 @@ const weekendOral: Lesson = {
   refs: ['14 CFR 61.57(a)', '14 CFR 91.103, preflight action', '14 CFR 91.151', '14 CFR 91.159', '14 CFR 91.9', 'PHAK ch. 10', 'Aviation Weather Handbook (FAA-H-8083-28), TAF'],
   build(ctx) {
     const t = weekendTrip(ctx);
-    const { plane, home, dest, log, load, full, loading, fit } = t;
+    const { plane, home, dest, log, load, full, loading, fit, bags } = t;
     const a = plane.aircraft;
     const p = plane.performance;
     const note = sampleNote(ctx, plane.sample, plane.standIn);
@@ -203,15 +238,19 @@ const weekendOral: Lesson = {
       },
       {
         kind: 'turn', id: 't4', title: 'Weigh it',
-        prompt: `"Loading. You're 170 for today, your friend up front is 190, the two in back come to ${fmt(load.rearLb)}, and there are ${load.bagsLb} pounds of bags. Full tanks, ${a.usableFuelGal} gallons. Where does that put you?"`,
+        prompt: bags
+          ? `"Loading. You're 170 for today, your friend up front is 190, the two in back come to ${fmt(load.rearLb)}. Everyone brought camping gear: you put it on the ramp scale and it comes to ${load.bagsLb} pounds. Full tanks, ${a.usableFuelGal} gallons. Where does that put you?"`
+          : `"Loading. You're 170 for today, your friend up front is 190, the two in back come to ${fmt(load.rearLb)}, and there are ${load.bagsLb} pounds of bags. Full tanks, ${a.usableFuelGal} gallons. Where does that put you?"`,
         blanks: [
           { id: 'total', label: 'Takeoff weight, full tanks', unit: 'lb', answer: full.totalLb, tolerance: 5,
             explain: `Empty ${fmt(a.emptyWeightLb)} + people ${fmt(load.frontLb + load.rearLb)} + bags ${load.bagsLb} + fuel ${fmt(a.usableFuelGal * FUEL_LB_PER_GAL)} (${a.usableFuelGal} gallons at 6 lb) = ${fmt(full.totalLb)} lb.${note}` },
           { id: 'over', label: 'Over maximum gross by', unit: 'lb', answer: Math.max(0, full.totalLb - a.maxGrossLb), tolerance: 5,
             explain: `Maximum gross is ${fmt(a.maxGrossLb)} lb. ${full.overGross ? `You're ${fmt(full.totalLb - a.maxGrossLb)} over. 91.9 makes the POH limit the law, and the airplane climbs and stalls like it knows.` : 'You are under it, so the question is the CG.'}` },
+          ...(bags ? [{ id: 'bagover', label: 'Over the baggage area placard by', unit: 'lb', answer: load.bagsLb - bags.limitLb, tolerance: 0,
+            explain: `The placard on the baggage door says ${bags.limitLb} lb, and the POH weight and balance section says the same. ${load.bagsLb} − ${bags.limitLb} = ${load.bagsLb - bags.limitLb} lb too much, whatever the airplane weighs in total.` }] : []),
         ],
       },
-      {
+      bags ? bagDecision(t, note) : {
         kind: 'decide', id: 'd1', title: 'Make it fit',
         situation: `${fmt(full.totalLb)} lb with full tanks against a ${fmt(a.maxGrossLb)} lb maximum. The trip needs ${gal(fit.fuel.requiredGal)} gallons with the reserve, and ${dest.name} sells fuel.`,
         options: [
@@ -289,8 +328,8 @@ function inopDecision(id: string, title: string, item: InopItem, situation: stri
     options: [
       { id: 'fly-as-is', label: 'Fly as it is. You can manage without it.' },
       { id: 'placard-fly', label: 'Placard it "INOPERATIVE", note it, and fly.' },
-      { id: 'fix-first', label: 'Get it fixed, or a special flight permit, before the airplane goes anywhere.' },
-      { id: 'cancel', label: 'Cancel and think about it.' },
+      { id: 'fix-first', label: 'Fix it first, or get a special flight permit.' },
+      { id: 'cancel', label: 'Cancel the flight and think about it some more.' },
     ],
     grades,
     consequence: follow(grades, intended, written, () => (rule ? `It is required by ${rule}, so it has to work.` : 'Nothing requires it for this flight, so 91.213(d) lets you placard it and go.')),
@@ -300,42 +339,60 @@ function inopDecision(id: string, title: string, item: InopItem, situation: stri
   };
 }
 
+/** Wet short grass against dry, from the UK CAA's SafetySense leaflet 9 (x1.3 against x1.2 on paved): about 10 percent more. */
+export const WET_GRASS_FACTOR = 1.1;
+/** A 2 percent upslope, same source: about 10 percent more. Downslope gets no credit. */
+export const UPSLOPE_FACTOR = 1.1;
+
+/**
+ * The morning after at a short grass strip: wet grass, runway 27 rising 2
+ * percent, wind straight down the slope. Two aboard, so the book number at
+ * maximum gross comes down with the square of the weight (PHAK ch. 11).
+ */
 export function grassStrip(ctx: LessonContext) {
   const plane = oralAirplane(ctx.aircraft);
+  const a = plane.aircraft;
   const strip = chartAirport('2X5')!;
-  const paved = chartAirport('KXQA')!;
   const altimeter = 30.02;
-  const afternoon = 32;
-  const morning = 18;
-  const at = (elev: number, oatC: number, surface: 'paved' | 'grass') =>
-    takeoffDistance(plane.performance, { fieldElevFt: elev, altimeterInHg: altimeter, oatC, headwindKt: 0, surface });
-  const hot = at(strip.elevationFt, afternoon, 'grass');
-  const cool = at(strip.elevationFt, morning, 'grass');
-  const alt = at(paved.elevationFt, afternoon, 'paved');
-  const grades: Record<'go-afternoon' | 'go-morning' | 'other-field' | 'cancel', Grade> = {
-    'go-afternoon': gradeRunway(hot.over50Ft, strip.runwayFt),
-    'go-morning': gradeRunway(cool.over50Ft, strip.runwayFt),
-    'other-field': gradeRunway(alt.over50Ft, paved.runwayFt),
-    cancel: 'acceptable',
+  const morning = 8;
+  const noon = 22;
+  const windKt = 8;
+  const bagStation = a.stations.some((x) => x.id === 'bag1' && x.armIn > 0) ? 'bag1' : 'rear';
+  const weightLb = weighTrip(a, { frontLb: 170 + 190, rearLb: 0, bagsLb: 20, bagStation }, a.usableFuelGal).totalLb;
+  const weightFactor = Math.min(1, (weightLb / a.maxGrossLb) ** 2);
+  const at = (oatC: number, headwindKt: number) =>
+    takeoffDistance(plane.performance, { fieldElevFt: strip.elevationFt, altimeterInHg: altimeter, oatC, headwindKt, surface: 'grass' });
+  const r5 = (x: number) => Math.round(x / 5) * 5;
+  const up = at(morning, windKt);
+  const down = at(morning, -windKt);
+  const dry = at(noon, windKt);
+  const upFt = r5(up.over50Ft * WET_GRASS_FACTOR * UPSLOPE_FACTOR * weightFactor);
+  const downFt = r5(down.over50Ft * WET_GRASS_FACTOR * weightFactor);
+  const dryFt = r5(dry.over50Ft * UPSLOPE_FACTOR * weightFactor);
+  const grades: Record<'up-wind' | 'down-slope' | 'wait-dry' | 'leave-it', Grade> = {
+    'up-wind': gradeRunway(upFt, strip.runwayFt),
+    'down-slope': gradeRunway(downFt, strip.runwayFt),
+    'wait-dry': gradeRunway(dryFt, strip.runwayFt),
+    'leave-it': 'acceptable',
   };
-  if (!Object.values(grades).includes('best')) grades.cancel = 'best';
-  return { plane, strip, paved, altimeter, afternoon, morning, hot, cool, alt, grades };
+  if (!Object.values(grades).includes('best')) grades['leave-it'] = 'best';
+  return { plane, strip, altimeter, morning, noon, windKt, weightLb, weightFactor, up, down, dry, upFt, downFt, dryFt, grades };
 }
 
 const airplaneOral: Lesson = {
   id: '9.2', module: 9, minutes: 25,
   title: 'Mock oral: the airplane',
-  summary: 'The examiner walks around your airplane: the documents, the inspections, two things that don\'t work, and whether it gets off a short grass strip on a hot day.',
+  summary: 'The examiner walks around your airplane: the documents, the inspections, a burnt-out bulb you may fix yourself, a gauge you may not, and which way to leave a wet, sloping grass strip.',
   acs: ['PA.I.B', 'PA.I.F', 'PA.I.G'],
-  refs: ['14 CFR 91.203', '14 CFR 91.409', '14 CFR 91.207', '14 CFR 91.413', '14 CFR 91.213', '14 CFR 91.205', 'PHAK ch. 11'],
+  refs: ['14 CFR 91.203', '14 CFR 91.409', '14 CFR 91.207', '14 CFR 91.413', '14 CFR 43.3(g)', '14 CFR 43 appendix A', '14 CFR 43.9', '14 CFR 91.213', '14 CFR 91.205', 'PHAK ch. 11', 'UK CAA SafetySense 9, weight, balance and performance'],
   build(ctx) {
     const d = inspectionDates(ctx.now);
     const s = grassStrip(ctx);
+    const bulb = gradeBulb({ pilotOwns: true, forHire: false });
     const note = sampleNote(ctx, s.plane.sample, s.plane.standIn);
     const eltWrong = [d.eltStatus.dueEnd, new Date(Date.UTC(d.elt.getUTCFullYear() + 1, d.elt.getUTCMonth(), d.elt.getUTCDate())), endOfCalendarMonth(d.elt, 13)];
     const xpdrWrong = [d.xpdrStatus.dueEnd, endOfCalendarMonth(d.xpdr, 12), new Date(Date.UTC(d.xpdr.getUTCFullYear() + 2, d.xpdr.getUTCMonth(), d.xpdr.getUTCDate()))];
     const sorted = (ds: Date[]) => [...new Set(ds.map((x) => x.getTime()))].sort((x, y) => x - y).map((x) => longDate(new Date(x)));
-    const morning50 = s.cool.over50Ft;
 
     return [
       {
@@ -371,17 +428,24 @@ const airplaneOral: Lesson = {
             explain: `91.413: within 24 calendar months, so through ${longDate(d.xpdrStatus.dueEnd)}.` },
         ],
       },
-      inopDecision('d1', 'The landing light', INOP_LANDING_LIGHT,
-        'The ELT is sorted. On the walkaround the landing light doesn\'t come on. It is a day flight, not for hire. The airplane has no MEL, and its equipment list doesn\'t require the light.',
-        false,
-        {
-          'fly-as-is': 'Close, but 91.213(d) asks you to deactivate it and placard it "Inoperative" first, and to make the call yourself in writing. Without that step you\'re flying with an unaddressed inop item.',
-          'placard-fly': 'Right. It passes all four questions for a day flight, so you deactivate it, placard it, and go. Fix it before you fly at night or for hire.',
-          'fix-first': 'Nothing wrong with fixing it, but nothing requires it for this flight.',
-          cancel: 'Safe, but you had the rule to make the decision with.',
-        },
-        { 'placard-fly': 'best' },
-      ),
+      {
+        kind: 'decide', id: 'd1', title: 'The landing light',
+        situation: 'The ELT is sorted. On the walkaround the landing light doesn\'t come on: the bulb is burnt out. It is your airplane, today\'s flight is not for hire, and there is a spare bulb with the right part number in the hangar.',
+        options: [
+          { id: 'swap-fly', label: 'Swap the bulb yourself and go.' },
+          { id: 'swap-log', label: 'Swap the bulb yourself, then log it in the maintenance records.' },
+          { id: 'placard-fly', label: 'Placard it "INOPERATIVE" and fly. Swap it another day.' },
+          { id: 'wait-mechanic', label: 'Leave it for a mechanic. Pilots don\'t work on their airplanes.' },
+        ],
+        grades: bulb,
+        consequence: follow(bulb, { 'swap-fly': 'marginal', 'swap-log': 'best', 'placard-fly': 'acceptable', 'wait-mechanic': 'acceptable' }, {
+          'swap-fly': 'The swap was yours to do, but preventive maintenance isn\'t finished until it is in the records (43.9). Without the entry, the next person to read the logbook can\'t know what was done or by whom.',
+          'swap-log': 'Right. Replacing landing light bulbs is on the preventive maintenance list in part 43 appendix A, and 43.3(g) lets a certificated pilot do it on an airplane they own or operate, not for hire. The entry gets what you did, the date, your signature, and your certificate number and kind.',
+          'placard-fly': 'Legal for a day flight not for hire: 91.213(d) lets you placard it and go. But the fix was ten minutes and yours to make.',
+          'wait-mechanic': 'Nothing wrong with it, but the rules let you do this one. Owners who know appendix A save days of downtime.',
+        }, (id) => `That choice grades ${bulb[id]} under 43.3(g) and 91.213(d).`),
+        why: 'Part 43 appendix A lists the preventive maintenance a pilot may do: oil changes, tire servicing, bulbs, and a few dozen more simple jobs with no complex assembly. 43.3(g) allows it on an airplane you own or operate, not used under part 121, 129 or 135, and 43.9 requires the record entry. Anything not on the list goes to a mechanic.',
+      },
       inopDecision('d2', 'The fuel gauge', INOP_FUEL_GAUGE,
         'The left fuel gauge reads empty. You dip the tank and it is full. "You know how much fuel you have. Can we go?"',
         false,
@@ -394,36 +458,36 @@ const airplaneOral: Lesson = {
         { 'fix-first': 'best' },
       ),
       {
-        kind: 'turn', id: 't2', title: 'A short grass strip',
-        prompt: `"Last one. Lunch at ${s.strip.name}, ${fmt(s.strip.runwayFt)} feet of grass at ${fmt(s.strip.elevationFt)} feet, four aboard. It will be ${s.afternoon}°C when you leave, altimeter ${s.altimeter.toFixed(2)}, wind calm."`,
-        figure: { kind: 'perf', chart: 'takeoff-50', performance: s.plane.performance, paFt: s.hot.pressureAltFt, oatC: s.afternoon, sample: s.plane.sample },
+        kind: 'turn', id: 't2', title: 'The morning after',
+        prompt: `"Last one. You flew into ${s.strip.name} yesterday with a friend, ${fmt(s.strip.runwayFt)} feet of grass at ${fmt(s.strip.elevationFt)} feet. It rained overnight. This morning it is ${s.morning}°C, altimeter ${s.altimeter.toFixed(2)}, wind 270 at ${s.windKt}, and runway 27 rises 2 percent toward its far end. You two and the bags weigh ${fmt(s.weightLb)} lb with full tanks."`,
+        figure: { kind: 'perf', chart: 'takeoff-50', performance: s.plane.performance, paFt: s.up.pressureAltFt, oatC: s.morning, sample: s.plane.sample },
         blanks: [
-          { id: 'pa', label: 'Pressure altitude', unit: 'ft', answer: s.hot.pressureAltFt, tolerance: 20,
-            explain: `${fmt(s.strip.elevationFt)} + (29.92 − ${s.altimeter.toFixed(2)}) × 1,000 = ${fmt(s.hot.pressureAltFt)} ft.` },
-          { id: 'da', label: 'Density altitude', unit: 'ft', answer: s.hot.densityAltFt, tolerance: 150,
-            explain: `Standard temperature there is about ${Math.round(15 - (2 * s.hot.pressureAltFt) / 1000)}°C. Each degree over adds about 120 feet: ${fmt(s.hot.densityAltFt)} ft.` },
-          { id: 'over50', label: 'Over a 50 ft obstacle, on grass', unit: 'ft', answer: s.hot.over50Ft, tolerance: 60,
-            explain: `The chart reads ${fmt(s.hot.steps[0].over50Ft)} ft at max gross. The grass note adds ${s.plane.performance.takeoff.notes.grassPctOfGroundRoll}% of the ground roll: ${fmt(s.hot.over50Ft)} ft.${note}` },
+          { id: 'pa', label: 'Pressure altitude', unit: 'ft', answer: s.up.pressureAltFt, tolerance: 20,
+            explain: `${fmt(s.strip.elevationFt)} + (29.92 − ${s.altimeter.toFixed(2)}) × 1,000 = ${fmt(s.up.pressureAltFt)} ft.` },
+          { id: 'over50', label: 'Book distance over 50 ft, grass, runway 27', unit: 'ft', answer: s.up.over50Ft, tolerance: 60,
+            explain: `The chart at maximum gross, less ${s.windKt} knots of headwind, plus the grass note: ${fmt(s.up.over50Ft)} ft.${note}` },
+          { id: 'adjusted', label: 'With wet grass, the slope and your weight', unit: 'ft', answer: s.upFt, tolerance: 60,
+            explain: `Wet grass about +10 percent, a 2 percent upslope about +10 percent (UK CAA SafetySense leaflet 9), and the weight below gross, (${fmt(s.weightLb)} ÷ ${fmt(s.plane.aircraft.maxGrossLb)})² = ${s.weightFactor.toFixed(2)}: ${fmt(s.up.over50Ft)} × 1.1 × 1.1 × ${s.weightFactor.toFixed(2)} ≈ ${fmt(s.upFt)} ft.` },
         ],
       },
       {
-        kind: 'decide', id: 'd3', title: 'Does it fit?',
-        situation: `${fmt(s.hot.over50Ft)} feet to clear 50 feet this afternoon, against ${fmt(s.strip.runwayFt)} feet of grass. At ${s.morning}°C in the morning it would be ${fmt(morning50)}. ${s.paved.name} has ${fmt(s.paved.runwayFt)} feet paved: ${fmt(s.alt.over50Ft)} in the afternoon. The book assumes a new airplane and a test pilot, so add ${Math.round((RUNWAY_MARGIN - 1) * 100)} percent.`,
-        figure: { kind: 'chart', highlight: ['2X5', 'KXQA'] },
+        kind: 'decide', id: 'd3', title: 'Which way out?',
+        situation: `Runway 27, uphill into the wind: ${fmt(s.upFt)} feet to clear 50 feet. Runway 09, downhill with ${s.windKt} knots behind you: ${fmt(s.downFt)}. Wait until noon for the grass to dry, ${s.noon}°C, runway 27: ${fmt(s.dryFt)}. The strip is ${fmt(s.strip.runwayFt)} feet, and the book assumes a new airplane and a test pilot, so add ${Math.round((RUNWAY_MARGIN - 1) * 100)} percent.`,
+        figure: { kind: 'chart', highlight: ['2X5'] },
         options: [
-          { id: 'go-afternoon', label: 'Lunch at the strip, leave after, use a good short-field technique.' },
-          { id: 'go-morning', label: 'Fly in and out early, before it heats up.' },
-          { id: 'other-field', label: `Meet at ${s.paved.name} instead.` },
-          { id: 'cancel', label: 'Skip the trip.' },
+          { id: 'up-wind', label: 'Runway 27 now: uphill, into the wind.' },
+          { id: 'down-slope', label: 'Runway 09 now: going downhill helps you accelerate.' },
+          { id: 'wait-dry', label: 'Wait for the grass to dry and leave at noon.' },
+          { id: 'leave-it', label: 'Leave the airplane and come back another day.' },
         ],
         grades: s.grades,
-        consequence: follow(s.grades, { 'go-afternoon': 'unsafe', 'go-morning': 'marginal', 'other-field': 'best', cancel: 'acceptable' }, {
-          'go-afternoon': `The book number already assumes a perfect short-field technique, and it is longer than the strip. There is no technique left to find.`,
-          'go-morning': `It fits on paper, ${fmt(morning50)} feet in ${fmt(s.strip.runwayFt)}, but with the margin it needs ${fmt(morning50 * RUNWAY_MARGIN)}. One soft spot or a little tailwind and you're in the trees.`,
-          'other-field': `${fmt(s.alt.over50Ft)} feet, ${fmt(s.alt.over50Ft * RUNWAY_MARGIN)} with the margin, well inside ${fmt(s.paved.runwayFt)}. Same lunch, a short drive.`,
-          cancel: 'Safe, but there was a field nearby that made the trip work.',
-        }, (id) => `${id === 'cancel' ? 'Nothing else fits with the margin.' : `That runway grades ${s.grades[id as keyof typeof s.grades]} against the book number with the margin.`}`),
-        why: `Density altitude and grass both lengthen the takeoff, and the chart is the best the airplane ever did. Compare the book number with the margin against the runway, and when it doesn't fit, change the runway, not the technique.${note}`,
+        consequence: follow(s.grades, { 'up-wind': 'best', 'down-slope': 'marginal', 'wait-dry': 'marginal', 'leave-it': 'acceptable' }, {
+          'up-wind': `${fmt(s.upFt)} feet, ${fmt(s.upFt * RUNWAY_MARGIN)} with the margin, inside ${fmt(s.strip.runwayFt)}. Walk the strip first for soft spots, and pick an abort point: if you aren't at 70 percent of liftoff speed by the halfway mark, close the throttle while there is grass left to stop on.`,
+          'down-slope': `The slope helps, but ${s.windKt} knots behind you costs more: ${fmt(s.downFt)} feet, ${fmt(s.downFt * RUNWAY_MARGIN)} with the margin. On a sloped strip the wind usually wins.`,
+          'wait-dry': `Dry grass helps, but by noon it is ${s.noon}°C and the density altitude has climbed: ${fmt(s.dryFt)} feet, no better than now. The sun took back what it gave.`,
+          'leave-it': 'Safe, and sometimes right, but runway 27 this morning fit with the margin.',
+        }, (id) => (id === 'leave-it' ? 'No way out fits with the margin, so the airplane waits.' : `That way out grades ${s.grades[id]} against the strip with the margin.`)),
+        why: `Wet grass and an upslope each add about 10 percent, weight below gross takes some back, and a tailwind adds about 10 percent for every 2 knots. Work out each way out with its factors, hold each to the margin, and choose before you start the engine, along with the point where you abort.${note}`,
       },
     ];
   },
@@ -453,7 +517,9 @@ const reviewLesson: Lesson = {
     const lapsedEnd = endOfCalendarMonth(today, -1);
     const lapsed = calendarStatus(endOfCalendarMonth(today, -25), 24, today);
     const daysLapsed = daysBetween(lapsedEnd, today);
-    const grades = gradeReviewLapse(lapsed);
+    const checkride = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 4, 12));
+    const ride = calendarStatus(checkride, 24, today);
+    const grades = gradeReviewLapse(lapsed, ride.current);
 
     const shown = mine
       ? { signed: dateOnly(ctx.lastFlightReview!), status: mine, yours: true }
@@ -495,22 +561,22 @@ const reviewLesson: Lesson = {
         ],
       },
       {
-        kind: 'decide', id: 'd1', title: 'It ran out',
-        situation: `Your review ran out on ${longDate(lapsedEnd)}, ${daysLapsed} day${daysLapsed === 1 ? '' : 's'} ago. You have 200 hours, you flew last week, and a friend wants to go up on Saturday.`,
+        kind: 'decide', id: 'd1', title: 'It ran out, or did it?',
+        situation: `Your last flight review ran out on ${longDate(lapsedEnd)}, ${daysLapsed} day${daysLapsed === 1 ? '' : 's'} ago. On ${longDate(checkride)} you passed the practical test for your instrument rating. You flew last week, and a friend wants to go up on Saturday.`,
         options: [
-          { id: 'fly-friend', label: 'Take your friend. A few days doesn\'t change how you fly.' },
-          { id: 'fly-solo', label: 'Fly solo to stay sharp until the review is done.' },
-          { id: 'review-first', label: 'Book a CFI for the review, then take your friend.' },
-          { id: 'wait', label: 'Stop flying until you get around to it.' },
+          { id: 'fly-friend', label: 'Take your friend on Saturday.' },
+          { id: 'fly-solo', label: 'Fly solo only, until a CFI signs a review.' },
+          { id: 'review-first', label: 'Book a CFI for a flight review, then take your friend.' },
+          { id: 'wait', label: 'Stop flying until you get a review signed.' },
         ],
         grades,
-        consequence: follow(grades, { 'fly-friend': 'unsafe', 'fly-solo': 'unsafe', 'review-first': 'best', wait: 'acceptable' }, {
-          'fly-friend': 'You would be acting as pilot in command without a current flight review. Your insurance likely stops here too.',
-          'fly-solo': 'Solo is still acting as pilot in command, and 61.56(c) covers every flight you are PIC, alone or not.',
-          'review-first': 'Right. The CFI is pilot in command for the review flight, you leave with the endorsement, and Saturday goes ahead.',
-          wait: 'Legal, but the longer you wait the more the review has to cover. Book it.',
-        }, () => 'The review status decides it.'),
-        why: '61.56(c) is about acting as pilot in command, not about passengers, so it covers solo flights too. The fix is quick: the review itself is a flight you can make with a CFI as PIC.',
+        consequence: follow(grades, { 'fly-friend': 'best', 'fly-solo': 'acceptable', 'review-first': 'acceptable', wait: 'marginal' }, {
+          'fly-friend': `Right. 61.56(d): passing a practical test for a certificate or rating in the 24 calendar months stands in for the review, so you are good through ${longDate(ride.dueEnd)}. Passenger currency under 61.57 is a separate check, and last week's landings cover it.`,
+          'fly-solo': 'Legal, and so is the trip with your friend. The checkride already counts as your review.',
+          'review-first': 'Never wasted, but not required. The checkride reset the clock, and the CFI\'s hour is better spent on what you want to sharpen.',
+          wait: 'You would be grounding yourself for a rule you already meet. Know what counts before you cancel.',
+        }, () => (ride.current ? 'The checkride inside 24 calendar months decides it.' : 'The review status decides it.')),
+        why: `61.56(c) is about acting as pilot in command, solo or not, so without the checkride every option but the review would be off the table. But 61.56(d) counts a practical test for a certificate or rating, and 61.56(e) a phase of the FAA WINGS program, in place of the review. Your logbook shows the endorsement or the temporary certificate, and that is what you show if asked.`,
       },
       {
         kind: 'brief', id: 'b2', title: 'What to bring',
