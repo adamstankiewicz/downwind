@@ -10,6 +10,7 @@ import type { NavLog } from '../lib/nav';
 import { parseTaf } from '../lib/taf';
 import { norm } from '../lib/wind';
 import { profileAlong } from '../scenarios/airspacePlan';
+import { CgChart } from './CgChart';
 import { RawReport } from './MetarBlock';
 import { ProfileFigure } from './ProfileFigure';
 import { SectionalChart } from './SectionalChart';
@@ -114,6 +115,18 @@ export function Figure({ figure, practiceField }: { figure: FigureModel; practic
   if (figure.kind === 'electrical') return <ElectricalFigure figure={figure} />;
   if (figure.kind === 'panel') return <PanelFigure figure={figure} />;
   if (figure.kind === 'carbIce') return <CarbIceFigure figure={figure} />;
+  if (figure.kind === 'wb') {
+    const ok = figure.loaded.withinEnvelope && !figure.loaded.overGross;
+    return (
+      <figure className="fig">
+        <CgChart envelope={figure.envelope} loaded={figure.loaded} zeroFuel={figure.zeroFuel} maxGrossLb={figure.maxGrossLb} />
+        <figcaption>
+          CG envelope with this loading: {fmt(figure.loaded.totalLb)} lb at {figure.loaded.cgIn} in, {ok ? 'inside the limits' : figure.loaded.overGross ? 'over max gross' : 'outside the envelope'}. The dashed line runs to the zero-fuel point, where the CG goes as fuel burns.{' '}
+          {figure.practice ? 'The practice trainer is a made-up airplane with sample numbers.' : figure.sample ? 'Sample numbers from the template. Use your own weight and balance record.' : 'From your airplane’s weight and balance record.'}
+        </figcaption>
+      </figure>
+    );
+  }
   const { airport, windMag, speedKt, gustKt, runwayId } = figure;
   const runway = airport.runways.find((r) => r.id === runwayId) ?? airport.runways[0];
   const wind = { dirTrue: norm(windMag + airport.magneticVariationDeg) || 360, speedKt, gustKt, variable: false, rangeTrue: null };

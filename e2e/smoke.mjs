@@ -3,9 +3,9 @@
 //   node e2e/smoke.mjs [http://localhost:4173]
 // Weather and airport requests are stubbed, so it runs offline and exercises
 // both the live path and the practice-weather fallback. Covers onboarding,
-// the course home, lessons 1.1, 2.1, 4.1, 5.1, 6.1, 7.1 and 8.1 end to end, the start
-// of 2.2, the daily flight through filing, and every rail screen, at desktop
-// and phone widths.
+// the course home, lessons 1.1 and 2.1 to 9.1 end to
+// end, the start of 2.2, the daily flight through filing, and every rail
+// screen, at desktop and phone widths.
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 
@@ -88,6 +88,7 @@ async function run(viewport, live) {
   check(planned < 9 && (await page.locator('.module.planned .m-count').filter({ hasText: 'being written' }).count()) === planned, `${label} every unwritten module says so`);
   check((await page.locator('.module.planned').filter({ hasText: 'Human factors and risk' }).count()) === 0, `${label} module 8 is written`);
   check((await page.locator('.module.planned').filter({ hasText: 'The oral and the flight review' }).count()) === 0, `${label} module 9 is written`);
+  check((await page.locator('.module.planned').filter({ hasText: 'Performance and loading' }).count()) === 0, `${label} module 3 is written`);
   check(await page.getByRole('list', { name: 'Modules' }).locator('li').count() === 9, `${label} strip shows nine modules`);
   check(!/C172K|N\d{3,5}[A-Z]{0,2}\b/.test(body), `${label} no tail number or type assumed in course copy`);
   await noHScroll('course home');
@@ -403,6 +404,45 @@ async function run(viewport, live) {
   await noHScroll('lesson 9.1 debrief');
   await btn('Back to course').click();
   await page.getByRole('heading', { name: 'Ground school', exact: true }).waitFor();
+
+  // Lesson 3.1, end to end: weight and balance with the sample airplane from onboarding.
+  await page.getByRole('heading', { name: 'Ground school', exact: true }).waitFor();
+  await page.locator('.module summary').filter({ hasText: 'Performance and loading' }).click();
+  await page.getByRole('button', { name: /3\.1 Weight and balance with real passengers/ }).click();
+  await page.getByRole('heading', { name: 'Four seats, not four people' }).waitFor();
+  body = await main();
+  check(/Lesson 1 of 4/.test(body) && /PA\.I\.F/.test(body), `${label} 3.1 header names module 3 and the ACS task`);
+  check(/sample values/.test(body), `${label} 3.1 says the airplane's numbers are sample values`);
+  check((await page.locator('svg[aria-label^="CG envelope"]').count()) > 0, `${label} 3.1 brief shows the CG envelope`);
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'Just the two of you first' }).waitFor();
+  body = await main();
+  check(/1,998 lb/.test(body) && /40\.04 in/.test(body), `${label} 3.1 worked example totals weight and CG`);
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'Your turn', exact: true }).waitFor();
+  await page.getByLabel(/Total weight/).fill('2378');
+  await page.locator('#t1-cg').fill('45.7');
+  await page.getByLabel(/Over max gross by/).fill('78');
+  await btn('Check my numbers').click();
+  check((await page.getByText(/^Right\./).count()) === 3, `${label} 3.1 checks weight, CG and the overage`);
+  await noHScroll('lesson 3.1 turn');
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'Who and what goes' }).waitFor();
+  check((await page.getByText(/^(Best call|Unsafe|Marginal|Sound)$/).count()) === 0, `${label} 3.1 grades hidden before commit`);
+  await page.getByRole('button', { name: /Take 25 gallons instead of full tanks/ }).click();
+  await btn('Commit').click();
+  body = await main();
+  check(/Best call/.test(body) && /right at max gross/.test(body), `${label} 3.1 less fuel graded best, with the computed weight`);
+  await btn('Debrief').click();
+  await page.getByRole('heading', { name: 'Debrief', exact: true }).waitFor();
+  body = await main();
+  check(/3 of 3/.test(body) && /PHAK ch\. 10/.test(body), `${label} 3.1 debrief counts blanks and cites the PHAK`);
+  const stored31 = await page.evaluate(() => JSON.parse(localStorage.getItem('downwind.course.v1') ?? '{}'));
+  check(stored31['3.1']?.lastGrade === 'best', `${label} lesson 3.1 recorded in course progress`);
+  await noHScroll('lesson 3.1 debrief');
+  await btn('Back to course').first().click();
+  await page.getByRole('heading', { name: 'Ground school', exact: true }).waitFor();
+  check(/\b8 of \d+ lessons flown/.test(await main()), `${label} course home counts 3.1 flown`);
 
   // Daily flight: the sheet
   await page.getByRole('button', { name: new RegExp(`Today's real conditions at ${icao}`) }).click();

@@ -15,6 +15,7 @@ import type { Performance } from '../lib/perf';
 import type { CarbIceRisk, InstrumentId, PowerSource } from '../lib/systems';
 import type { Volume } from '../lib/airspace';
 import type { PlanLeg } from '../scenarios/airspacePlan';
+import type { Envelope, WbResult } from '../lib/wb';
 
 export interface LessonContext {
   /** The pilot's home field, or the practice field when it can't be used. */
@@ -55,6 +56,8 @@ export type Figure =
   /** A POH-style performance chart with the four corners used for the reading marked. */
   | { kind: 'perf'; chart: PerfChartId; performance: Performance; paFt: number; oatC: number; sample: boolean }
   | { kind: 'navlog'; log: NavLog; altitudeMsl?: number }
+  /** The CG envelope with a loading plotted, and its zero-fuel point so the burn line shows. */
+  | { kind: 'wb'; envelope: Envelope; maxGrossLb: number; loaded: WbResult; zeroFuel: WbResult; sample: boolean; practice: boolean }
   /** Glide range from a height, with candidate fields by bearing and distance. */
   | { kind: 'glide'; heightAglFt: number; rangeNm: number; windFromTrue?: number; windKt?: number; fields: { name: string; bearingTrue: number; distanceNm: number; reachable: boolean }[] }
   /**

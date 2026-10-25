@@ -11,6 +11,7 @@ import { weatherLessons } from './weather';
 import { crossCountryLessons } from './crossCountry';
 import { humanFactorsLessons } from './human';
 import { airspaceLessons } from './airspace';
+import { performanceLessons } from './performance';
 
 export const modules: Module[] = [
   {
@@ -28,8 +29,8 @@ export const modules: Module[] = [
   {
     n: 3, title: 'Performance and loading', acsAreas: ['I.F'],
     summary: 'Weight and balance, density altitude and runway performance for your airplane on today\'s day.',
-    lessons: [],
-    outline: ['Weight and balance with real passengers', 'Density altitude on a hot afternoon', 'Takeoff distance and the 50 foot obstacle', 'Fuel: legal reserve and real reserve'],
+    lessons: performanceLessons,
+    outline: [],
   },
   {
     n: 4, title: 'Airspace and the chart', acsAreas: ['I.E', 'III.A'],
