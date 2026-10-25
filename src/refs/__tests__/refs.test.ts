@@ -60,6 +60,24 @@ describe('passage search', () => {
     expect(findPage(pages, ['Not here', 'METAR'])).toEqual({ page: 2, phrase: 'METAR' });
     expect(findPage(pages, ['Not here'])).toBeNull();
   });
+  it('does not take a worked example with dot leaders for a contents page', () => {
+    const example =
+      'Sample Problem 1 Airport Elevation..........5,883 feet OAT..........70 °F Altimeter..........30.10 "Hg ' +
+      'Takeoff Weight..........2,600 pounds Headwind..........12 knots Crosswind and Headwind Component Chart';
+    expect(looksLikeContents(example)).toBe(false);
+    expect(looksLikeContents('Contents Wind . . . . . . 6 - 4 Fog . . . . . . 6 - 9 Ice ...... 3-13 Haze ...... 7-2 Smoke ...... 7-3')).toBe(true);
+    expect(findPage(['Contents', example], ['Crosswind and Headwind Component'])).toEqual({ page: 2, phrase: 'Crosswind and Headwind Component' });
+  });
+  it('prefers the heading over a lowercase mention or a quoted cross-reference', () => {
+    const pages = [
+      'Pilots who practice risk management have predetermined personal minimums.',
+      'Methods are explained in the “Crosswind Approach and Landing” section of this chapter.',
+      'Personal Minimums Pilots who understand the difference... Crosswind Approach and Landing Most runways',
+    ];
+    expect(findPage(pages, ['Personal Minimums'])?.page).toBe(3);
+    expect(findPage(pages, ['Crosswind Approach and Landing'])?.page).toBe(3);
+    expect(findPage(pages.slice(0, 1), ['Personal Minimums'])?.page).toBe(1);
+  });
   it('highlights a phrase split across text items', () => {
     expect(hitItems(['Chapter', 'Crosswind and', 'Headwind Component', 'Chart'], 'crosswind and headwind component')).toEqual([1, 2]);
   });
