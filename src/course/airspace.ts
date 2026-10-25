@@ -51,7 +51,7 @@ interface PlanOption {
  * the consequence adds the rule that was broken, from the same check, so
  * the copy can't claim a different reason than the grade.
  */
-function planDecision(id: string, title: string, situation: string, figure: Figure, options: PlanOption[], active: string[], why: string, o: GradeOptions = {}, extra: Volume[] = []): Step {
+function planDecision(id: string, title: string, situation: string, figure: Figure, options: PlanOption[], active: string[], why: string, o: GradeOptions = {}, extra: Volume[] = [], keepOrder = false): Step {
   const plans = options.map((x) => ({ ...x.plan, id: x.id }));
   const { grades, checks } = gradePlans(withVolumes(R, extra), plans, active, o);
   const consequence: Record<string, string> = {};
@@ -64,7 +64,7 @@ function planDecision(id: string, title: string, situation: string, figure: Figu
   return {
     kind: 'decide', id, title, situation, figure,
     options: options.map((x) => ({ id: x.id, label: x.label })),
-    grades, consequence, why,
+    grades, consequence, why, keepOrder,
   };
 }
 
@@ -168,6 +168,8 @@ const chartAroundField: Lesson = {
         [],
         `Two checks pick the altitude. Stay at least 1,000 ft above the highest maximum elevation figure on the route, and once you are more than 3,000 ft above the ground, fly ${westbound ? 'even' : 'odd'} thousands plus 500 on a magnetic course of ${pad3(mc)} (91.159).`,
         { mef: true },
+        [],
+        true,
       ),
     ];
   },

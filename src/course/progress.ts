@@ -17,6 +17,8 @@ export interface LessonRecord {
   lastGrade: Grade;
   bestGrade: Grade;
   lcg: Lcg;
+  /** Situations flown, in order (course/variant.ts). Older saves don't have it. */
+  seen?: number[];
   /** Older saves may still carry this flag from the removed confidence slider. */
   confidentlyWrong?: boolean;
 }
@@ -113,7 +115,7 @@ export function scoreLesson(steps: Step[], answers: LessonAnswers): LessonResult
   };
 }
 
-export function recordLesson(progress: CourseProgress, lessonId: string, result: LessonResult, now = new Date()): CourseProgress {
+export function recordLesson(progress: CourseProgress, lessonId: string, result: LessonResult, now = new Date(), variant = 0): CourseProgress {
   const prev = progress[lessonId];
   const at = now.toISOString();
   return {
@@ -125,6 +127,7 @@ export function recordLesson(progress: CourseProgress, lessonId: string, result:
       lastGrade: result.grade,
       bestGrade: prev ? better(prev.bestGrade, result.grade) : result.grade,
       lcg: result.lcg,
+      seen: [...(prev?.seen ?? []), variant],
     },
   };
 }

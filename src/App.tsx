@@ -126,7 +126,7 @@ export function App() {
             />
           )}
           {screen.rail === 'tools' && (
-            <Tools tool={tool} setTool={setTool} airport={airport} aircraft={aircraft} setAircraft={setAircraft} loading={loading} setLoading={setLoading} epoch={epoch} onSetup={() => rerunSetup(1)} />
+            <Tools tool={tool} setTool={setTool} airport={airport} aircraft={aircraft} setAircraft={setAircraft} loading={loading} setLoading={setLoading} epoch={epoch} onSetup={() => rerunSetup(1)} ctx={ctx} />
           )}
           {screen.rail === 'logbook' && <Logbook progress={progress} log={log} lastFlightReview={pilot.lastFlightReview} epoch={epoch} goReview={() => openTool('review')} goCourse={() => go({ rail: 'course' })} />}
           {screen.rail === 'pilot' && (

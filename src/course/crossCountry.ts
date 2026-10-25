@@ -308,6 +308,7 @@ const windsAloft: Lesson = {
         options: options.map((o) => option(id(o.altFt), `${fmt(o.altFt)} feet, ${byAlt[o.altFt]} minutes`)),
         grades: Object.fromEntries(options.map((o) => [id(o.altFt), grades[o.altFt]])),
         consequence,
+        keepOrder: true,
         why: 'Three things pick a cruising altitude: the hemispheric rule (91.159) when you are more than 3,000 feet above the ground, a margin over the highest terrain and obstacles, and then the wind. Legal and clear come before fast.',
       },
     ];
