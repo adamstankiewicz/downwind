@@ -531,7 +531,7 @@ const ceilings: Lesson = {
           ? `Grey but bright this morning. You only want to fly the pattern at ${fieldName(ctx)}.`
           : `Low and grey this morning. You only want to fly the pattern at ${fieldName(ctx)}.`,
         say: {
-          full: `There are three different ceilings in your head. The **legal** one: to take off or land VFR in a surface area you need a 1,000 foot ceiling and 3 miles (91.155(c) and (d)). The **practical** one: a pattern at 1,000 feet above the field, with the 500 feet of clearance below cloud that Class D and E require, needs about 1,500 feet. And **yours**: you set ${fmt(ctx.minimums.ceilingFt)} on a calm day for reasons you'll want to remember on a day like this.`,
+          full: `There are three different ceilings in your head. The **legal** one: to take off or land VFR in a surface area you need a 1,000 foot ceiling and 3 miles (91.155(c) and (d)). The **practical** one: a pattern at 1,000 feet above the field, with the 500 feet of clearance below cloud that Class D and E require, needs a ceiling of about 1,500 feet. And **yours**: you set ${fmt(ctx.minimums.ceilingFt)} on a calm day for reasons you'll want to remember on a day like this.`,
           short: 'Legal 1,000. A normal pattern about 1,500. Yours is the one that binds.',
         },
         figure,

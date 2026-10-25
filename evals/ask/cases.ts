@@ -143,7 +143,7 @@ export const CASES: CaseSpec[] = [
     id: 'alcohol-hours', lesson: '8.2', step: 'b1', category: 'fact', wantRefs: true,
     question: 'How long after a beer before I can fly?',
     facts: [[/8 hours|eight hours/i]],
-    forbid: [/\b(4|6|four|six) hours\b/i],
+    forbid: [/(?<!(slept|sleep|slept about|slept only|sleep of about) )\b(4|6|four|six) hours\b/i],
     reference: 'The rule is at least **8 hours** from the last drink, and under 0.04 percent blood alcohol, and not under the influence. Eight hours is a minimum; many pilots use twelve or more, and a hangover alone can make you unfit.',
     referenceRefs: ['14 CFR 91.17'],
   },

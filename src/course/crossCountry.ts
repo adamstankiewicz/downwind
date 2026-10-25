@@ -295,7 +295,7 @@ const windsAloft: Lesson = {
         kind: 'brief', id: 'b1', title: 'The wind up there',
         scene: `Same trip to ${nameOf(DEST)}. The practice winds aloft forecast for the area reads: **${fb}** (3,000, 6,000 and 9,000 feet).${sampleLine(p)}`,
         say: {
-          full: 'Winds aloft come in four digits per altitude: the first two are the direction in tens of degrees **true**, the next two the speed in knots, then the temperature from 6,000 feet up. There is no 3,000 foot temperature, and no wind at all for a level within 1,500 feet of the station. Your altitude is usually between two levels, so you **interpolate**: a straight line between them. Your share of the way is how far you are above the lower level over the gap to the next: 500 feet above 6,000 is 500 of 3,000, one sixth.',
+          full: 'Winds aloft come in four digits per altitude: the first two are the direction in tens of degrees **true**, the next two the speed in knots, then the temperature from 6,000 feet up. There is no 3,000 foot temperature, and no wind at all for a level within 1,500 feet of the station. Your altitude is usually between two levels, so you **interpolate**: a straight line between them. Your share of the way is how far you are above the lower level over the gap to the next: 500 feet above 6,000 is 500 of 3,000, one sixth. Then the wind triangle starts from the **true course** and true airspeed.',
           short: 'Direction true in tens, speed in knots, temperature. Interpolate between levels.',
         },
       },
