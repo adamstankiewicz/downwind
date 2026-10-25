@@ -2,7 +2,7 @@
 // Highlighting is cosmetic; the parsed values come from lib/metar and lib/taf.
 
 const WIND = /^(\d{3}|VRB)\d{2,3}(G\d{2,3})?(KT|MPS)$|^\d{3}V\d{3}$/;
-const VIS = /SM$|^CAVOK$|^P6SM$/;
+const VIS = /^[MP]?\d+(\/\d+)?SM$|^CAVOK$/;
 const CLOUD = /^(FEW|SCT|BKN|OVC|VV)(\d{3}|\/\/\/)(CB|TCU)?$|^SKC$|^CLR$|^NSC$/;
 const TEMP = /^M?\d{2}\/(M?\d{2})?$/;
 const ALT = /^[AQ]\d{4}$/;
@@ -22,7 +22,8 @@ function classify(tok: string, prevIsVisInt: boolean): Kind {
   return 'plain';
 }
 
-export function RawReport({ raw, label, ceilingToken }: { raw: string; label: string; ceilingToken?: string | null }) {
+/** `marks` are tokens the lesson wants underlined; `ceilingToken` is the ceiling layer. */
+export function RawReport({ raw, label, ceilingToken, marks }: { raw: string; label: string; ceilingToken?: string | null; marks?: string[] }) {
   const [body, remarks] = raw.split(/ RMK /);
   const tokens = body.split(' ');
   return (
@@ -33,7 +34,8 @@ export function RawReport({ raw, label, ceilingToken }: { raw: string; label: st
         const nextIsFracVis = /^\d+$/.test(t) && /^\d+\/\d+SM$/.test(tokens[i + 1] ?? '');
         const kind = classify(t, nextIsFracVis);
         const isCeiling = ceilingToken && t === ceilingToken;
-        const cls = isCeiling ? 'hl c' : kind === 'wx' ? 'hl' : kind === 'plain' ? '' : kind;
+        const marked = marks?.includes(t);
+        const cls = `${isCeiling ? 'hl c' : kind === 'wx' ? 'hl' : kind === 'plain' ? '' : kind}${marked ? ' mark' : ''}`.trim();
         return (
           <span key={i}>
             <span className={cls}>{t}</span>

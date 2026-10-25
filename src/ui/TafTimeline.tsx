@@ -80,7 +80,7 @@ export function TafTimeline({ taf, departure, tripHours }: { taf: Taf | null; de
             <g key={`m${i}`}>
               <rect x={x(s.a)} y="14" width={w} height="26" fill={color(s.p)} opacity="0.9" />
               {w > 60 && (
-                <text x={x(s.a) + 6} y="31" fontFamily="var(--body)" fontSize="11" fill="#fff" fontWeight="600">
+                <text x={x(s.a) + 6} y="31" fontFamily="var(--label)" fontSize="11" fill="var(--paper)" fontWeight="600">
                   {s.p.category ?? '—'} {windText(s.p)}
                 </text>
               )}
@@ -94,7 +94,7 @@ export function TafTimeline({ taf, departure, tripHours }: { taf: Taf | null; de
             <g key={`t${i}`}>
               <rect x={x(s.a)} y="46" width={w} height="12" fill={color(s.p)} opacity="0.55" />
               {w > 70 && (
-                <text x={x(s.a) + 4} y="56" fontFamily="var(--body)" fontSize="9" fill="var(--ink)">
+                <text x={x(s.a) + 4} y="56" fontFamily="var(--label)" fontSize="9" fill="var(--ink)">
                   {s.p.kind}{s.p.probability ? s.p.probability : ''} {s.p.category ?? ''}
                 </text>
               )}
@@ -106,7 +106,7 @@ export function TafTimeline({ taf, departure, tripHours }: { taf: Taf | null; de
         {ticks.map((h) => (
           <g key={h}>
             <line x1={x(h)} y1={H - 26} x2={x(h)} y2={H - 18} stroke="var(--ink)" />
-            <text x={x(h)} y={H - 6} textAnchor="middle" fontFamily="var(--body)" fontSize="10" fill="var(--muted)">
+            <text x={x(h)} y={H - 6} textAnchor="middle" fontFamily="var(--label)" fontSize="10" fill="var(--muted)">
               {h === 0 ? 'Depart' : h === tripHours ? 'Return' : `+${h} h`}
             </text>
           </g>

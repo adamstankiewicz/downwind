@@ -198,7 +198,7 @@ export function buildBrief(input: GoNoGoInput): Brief {
   // Ceiling and visibility against personal minimums.
   if (metar.ceilingFtAgl !== null && metar.ceilingFtAgl >= 1000 && metar.ceilingFtAgl < mins.ceilingFt) {
     add({ id: 'ceiling-personal', severity: 'personal', title: 'Ceiling below your personal minimum',
-      detail: `${metar.ceilingFtAgl} ft against your ${mins.ceilingFt} ft minimum.`,
+      detail: `${metar.ceilingFtAgl.toLocaleString('en-US')} ft against your ${mins.ceilingFt.toLocaleString('en-US')} ft minimum.`,
       acs: ['PA.I.C'], refs: ['Risk Management Handbook, personal minimums'] });
   }
   if (metar.visibilitySm !== null && metar.visibilitySm >= 3 && metar.visibilitySm < mins.visibilitySm) {
@@ -277,11 +277,10 @@ export interface Debrief {
   rationale: string;
   /** Learner-centered grading level this attempt demonstrates. */
   lcg: 'Explain' | 'Practice' | 'Perform' | 'Manage/Decide';
-  confidentlyWrong: boolean;
   keyFindings: Finding[];
 }
 
-export function debrief(brief: Brief, choice: ChoiceId, confidencePct: number): Debrief {
+export function debrief(brief: Brief, choice: ChoiceId): Debrief {
   const grade = brief.grades[choice];
   const lcg = grade === 'best' ? 'Manage/Decide' : grade === 'acceptable' ? 'Perform' : grade === 'marginal' ? 'Practice' : 'Explain';
   const rank: Severity[] = ['illegal', 'limit', 'personal', 'caution', 'info'];
@@ -290,7 +289,6 @@ export function debrief(brief: Brief, choice: ChoiceId, confidencePct: number): 
     grade,
     rationale: brief.rationale,
     lcg,
-    confidentlyWrong: (grade === 'unsafe' || grade === 'marginal') && confidencePct >= 70,
     keyFindings,
   };
 }

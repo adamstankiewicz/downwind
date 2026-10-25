@@ -7,6 +7,8 @@ import { aircraftTemplates, blankAircraft, type AircraftProfile } from '../data/
 import { defaultPilot, type PilotProfile } from '../data/pilot';
 import type { Airport } from '../data/airports';
 import { computeWb, FUEL_LB_PER_GAL, type LoadItem, type WbResult } from '../lib/wb';
+import { COURSE_KEY, type CourseProgress } from '../course/progress';
+import { LOGBOOK_KEY, type FiledSheet } from '../course/daily';
 
 export const KEYS = {
   aircraft: 'downwind.aircraft.v1',
@@ -66,6 +68,13 @@ export function usePersisted<T>(key: string, fallback: T): [T, (next: T | ((prev
     [key],
   );
   return [value, set];
+}
+
+export function useCourse() {
+  return usePersisted<CourseProgress>(COURSE_KEY, {});
+}
+export function useLogbook() {
+  return usePersisted<FiledSheet[]>(LOGBOOK_KEY, []);
 }
 
 export function useAircraft() {

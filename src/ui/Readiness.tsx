@@ -1,4 +1,4 @@
-// Readiness: mastery per ACS Area I task, plus the confidently-wrong rate.
+// Readiness: mastery per ACS Area I task.
 
 import { masteryByTask } from '../review/scheduler';
 import { reviewItems } from '../review/items';
@@ -16,7 +16,7 @@ export const TASK_NAMES: Record<string, string> = {
   'PA.I.H': 'Human Factors',
 };
 
-export function Readiness({ goReview }: { goReview: () => void }) {
+export function Readiness({ goReview, embedded }: { goReview: () => void; embedded?: boolean }) {
   const mastery = masteryByTask();
   const byAcs = new Map(mastery.map((m) => [m.acs, m]));
   const tasks = Object.keys(TASK_NAMES);
@@ -25,22 +25,24 @@ export function Readiness({ goReview }: { goReview: () => void }) {
 
   const answered = mastery.reduce((n, m) => n + m.answered, 0);
   const weighted = answered ? mastery.reduce((n, m) => n + m.correctRate * m.answered, 0) / answered : 0;
-  const cwTasks = mastery.filter((m) => m.answered > 0);
-  const cwRate = cwTasks.length ? cwTasks.reduce((n, m) => n + m.confidentlyWrongRate * m.answered, 0) / cwTasks.reduce((n, m) => n + m.answered, 0) : 0;
 
   return (
     <>
-      <PageHead
-        title="Readiness"
-        lead="Where you stand against the Private Pilot ACS, Area I. Recent answers weigh more than old ones."
-        meta={<>Standard <b>FAA-S-ACS-6C</b></>}
-      />
+      {embedded ? (
+        <div className="card-head"><h2>Review readiness</h2><span className="sub">Private Pilot ACS, Area I, FAA-S-ACS-6C. Recent answers weigh more than old ones.</span></div>
+      ) : (
+        <PageHead
+          title="Readiness"
+          lead="Where you stand against the Private Pilot ACS, Area I. Recent answers weigh more than old ones."
+          meta={<>Standard <b>FAA-S-ACS-6C</b></>}
+        />
+      )}
       {answered === 0 ? (
         <div className="empty">
-          <EmptyGlyph />
-          <h2>No data yet</h2>
-          <p>Readiness fills in as you answer review items and make go/no-go decisions. Eight Area I tasks are tracked; each needs a few answers before the bar means anything.</p>
-          <button type="button" className="btn primary" onClick={goReview}>Start a review session</button>
+          {!embedded && <EmptyGlyph />}
+          <h2>No review answers yet</h2>
+          <p>Readiness fills in as you answer items in the review deck. Eight Area I tasks are tracked; each needs a few answers before the bar means anything.</p>
+          <button type="button" className="btn" onClick={goReview}>Open the review deck</button>
         </div>
       ) : (
         <div className="grid-2">
@@ -67,13 +69,13 @@ export function Readiness({ goReview }: { goReview: () => void }) {
             <p className="help">Green is 80% and up, blue 60 to 79, amber below. Tasks without items yet (Operation of Systems) fill in with later content.</p>
           </Card>
           <div className="stack">
-            <Card title="Calibration">
+            <Card title="Overall">
               <div className="score-row">
                 <div className="stat"><span className="k">Weighted correct</span><span className="v">{Math.round(weighted * 100)}%</span></div>
-                <div className="stat"><span className="k">Confidently wrong</span><span className={`v ${cwRate > 0.2 ? 'warn' : ''}`}>{Math.round(cwRate * 100)}%</span></div>
+                <div className="stat"><span className="k">Answered</span><span className="v">{answered}</span></div>
               </div>
               <p className="help">
-                Confidently wrong is the share of missed answers given at 70% confidence or higher. A high number means you don't know what you don't know, which is the dangerous kind of gap. A low number with a low score just means you need more reps.
+                Missed items come back sooner, so a low score on a task mostly means it needs more reps. The weakest tasks are listed next.
               </p>
             </Card>
             <Card title="Weakest tasks">

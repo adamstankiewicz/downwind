@@ -1,5 +1,5 @@
-// Review: an FSRS session over the items due now. Confidence is rated before
-// the answer is revealed; the scheduler uses both.
+// Review: an FSRS session over the items due now. Pick an answer, then reveal;
+// the scheduler uses whether it was right.
 
 import { useState } from 'react';
 import type { ReviewItem } from '../review/items';
@@ -11,14 +11,12 @@ const KEYS = ['A', 'B', 'C', 'D', 'E', 'F'];
 interface Answered {
   item: ReviewItem;
   correct: boolean;
-  confidence: number;
 }
 
 export function Review() {
   const [session, setSession] = useState<ReviewItem[]>(() => dueItems());
   const [idx, setIdx] = useState(0);
   const [picked, setPicked] = useState<number | null>(null);
-  const [confidence, setConfidence] = useState(50);
   const [revealed, setRevealed] = useState(false);
   const [done, setDone] = useState<Answered[]>([]);
 
@@ -29,7 +27,6 @@ export function Review() {
     setSession(dueItems());
     setIdx(0);
     setPicked(null);
-    setConfidence(50);
     setRevealed(false);
     setDone([]);
   };
@@ -37,15 +34,14 @@ export function Review() {
   const commit = () => {
     if (picked === null || !item) return;
     const correct = picked === item.answer;
-    recordAnswer(item.id, correct, confidence);
-    setDone([...done, { item, correct, confidence }]);
+    recordAnswer(item.id, correct);
+    setDone([...done, { item, correct }]);
     setRevealed(true);
   };
 
   const next = () => {
     setIdx(idx + 1);
     setPicked(null);
-    setConfidence(50);
     setRevealed(false);
   };
 
@@ -65,7 +61,6 @@ export function Review() {
 
   if (finished) {
     const right = done.filter((d) => d.correct).length;
-    const cw = done.filter((d) => !d.correct && d.confidence >= 70).length;
     return (
       <>
         <PageHead title="Review" lead="Session complete." />
@@ -73,13 +68,8 @@ export function Review() {
           <div className="score-row">
             <div className="stat"><span className="k">Answered</span><span className="v">{done.length}</span></div>
             <div className="stat"><span className="k">Correct</span><span className="v">{right}</span></div>
-            <div className="stat"><span className="k">Confidently wrong</span><span className={`v ${cw ? 'warn' : ''}`}>{cw}</span></div>
           </div>
-          {cw > 0 && (
-            <p className="help">
-              Confidently wrong answers come back soonest. They are the ones that would bite you on a checkride or in the airplane.
-            </p>
-          )}
+          {right < done.length && <p className="help">Missed items come back soonest.</p>}
           <ul className="findings">
             {done.map((d) => (
               <li key={d.item.id} className={`finding ${d.correct ? 'right' : 'illegal'}`}>
@@ -102,7 +92,7 @@ export function Review() {
     <>
       <PageHead
         title="Review"
-        lead="Answer first, then read. Rate your confidence before you reveal."
+        lead="Answer first, then read."
         meta={<>Item <b>{idx + 1}</b> of {session.length}</>}
       />
       <div className="progress" aria-hidden="true"><i style={{ width: `${(idx / session.length) * 100}%` }} /></div>
@@ -135,20 +125,12 @@ export function Review() {
           <Card title={revealed ? 'Result' : 'Your answer'} className="decide">
             {!revealed ? (
               <>
-                <div className="conf">
-                  <div className="conf-row">
-                    <label htmlFor="rconf">How sure are you?</label>
-                    <b>{confidence}%</b>
-                  </div>
-                  <input id="rconf" type="range" min={0} max={100} step={5} value={confidence} onChange={(e) => setConfidence(Number(e.target.value))} />
-                  <div className="conf-row"><span>Guessing</span><span>Certain</span></div>
-                </div>
                 <button type="button" className="btn primary" disabled={picked === null} onClick={commit}>Reveal</button>
               </>
             ) : (
               <>
                 <div className={`result ${correct ? '' : 'wrong'}`}>
-                  <b>{correct ? 'Correct' : confidence >= 70 ? 'Missed, and you were sure' : 'Missed'}</b>
+                  <b>{correct ? 'Correct' : 'Missed'}</b>
                   <span>{item.explanation}</span>
                   <div className="refs">
                     <span className="chip acs">{item.acs}</span>

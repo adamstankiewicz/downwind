@@ -145,8 +145,7 @@ describe('go/no-go', () => {
     expect(b.facts.runwayWind?.runway.id).toBe('32');
     expect(b.grades.go).toBe('unsafe');
     expect(b.grades.delay).toBe('best');
-    const d = debrief(b, 'go', 90);
-    expect(d.confidentlyWrong).toBe(true);
+    const d = debrief(b, 'go');
     expect(d.lcg).toBe('Explain');
   });
   it('calls a sub-1,000 ceiling illegal', () => {
