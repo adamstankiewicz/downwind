@@ -206,3 +206,26 @@ describe('plan check', () => {
     for (const a of R.airports) expect(R.groundFt(a.pos)).toBe(a.elevationFt);
   });
 });
+
+describe.each(contexts)('module 4 situations: %s', (_name, ctx) => {
+  const g = (id: string, variant: number) => decide(airspaceLessons.find((l) => l.id === id)!.build({ ...ctx, variant })).grades;
+  it('the right altitude follows the direction and the ground', () => {
+    expect(g('4.1', 0)['alt-4500']).toBe('best');
+    expect(g('4.1', 1)).toMatchObject({ 'alt-4500': 'unsafe', 'alt-5500': 'best' });
+    expect(g('4.1', 2)['alt-3500']).toBe('best');
+  });
+  it('the controller\'s exact words decide whether you go in', () => {
+    expect(g('4.2', 0)).toMatchObject({ continue: 'unsafe', hold: 'best' });
+    expect(g('4.2', 1)).toMatchObject({ continue: 'best', hold: 'acceptable' });
+    expect(g('4.2', 2)).toMatchObject({ continue: 'unsafe', hold: 'acceptable', around: 'best' });
+    expect(g('4.3', 0)).toMatchObject({ continue: 'unsafe', hold: 'best' });
+    expect(g('4.3', 1)).toMatchObject({ continue: 'best', hold: 'acceptable' });
+    expect(g('4.4', 0)).toMatchObject({ continue: 'unsafe', below: 'best' });
+    expect(g('4.4', 1)).toMatchObject({ continue: 'best', below: 'unsafe', squeeze: 'unsafe' });
+  });
+  it('the briefing decides which way around', () => {
+    expect(g('4.5', 0)).toMatchObject({ west: 'best', east: 'unsafe', over: 'best' });
+    expect(g('4.5', 1)).toMatchObject({ west: 'best', east: 'best' });
+    expect(g('4.5', 2)).toMatchObject({ west: 'best', over: 'unsafe' });
+  });
+});
