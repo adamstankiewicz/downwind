@@ -27,13 +27,24 @@ const freshSeed = () => Math.floor(Math.random() * 2 ** 31);
 const KEYS = ['A', 'B', 'C', 'D'];
 const KIND_LABEL: Record<Step['kind'], string> = { brief: 'Brief', example: 'Worked example', turn: 'Your turn', dials: 'Dials', decide: 'Decide' };
 
-export function LessonPlayer({ lesson, ctx, progress, setProgress, onExit, onNext }: {
+/**
+ * A lesson outside the course, such as a planned trip: its own header line,
+ * its own place to keep the result, and no "next lesson".
+ */
+export interface Standalone {
+  line: string;
+  onResult: (r: LessonResult) => void;
+  exitLabel: string;
+}
+
+export function LessonPlayer({ lesson, ctx, progress, setProgress, onExit, onNext, standalone }: {
   lesson: Lesson;
   ctx: LessonContext;
   progress: CourseProgress;
   setProgress: (next: CourseProgress | ((p: CourseProgress) => CourseProgress)) => void;
   onExit: () => void;
   onNext: (l: Lesson) => void;
+  standalone?: Standalone;
 }) {
   const [attempt, setAttempt] = useState(0);
   // Built once per attempt so the practice weather holds still while the pilot
@@ -54,8 +65,8 @@ export function LessonPlayer({ lesson, ctx, progress, setProgress, onExit, onNex
 
   const shown = visibleSteps(steps, answers);
   const step = shown[Math.min(idx, shown.length - 1)];
-  const m = modules.find((x) => x.n === lesson.module)!;
-  const lessonNo = m.lessons.findIndex((l) => l.id === lesson.id) + 1;
+  const m = modules.find((x) => x.n === lesson.module);
+  const lessonNo = m ? m.lessons.findIndex((l) => l.id === lesson.id) + 1 : 0;
 
   const complete = (s: Step) =>
     s.kind === 'brief' || s.kind === 'example' ||
@@ -67,8 +78,11 @@ export function LessonPlayer({ lesson, ctx, progress, setProgress, onExit, onNex
   const finish = () => {
     const r = scoreLesson(steps, answers);
     setResult(r);
-    setProgress((p) => recordLesson(p, lesson.id, r, new Date(), variant));
-    enrollLesson(lesson.id, lessonOutcomes(steps, answers));
+    if (standalone) standalone.onResult(r);
+    else {
+      setProgress((p) => recordLesson(p, lesson.id, r, new Date(), variant));
+      enrollLesson(lesson.id, lessonOutcomes(steps, answers));
+    }
     window.scrollTo({ top: 0 });
   };
   const again = () => {
@@ -106,16 +120,16 @@ export function LessonPlayer({ lesson, ctx, progress, setProgress, onExit, onNex
       <div className="strip-head">
         <div className="strip-title">
           <div>
-            <h1><span className="lid">{lesson.id}</span> {lesson.title}</h1>
-            <span className="muted">Module {m.n}, {m.title}. Lesson {lessonNo} of {m.lessons.length}. {lesson.acs.join(', ')}.{variantCount(lesson) > 1 ? ` Situation ${variant + 1} of ${variantCount(lesson)}.` : ''}{ctx.practiceField ? ' Practice field, not a real airport.' : ''}</span>
+            <h1>{!standalone && <span className="lid">{lesson.id}</span>}{!standalone && ' '}{lesson.title}</h1>
+            <span className="muted">{standalone || !m ? standalone?.line ?? '' : `Module ${m.n}, ${m.title}. Lesson ${lessonNo} of ${m.lessons.length}.`} {lesson.acs.join(', ')}.{!standalone && variantCount(lesson) > 1 ? ` Situation ${variant + 1} of ${variantCount(lesson)}.` : ''}{ctx.practiceField && !standalone ? ' Practice field, not a real airport.' : ''}</span>
           </div>
-          <button type="button" className="btn quiet" onClick={onExit}>{result ? 'Back to course' : 'Leave lesson'}</button>
+          <button type="button" className="btn quiet" onClick={onExit}>{result ? standalone?.exitLabel ?? 'Back to course' : 'Leave lesson'}</button>
         </div>
         <Strip points={points} label="Steps of this lesson" />
       </div>
 
       {result ? (
-        <Debrief lesson={lesson} steps={shown} answers={answers} result={result} progress={progress} onAgain={again} onNext={onNext} onExit={onExit} />
+        <Debrief lesson={lesson} steps={shown} answers={answers} result={result} progress={progress} onAgain={again} onNext={onNext} onExit={onExit} exitLabel={standalone?.exitLabel} />
       ) : (
         <div className="lesson">
           <div className="scene">
@@ -290,7 +304,7 @@ export function StepView({ step, level, answers, setAnswers, checked, onCheck, c
   );
 }
 
-function Debrief({ lesson, steps, answers, result, progress, onAgain, onNext, onExit }: {
+function Debrief({ lesson, steps, answers, result, progress, onAgain, onNext, onExit, exitLabel }: {
   lesson: Lesson;
   steps: Step[];
   answers: LessonAnswers;
@@ -299,8 +313,10 @@ function Debrief({ lesson, steps, answers, result, progress, onAgain, onNext, on
   onAgain: () => void;
   onNext: (l: Lesson) => void;
   onExit: () => void;
+  /** Set for a standalone lesson: no next lesson, just this way out. */
+  exitLabel?: string;
 }) {
-  const next = nextLesson(progress);
+  const next = exitLabel ? null : nextLesson(progress);
   const decideSteps = steps.filter((s): s is Extract<Step, { kind: 'decide' }> => s.kind === 'decide');
   return (
     <div className="debrief-page">
@@ -375,7 +391,7 @@ function Debrief({ lesson, steps, answers, result, progress, onAgain, onNext, on
         <span style={{ flex: 1 }} />
         {next && next.id !== lesson.id
           ? <button type="button" className="btn primary" onClick={() => onNext(next)}>Next lesson: {next.id} {next.title}</button>
-          : <button type="button" className="btn primary" onClick={onExit}>Back to course</button>}
+          : <button type="button" className="btn primary" onClick={onExit}>{exitLabel ?? 'Back to course'}</button>}
       </div>
     </div>
   );

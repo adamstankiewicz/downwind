@@ -3,6 +3,7 @@ import { CourseHome } from './ui/CourseHome';
 import { LessonPlayer } from './ui/LessonPlayer';
 import { DailyFlight } from './ui/DailyFlight';
 import { Tools, type Tool } from './ui/Tools';
+import { Trip } from './ui/Trip';
 import { Logbook } from './ui/Logbook';
 import { Settings } from './ui/Settings';
 import { Onboarding } from './ui/Onboarding';
@@ -13,11 +14,12 @@ import { lessonContext } from './course/practice';
 import type { Lesson } from './course/types';
 import { RefProvider } from './refs/RefViewer';
 
-type Rail = 'course' | 'tools' | 'logbook' | 'pilot';
+type Rail = 'course' | 'trip' | 'tools' | 'logbook' | 'pilot';
 type Screen = { rail: Rail; view?: 'lesson' | 'daily'; lessonId?: string };
 
 const RAILS: { id: Rail; label: string; icon: React.ReactNode }[] = [
   { id: 'course', label: 'Course', icon: Icons.course },
+  { id: 'trip', label: 'Trip', icon: Icons.trip },
   { id: 'tools', label: 'Tools', icon: Icons.tools },
   { id: 'logbook', label: 'Logbook', icon: Icons.logbook },
   { id: 'pilot', label: 'Pilot', icon: Icons.pilot },
@@ -124,6 +126,9 @@ export function App() {
               onDaily={() => go({ rail: 'course', view: 'daily' })}
               onSetup={() => rerunSetup(1)}
             />
+          )}
+          {screen.rail === 'trip' && (
+            <Trip airport={airport} aircraft={aircraft} pilot={pilot} ctx={ctx} progress={progress} setProgress={setProgress} onSetup={() => rerunSetup(1)} />
           )}
           {screen.rail === 'tools' && (
             <Tools tool={tool} setTool={setTool} airport={airport} aircraft={aircraft} setAircraft={setAircraft} loading={loading} setLoading={setLoading} epoch={epoch} onSetup={() => rerunSetup(1)} ctx={ctx} />

@@ -84,7 +84,22 @@ export type Figure =
    * The field from the side: the pattern at its height, the cloud base, the
    * 500 ft the pattern keeps below it, and the legal and personal lines.
    */
-  | { kind: 'sky'; airport: Airport; ceilingFtAgl: number | null; visibilitySm: number; patternFtAgl: number; legalCeilingFt: number | null; personalCeilingFt: number };
+  | { kind: 'sky'; airport: Airport; ceilingFtAgl: number | null; visibilitySm: number; patternFtAgl: number; legalCeilingFt: number | null; personalCeilingFt: number }
+  /**
+   * A schematic plan view around the pilot's home field for Trip: range
+   * rings, the fields in play and, for a diversion, the airplane. North up,
+   * drawn to scale, never a chart. `practice` says the fields are made up.
+   */
+  | { kind: 'tripMap'; practice: boolean; variationDeg: number; home: MapPoint; points: MapPoint[]; ringsNm: number[]; route?: [string, string]; marker?: LatLon };
+
+export interface MapPoint {
+  id: string;
+  label: string;
+  /** A short second line: distance, or why a field was left out. */
+  sub?: string;
+  pos: LatLon;
+  role: 'home' | 'pick' | 'filtered' | 'dest' | 'alternate';
+}
 
 export interface ElectricalLoad {
   id: string;
