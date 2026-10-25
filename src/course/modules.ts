@@ -7,6 +7,7 @@ import { pilotAirplaneLessons } from './pilotAirplane';
 import { systemsLessons } from './systems';
 import { weatherLessons } from './weather';
 import { crossCountryLessons } from './crossCountry';
+import { humanFactorsLessons } from './human';
 
 export const modules: Module[] = [
   {
@@ -54,8 +55,8 @@ export const modules: Module[] = [
   {
     n: 8, title: 'Human factors and risk', acsAreas: ['I.H', 'II'],
     summary: 'IMSAFE, PAVE, the hazardous attitudes and external pressure, applied to your own flying.',
-    lessons: [],
-    outline: ['Minimums under pressure', 'Fatigue, hypoxia and medication', 'Get-there-itis', 'Night: what changes'],
+    lessons: humanFactorsLessons,
+    outline: [],
   },
   {
     n: 9, title: 'The oral and the flight review', acsAreas: ['I', 'XI'],

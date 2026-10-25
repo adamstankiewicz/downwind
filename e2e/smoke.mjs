@@ -3,9 +3,9 @@
 //   node e2e/smoke.mjs [http://localhost:4173]
 // Weather and airport requests are stubbed, so it runs offline and exercises
 // both the live path and the practice-weather fallback. Covers onboarding,
-// the course home, lessons 1.1, 2.1, 5.1 and 7.1 end to end, the start of
-// 2.2, the daily flight through filing, and every rail screen, at desktop and
-// phone widths.
+// the course home, lessons 1.1, 2.1, 5.1, 7.1 and 8.1 end to end, the start
+// of 2.2, the daily flight through filing, and every rail screen, at desktop
+// and phone widths.
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 
@@ -86,6 +86,7 @@ async function run(viewport, live) {
   check(/Today's real conditions at/.test(body), `${label} daily flight listed`);
   const planned = await page.locator('.module.planned').count();
   check(planned < 9 && (await page.locator('.module.planned .m-count').filter({ hasText: 'being written' }).count()) === planned, `${label} every unwritten module says so`);
+  check((await page.locator('.module.planned').filter({ hasText: 'Human factors and risk' }).count()) === 0, `${label} module 8 is written`);
   check(await page.getByRole('list', { name: 'Modules' }).locator('li').count() === 9, `${label} strip shows nine modules`);
   check(!/C172K|N\d{3,5}[A-Z]{0,2}\b/.test(body), `${label} no tail number or type assumed in course copy`);
   await noHScroll('course home');
@@ -191,12 +192,52 @@ async function run(viewport, live) {
   await btn('Leave lesson').click();
   await page.getByRole('heading', { name: 'Ground school', exact: true }).waitFor();
   body = await main();
-  check(/1\.2 The documents in the airplane/.test(body) && /2 of 40/.test(body), `${label} course home advances to 1.2 with 2 of 40 flown`);
+  check(/1\.2 The documents in the airplane/.test(body) && /\b2 of \d+/.test(body), `${label} course home advances to 1.2 with 2 lessons flown`);
 
   // Persistence: reload should skip onboarding and keep progress.
   await page.reload();
   await page.getByRole('heading', { name: 'Ground school', exact: true }).waitFor();
-  check(/2 of 40/.test(await main()), `${label} progress survives reload, onboarding not shown again`);
+  check(/\b2 of \d+/.test(await main()), `${label} progress survives reload, onboarding not shown again`);
+
+  // Lesson 8.1, end to end: minimums widened for the day, and a passenger waiting.
+  await page.locator('.module').filter({ hasText: 'Human factors and risk' }).locator('summary').click();
+  await page.getByRole('button', { name: /8\.1 Minimums under pressure/ }).click();
+  await page.getByRole('heading', { name: 'A number written on a calm day' }).waitFor();
+  body = await main();
+  check(/Module 8, Human factors and risk/.test(body) && /PA\.I\.H/.test(body), `${label} 8.1 header names the module and ACS task`);
+  check(/add at least 500 feet/.test(body) && (await page.locator('.metar').count()) > 0, `${label} 8.1 brief gives the RMH margin beside the report`);
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'Your numbers, widened' }).waitFor();
+  check(/3,000 → 3,500 ft/.test(await main()), `${label} 8.1 worked example widens the pilot's own ceiling`);
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'Your turn', exact: true }).waitFor();
+  await page.getByLabel(/Ceiling you need today/).fill('3500');
+  await page.getByLabel(/Visibility you need today/).fill('5.5');
+  await page.getByLabel(/Ceiling short by/).fill('300');
+  await page.getByRole('button', { name: 'External pressures', exact: true }).click();
+  await page.getByRole('button', { name: 'Macho', exact: true }).click();
+  await btn('Check my numbers').click();
+  body = await main();
+  check((body.match(/Right\./g) ?? []).length === 4 && /Not quite\. 200 ft/.test(body), `${label} 8.1 blanks checked, the short-by answer corrected`);
+  await noHScroll('lesson 8.1 turn');
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'Your friend is already at the airport' }).waitFor();
+  check(/clears the 3,000 foot minimum you wrote down, but not the 3,500/.test(await main()), `${label} 8.1 decision states both minimums`);
+  await page.getByRole('button', { name: /Call it for today/ }).click();
+  await btn('Commit').click();
+  body = await main();
+  check(/Best call/.test(body) && /Unsafe/.test(body) && /Saying no to someone you like/.test(body), `${label} 8.1 grades and consequence shown after commit`);
+  await btn('Debrief').click();
+  await page.getByRole('heading', { name: 'Debrief', exact: true }).waitFor();
+  body = await main();
+  check(/4 of 5/.test(body) && /Risk Management Handbook, personal minimums/.test(body), `${label} 8.1 debrief counts blanks and cites the RMH`);
+  check(await page.getByRole('button', { name: 'PHAK, the PAVE checklist' }).isVisible(), `${label} 8.1 PAVE reference opens in the viewer`);
+  const stored8 = await page.evaluate(() => JSON.parse(localStorage.getItem('downwind.course.v1') ?? '{}'));
+  check(stored8['8.1']?.lastGrade === 'best', `${label} lesson 8.1 recorded in course progress`);
+  await noHScroll('lesson 8.1 debrief');
+  await page.getByRole('button', { name: 'Back to course' }).first().click();
+  await page.getByRole('heading', { name: 'Ground school', exact: true }).waitFor();
+  check(/\b3 of \d+/.test(await main()), `${label} course home counts 8.1 as flown`);
 
   // Lesson 7.1, end to end: the alternator light, battery minutes and the field it reaches.
   await page.locator('.module summary').filter({ hasText: 'Systems and the panel' }).click();
