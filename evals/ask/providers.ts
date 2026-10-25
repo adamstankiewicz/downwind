@@ -1,5 +1,7 @@
 // The models the eval can run, all behind the worker's AskModel interface.
-//   anthropic:<model>   Claude through the worker's own adapter (needs ANTHROPIC_API_KEY)
+//   anthropic:<model>   Claude through the worker's own adapter (needs ANTHROPIC_API_KEY);
+//                       <model> may add +think or +think:medium
+//   route:<cheap>/<strong>  two anthropic specs behind the worker's router
 //   local:<hf repo>     an open-weight model through transformers.js, the same
 //                       runtime the browser would use (ONNX, q4). Here it runs
 //                       on CPU, so latency is a floor for slow devices, not a
@@ -7,7 +9,8 @@
 //   oracle              the reference answers, to prove the graders pass good answers
 //   null                an empty answer, to prove the graders fail bad ones
 
-import { anthropicModel } from '../../worker/models/anthropic';
+import { anthropicModel, parseSpec } from '../../worker/models/anthropic';
+import { routedModel } from '../../worker/models/router';
 import type { AskModel, ModelResult } from '../../worker/models/types';
 import type { BuiltCase } from './cases';
 
@@ -19,8 +22,9 @@ export const PRICES: Record<string, [number, number, number, number]> = {
 };
 
 export function costOf(modelId: string, r: ModelResult): number {
-  const name = modelId.replace(/^anthropic:/, '');
-  const p = PRICES[name];
+  // The model that actually answered, so a router is priced per question.
+  const served = Object.keys(PRICES).find((k) => r.model?.startsWith(k));
+  const p = PRICES[served ?? parseSpec(modelId.replace(/^anthropic:/, '')).model];
   if (!p || !r.usage) return 0;
   const u = r.usage;
   return (u.inputTokens * p[0] + u.outputTokens * p[1] + (u.cacheReadTokens ?? 0) * p[2] + (u.cacheWriteTokens ?? 0) * p[3]) / 1e6;
@@ -35,6 +39,10 @@ export async function makeModel(spec: string, current: () => BuiltCase): Promise
     const key = process.env.ANTHROPIC_API_KEY;
     if (!key) throw new Error('anthropic models need ANTHROPIC_API_KEY');
     return anthropicModel(key, spec.slice('anthropic:'.length));
+  }
+  if (spec.startsWith('route:')) {
+    const [cheap, strong] = spec.slice('route:'.length).split('/');
+    return routedModel(await makeModel(`anthropic:${cheap}`, current), await makeModel(`anthropic:${strong}`, current));
   }
   if (spec.startsWith('local:')) return localModel(spec.slice('local:'.length));
   throw new Error(`Unknown model ${spec}`);
