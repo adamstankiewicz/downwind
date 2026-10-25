@@ -3,7 +3,7 @@
 //   node e2e/smoke.mjs [http://localhost:4173]
 // Weather and airport requests are stubbed, so it runs offline and exercises
 // both the live path and the practice-weather fallback. Covers onboarding,
-// the course home, lessons 1.1 and 2.1 end to end, the start of 2.2, the daily flight
+// the course home, lessons 1.1, 2.1 and 7.1 end to end, the start of 2.2, the daily flight
 // through filing, and every rail screen, at desktop and phone widths.
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
@@ -196,6 +196,40 @@ async function run(viewport, live) {
   await page.reload();
   await page.getByRole('heading', { name: 'Ground school', exact: true }).waitFor();
   check(/2 of 40/.test(await main()), `${label} progress survives reload, onboarding not shown again`);
+
+  // Lesson 7.1, end to end: the alternator light, battery minutes and the field it reaches.
+  await page.locator('.module summary').filter({ hasText: 'Systems and the panel' }).click();
+  await page.getByRole('button', { name: /7\.1 Electrical system and the alternator light/ }).click();
+  await page.getByRole('heading', { name: 'Where the electrons come from' }).waitFor();
+  body = await main();
+  check(/magnetos/.test(body) && /practice sectional|Heading home to KXYZ/.test(body), `${label} 7.1 brief flies on the practice chart`);
+  check(await page.locator('.fig figcaption').filter({ hasText: /[Ss]ample/ }).first().isVisible(), `${label} 7.1 electrical figure says its loads are sample values`);
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'The light comes on' }).waitFor();
+  check(/12 Ah ÷ 21\.2 A × 60/.test(await main()), `${label} 7.1 worked example shows the battery arithmetic`);
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'Your turn', exact: true }).waitFor();
+  await page.getByLabel(/Load after shedding/).fill('4.2');
+  await page.getByLabel(/Battery minutes/).fill('170');
+  await page.getByLabel(/Minutes to home/).fill('29');
+  await btn('Check my numbers').click();
+  check((await page.getByText(/Right\./).count()) === 3, `${label} 7.1 all three numbers checked right`);
+  await noHScroll('lesson 7.1 turn');
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'Which field?' }).waitFor();
+  check((await page.locator('.sectional svg').count()) === 1, `${label} 7.1 decision shows the practice chart`);
+  await page.getByRole('button', { name: /Shed load, call KXYZ tower early/ }).click();
+  await btn('Commit').click();
+  check(/Best call/.test(await main()), `${label} 7.1 shedding and going home grades best`);
+  await btn('Debrief').click();
+  await page.getByRole('heading', { name: 'Debrief', exact: true }).waitFor();
+  body = await main();
+  check(/PA\.I\.G/.test(body) && /PHAK, electrical system/.test(body), `${label} 7.1 debrief shows ACS code and reference`);
+  const stored71 = await page.evaluate(() => JSON.parse(localStorage.getItem('downwind.course.v1') ?? '{}'));
+  check(stored71['7.1']?.lastGrade === 'best', `${label} lesson 7.1 recorded in course progress`);
+  await noHScroll('lesson 7.1 debrief');
+  await btn('Back to course').click();
+  await page.getByRole('heading', { name: 'Ground school', exact: true }).waitFor();
 
   // Daily flight: the sheet
   await page.getByRole('button', { name: new RegExp(`Today's real conditions at ${icao}`) }).click();

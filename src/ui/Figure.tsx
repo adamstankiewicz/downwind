@@ -10,6 +10,7 @@ import { parseTaf } from '../lib/taf';
 import { norm } from '../lib/wind';
 import { RawReport } from './MetarBlock';
 import { SectionalChart } from './SectionalChart';
+import { CarbIceFigure, ElectricalFigure, PanelFigure } from './SystemsFigures';
 import { TafTimeline } from './TafTimeline';
 import { WindDiagram } from './WindDiagram';
 
@@ -91,6 +92,9 @@ export function Figure({ figure, practiceField }: { figure: FigureModel; practic
       </figure>
     );
   }
+  if (figure.kind === 'electrical') return <ElectricalFigure figure={figure} />;
+  if (figure.kind === 'panel') return <PanelFigure figure={figure} />;
+  if (figure.kind === 'carbIce') return <CarbIceFigure figure={figure} />;
   const { airport, windMag, speedKt, gustKt, runwayId } = figure;
   const runway = airport.runways.find((r) => r.id === runwayId) ?? airport.runways[0];
   const wind = { dirTrue: norm(windMag + airport.magneticVariationDeg) || 360, speedKt, gustKt, variable: false, rangeTrue: null };

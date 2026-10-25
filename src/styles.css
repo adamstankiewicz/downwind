@@ -910,4 +910,72 @@ dl.kv dd { margin: 0; }
   .records.squawks .records-table tbody th:first-child, .records.squawks .records-table tbody.focus > tr > th:first-child { --sq-left: 0px; padding-left: calc(2.25ch + 8px); }
   .records.squawks .records-table tbody th:first-child::before { top: 0; }
   .records[class].squawks .records-table tr.rec-note td { padding-left: calc(2.25ch + 8px); }
+
+/* ---------- module 7, systems figures (ui/SystemsFigures.tsx) ----------
+   The electrical bus is a load list with a bar of amps above it; shedding
+   reads as the bar emptying and the minutes going up. The annunciators are a
+   small black sign, dark until the alternator quits. The gauges are schematic
+   instruments on their own face tokens (a dark face in both themes, the way
+   real instruments are), with the Windsock orange for the fixed index and
+   airplane, and a taxiway-yellow sticky note over anything covered. The carb
+   ice chart uses the two warning tints: sock for high, taxi for possible. */
+.elec { display: grid; gap: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px 16px; min-width: 0; }
+.elec-head { display: flex; justify-content: space-between; align-items: center; gap: 8px 16px; flex-wrap: wrap; }
+.elec-bus { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.elec-bus .runway { font-size: 1.75rem; }
+.elec-bus .runway small, .elec-sum .runway small { font-size: 0.85rem; font-weight: 600; font-stretch: 87.5%; letter-spacing: 0; }
+.elec-bus .muted { font-size: 0.9rem; }
+.elec-annun { display: inline-flex; gap: 4px; padding: 4px; background: var(--sign); border-radius: var(--r-sm); }
+.elec-annun span { display: inline-grid; place-items: center; min-width: 48px; min-height: 28px; padding: 0 8px; border-radius: 3px; font-size: 12px; line-height: 1; font-weight: 800; letter-spacing: 0.06em; color: color-mix(in srgb, var(--on-ink) 35%, transparent); background: color-mix(in srgb, var(--on-ink) 8%, transparent); }
+.elec-annun span.lit.alt { background: var(--taxi); color: var(--on-taxi); }
+.elec-annun span.lit.volts { background: var(--unsafe-fill); color: var(--cat-ink-light); }
+:root[data-theme="dark"] .elec-annun span:not(.lit) { color: color-mix(in srgb, var(--ink) 35%, transparent); background: color-mix(in srgb, var(--ink) 8%, transparent); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .elec-annun span:not(.lit) { color: color-mix(in srgb, var(--ink) 35%, transparent); background: color-mix(in srgb, var(--ink) 8%, transparent); } }
+.elec-bar { display: flex; gap: 2px; height: 14px; border-radius: 4px; overflow: hidden; }
+.elec-bar i { display: block; flex: 0 1 0; min-width: 2px; background: var(--sky); border-radius: 2px; }
+.elec-bar i.ess { background: var(--ink); }
+.elec-bar i.off { background: repeating-linear-gradient(135deg, var(--line) 0 3px, transparent 3px 6px); }
+.elec-loads { display: grid; border-top: var(--hair) solid var(--line); }
+.elec-loads li { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line-soft); font-size: 0.95rem; }
+.elec-loads li.off { color: var(--ink-2); }
+.elec-loads .rocker { width: 12px; height: 20px; display: block; color: var(--ink); }
+.elec-loads li.off .rocker { color: var(--line); }
+.elec-name { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ess-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--line); }
+.ess-dot.ess { background: var(--ink); border-color: var(--ink); }
+.elec-loads li.off .ess-dot.ess { background: var(--ink-2); border-color: var(--ink-2); }
+.elec-amps { font-size: 0.95rem; white-space: nowrap; }
+.elec-amps small { font-size: 0.8rem; color: var(--ink-2); }
+.elec-sum { margin: 0; display: flex; gap: 12px 28px; flex-wrap: wrap; align-items: end; }
+.elec-sum div { display: grid; gap: 2px; }
+.elec-sum dt { font-size: 13px; line-height: 16px; color: var(--ink-2); font-stretch: 87.5%; font-weight: 600; letter-spacing: 0.01em; }
+.elec-sum dd { margin: 0; }
+.elec-sum .runway { font-size: 1.75rem; }
+.elec-sum div.now { padding: 6px 12px 8px; margin: -6px -12px -8px; background: var(--sock-tint); border-radius: var(--r-sm); }
+.elec-sum div.now .runway { color: var(--sock-ink); font-size: 2.25rem; }
+.elec-sum div.now dt { color: var(--sock-ink); }
+/* the panel */
+.panel { display: grid; gap: 10px; justify-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 12px; min-width: 0;
+  --gauge-face: #171c21; --gauge-bezel: #c0c6c1; --gauge-rim: #3a434b; --gauge-mark: #eceff1; --gauge-mark-2: #a7b1b9; --gauge-index: #ff5a1f; --gauge-sky: #2f6fb3; --gauge-ground: #6e4a2a; }
+:root[data-theme="dark"] .panel { --gauge-face: #0c0f12; --gauge-bezel: #3d474f; --gauge-rim: #262d33; --gauge-index: #ff6a35; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .panel { --gauge-face: #0c0f12; --gauge-bezel: #3d474f; --gauge-rim: #262d33; --gauge-index: #ff6a35; } }
+.panel-six { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 8px; width: 100%; }
+.gauge { display: grid; gap: 4px; justify-items: center; min-width: 0; }
+.gauge svg { width: 100%; height: auto; display: block; font-family: var(--label); font-stretch: 87.5%; font-variant-numeric: tabular-nums; }
+.gauge.wide { width: min(100%, 320px); order: -1; }
+.gauge-label { display: grid; justify-items: center; text-align: center; gap: 0; font-size: 0.8125rem; line-height: 1.3; }
+.gauge-label b { font-weight: 700; }
+.gauge-label .muted { font-size: 0.75rem; }
+/* carb ice */
+.carb { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 10px 10px 6px; min-width: 0; }
+.carb svg { width: 100%; height: auto; display: block; font-family: var(--label); font-stretch: 87.5%; font-variant-numeric: tabular-nums; }
+@media (max-width: 559px) {
+  .elec { padding: 12px 12px 14px; }
+  .elec-sum { gap: 10px 20px; }
+  .elec-sum .runway { font-size: 1.5rem; }
+  .elec-sum div.now .runway { font-size: 2rem; }
+  .panel { padding: 8px; gap: 8px; }
+  .panel-six { gap: 8px 4px; }
+  .gauge-label { font-size: 0.75rem; }
+  .gauge-label .muted { font-size: 0.7rem; }
 }

@@ -42,6 +42,13 @@ const PASSAGES: Record<string, RefLink[]> = {
   'PHAK ch. 9, aircraft documents': [doc('PHAK, aircraft documents', 'phak-9', PHAK_DOCS)],
   'PHAK ch. 9, inspections': [doc('PHAK, aircraft inspections', 'phak-9', PHAK_INSPECTIONS)],
   'PHAK ch. 9, inoperative equipment': [doc('PHAK, inoperative equipment', 'phak-9', PHAK_INOP)],
+  'PHAK, electrical system': [doc('PHAK, electrical system', 'phak-7', ['Electrical System'])],
+  'PHAK, carburetor icing': [doc('PHAK, carburetor icing', 'phak-7', ['Carburetor Icing'])],
+  'PHAK, fuel systems': [doc('PHAK, fuel systems', 'phak-7', ['Fuel Systems'])],
+  'PHAK, gyroscopic instruments': [doc('PHAK, gyroscopic instruments', 'phak-8', ['Gyroscopic Flight Instruments'])],
+  'PHAK, blocked pitot-static system': [doc('PHAK, blocked pitot-static system', 'phak-8', ['Blockage of the Pitot-Static System'])],
+  'PHAK, pilotage and dead reckoning': [doc('PHAK, pilotage', 'phak-16', ['Pilotage']), doc('PHAK, dead reckoning', 'phak-16', ['Dead Reckoning'])],
+  'PHAK, GPS': [doc('PHAK, GPS', 'phak-16', ['Global Positioning System (GPS)'])],
 };
 
 /** Every handbook passage the course cites, for the live check against the FAA files. */

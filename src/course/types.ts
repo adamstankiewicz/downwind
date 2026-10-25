@@ -12,6 +12,7 @@ import type { PersonalMinimums } from '../data/pilot';
 import type { Brief, Grade } from '../scenarios/goNoGo';
 import type { LatLon, NavLog } from '../lib/nav';
 import type { Performance } from '../lib/perf';
+import type { CarbIceRisk, InstrumentId, PowerSource } from '../lib/systems';
 
 export interface LessonContext {
   /** The pilot's home field, or the practice field when it can't be used. */
@@ -47,11 +48,43 @@ export type Figure =
   /** Glide range from a height, with candidate fields by bearing and distance. */
   | { kind: 'glide'; heightAglFt: number; rangeNm: number; windFromTrue?: number; windKt?: number; fields: { name: string; bearingTrue: number; distanceNm: number; reachable: boolean }[] }
   /**
+   * The electrical bus: each load, what it draws, and whether it is on. With
+   * the alternator failed, the battery carries `totalAmps` for `minutesLeft`.
+   */
+  | { kind: 'electrical'; volts: number; alternator: 'online' | 'failed'; loads: ElectricalLoad[]; totalAmps: number; usableAh: number; minutesLeft: number; sample: boolean }
+  /** The six basic instruments and the compass, each with its source and what it shows now. */
+  | { kind: 'panel'; instruments: PanelInstrument[] }
+  /** The PHAK carburetor icing chart (figure 7-12) with today's air marked. */
+  | { kind: 'carbIce'; tempC: number; dewC: number; rhPct: number; risk: CarbIceRisk }
+  /**
    * A page of paperwork made up for the lesson: logbook lines, the documents
    * in the airplane, maintenance entries or a squawk list. `focus` rows are the
    * ones the step is about. Cells are plain text; the caption says it is made up.
    */
   | { kind: 'records'; variant: RecordsVariant; title: string; columns: RecordColumn[]; rows: RecordRow[]; caption: string };
+
+export interface ElectricalLoad {
+  id: string;
+  name: string;
+  amps: number;
+  on: boolean;
+  /** Stays on after a load shed. */
+  essential: boolean;
+}
+
+export interface PanelInstrument {
+  id: InstrumentId;
+  sources: PowerSource[];
+  /** `wrong` is telling a lie the pilot has to catch; `covered` has been covered over by the pilot. */
+  state: 'ok' | 'wrong' | 'covered';
+  /**
+   * What the needle shows. asi: knots. ai: bank in degrees, right positive
+   * (with `pitchDeg`). alt: feet. tc: turn rate in standard-rate units, right
+   * positive. hi and compass: heading in degrees. vsi: feet per minute.
+   */
+  value: number;
+  pitchDeg?: number;
+}
 
 export type RecordsVariant = 'logbook' | 'documents' | 'maintenance' | 'squawks';
 
