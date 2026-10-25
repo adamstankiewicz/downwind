@@ -10,12 +10,14 @@ import type { Grade } from './goNoGo';
 /** 6.1: the engine quits on the climb out. */
 export type AfterTakeoffChoice = 'land-ahead' | 'turn-back' | 'side-field' | 'restart-first';
 
-export function gradeAfterTakeoff(o: { turnCompletes: boolean; aheadReachable: boolean; sideReachable: boolean }): Record<AfterTakeoffChoice, Grade> {
+export function gradeAfterTakeoff(o: { turnCompletes: boolean; aheadReachable: boolean; sideReachable: boolean; aheadBuiltUp?: boolean }): Record<AfterTakeoffChoice, Grade> {
+  // Straight ahead into houses is still controlled, but it is no longer the lowest risk when an open field is in reach off to the side.
+  const aheadOk = o.aheadReachable && !o.aheadBuiltUp;
   return {
-    'land-ahead': o.aheadReachable ? 'best' : 'acceptable',
+    'land-ahead': aheadOk ? 'best' : o.aheadBuiltUp && o.sideReachable ? 'marginal' : 'acceptable',
     // Even a turn that completes is only for a pilot who has trained it in this airplane.
     'turn-back': o.turnCompletes ? 'marginal' : 'unsafe',
-    'side-field': o.sideReachable ? 'acceptable' : 'unsafe',
+    'side-field': !o.sideReachable ? 'unsafe' : aheadOk ? 'acceptable' : 'best',
     // Holding the climb attitude without power bleeds the airspeed toward a stall.
     'restart-first': 'unsafe',
   };
@@ -79,7 +81,7 @@ export function gradePartialPower(o: { nearestInGlide: boolean; homeInGlide: boo
     nearest: o.nearestInGlide ? 'best' : 'acceptable',
     'press-home': o.homeIsNearest ? 'best' : o.homeInGlide ? 'acceptable' : 'unsafe',
     // A precautionary landing while power remains beats a forced one later, but trades a runway for a field.
-    'field-now': o.nearestInGlide ? 'acceptable' : 'best',
+    'field-now': o.nearestInGlide || (o.homeIsNearest && o.homeInGlide) ? 'acceptable' : 'best',
     // Circling spends the power you have over a place you have not chosen.
     circle: 'marginal',
   };

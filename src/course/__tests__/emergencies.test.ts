@@ -214,3 +214,15 @@ describe('module 6 follows the airplane', () => {
     expect(m6.outline).toEqual([]);
   });
 });
+
+describe('module 6 situations', () => {
+  const ctx = lessonContext(null, blankAircraft, defaultPilot.minimums, new Date(Date.UTC(2026, 9, 24, 16, 20)));
+  const g = (id: string, variant: number) => (emergencyLessons.find((l) => l.id === id)!.build({ ...ctx, variant }).find((s) => s.kind === 'decide') as Extract<Step, { kind: 'decide' }>).grades;
+  it('the best field follows what is really out there', () => {
+    expect(g('6.1', 1)).toMatchObject({ 'side-field': 'best', 'land-ahead': 'marginal' });
+    expect(g('6.2', 0)['glide-kxyz']).toBe('best');
+    expect(g('6.2', 1)).toMatchObject({ 'glide-2x5': 'best', 'glide-kxyz': 'unsafe' });
+    expect(g('6.4', 1).pasture).toBe('best');
+    expect(g('6.5', 1)).toMatchObject({ 'press-home': 'best', 'field-now': 'acceptable' });
+  });
+});
