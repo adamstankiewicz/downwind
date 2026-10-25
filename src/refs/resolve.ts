@@ -42,6 +42,8 @@ const PASSAGES: Record<string, RefLink[]> = {
   'Airplane Flying Handbook (FAA-H-8083-3), crosswind approach and landing': [doc('AFH, crosswind approach and landing', 'afh-9', AFH_XW_LANDING)],
   'AFH, crosswind takeoff and landing': [doc('AFH, crosswind takeoff', 'afh-6', AFH_XW_TAKEOFF), doc('AFH, crosswind landing', 'afh-9', AFH_XW_LANDING)],
   'Airplane Flying Handbook (FAA-H-8083-3), engine failure after takeoff': [doc('AFH, engine failure after takeoff', 'afh-18', AFH_EFATO)],
+  'Airplane Flying Handbook (FAA-H-8083-3), stalls': [doc('AFH, stall recovery', 'afh-5', ['Fundamentals of Stall Recovery'])],
+  'Airplane Flying Handbook (FAA-H-8083-3), soft-field takeoff': [doc('AFH, soft-field takeoff', 'afh-6', ['Soft/Rough-Field Takeoff and Climb'])],
   'Airplane Flying Handbook (FAA-H-8083-3), terrain selection': [doc('AFH, terrain selection', 'afh-18', AFH_TERRAIN)],
   'Airplane Flying Handbook (FAA-H-8083-3), in-flight fire': [doc('AFH, in-flight fire', 'afh-18', AFH_FIRE)],
   'Airplane Flying Handbook (FAA-H-8083-3), emergency descents': [doc('AFH, emergency descents', 'afh-18', AFH_DESCENT)],

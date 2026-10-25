@@ -4,6 +4,7 @@
 // only interpolates and applies the corrections the table notes ask for.
 // Sample tables ship with the templates and are labeled as sample values.
 
+import type { VSpeeds } from './aero';
 import { densityAltitudeFt, isaTempC, pressureAltitudeFt } from './density';
 
 /** A POH-style chart: rows by pressure altitude (ft), columns by OAT (°C). */
@@ -43,6 +44,8 @@ export interface Performance {
   glideRatio: number;
   vxKias: number;
   vyKias: number;
+  /** Stall, maneuvering and approach speeds (lib/aero.ts). Older profiles don't have them. */
+  speeds?: VSpeeds;
 }
 
 /** Linear interpolation of y at x between sorted xs. Clamps outside the table and says so. */

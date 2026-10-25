@@ -16,6 +16,7 @@ import type { CarbIceRisk, InstrumentId, PowerSource } from '../lib/systems';
 import type { Volume } from '../lib/airspace';
 import type { PlanLeg } from '../scenarios/airspacePlan';
 import type { Envelope, WbResult } from '../lib/wb';
+import type { AirportSign } from '../lib/airportOps';
 
 export interface LessonContext {
   /** The pilot's home field, or the practice field when it can't be used. */
@@ -79,6 +80,14 @@ export type Figure =
    * in the airplane, maintenance entries or a squawk list. `focus` rows are the
    * ones the step is about. Cells are plain text; the caption says it is made up.
    */
+  /**
+   * Airport signs as they stand at one spot on the taxiway, left to right, and
+   * the pavement marking under them: the runway holding position (two solid
+   * and two dashed yellow lines) or the ILS critical area ladder.
+   */
+  /** Stall speed against bank angle, clean and flaps down, with the approach speed and the bank in use marked. */
+  | { kind: 'loadFactor'; bankDeg: number; vs0Kias: number; vs1Kias: number; approachKias: number; sample: boolean }
+  | { kind: 'signs'; signs: AirportSign[]; marking?: 'runway-hold' | 'ils-hold'; caption: string }
   | { kind: 'records'; variant: RecordsVariant; title: string; columns: RecordColumn[]; rows: RecordRow[]; caption: string }
   /**
    * The field from the side: the pattern at its height, the cloud base, the
@@ -243,7 +252,7 @@ export type Step =
   | { kind: 'example'; id: string; title: string; say: Coach; figure?: Figure; work: WorkRow[]; showIf?: Condition }
   | { kind: 'turn'; id: string; title: string; prompt: string; figure?: Figure; blanks: Blank[]; showIf?: Condition }
   /** Dials on the figure: the pilot turns the conditions and the lesson recomputes live. */
-  | { kind: 'dials'; id: string; title: string; say: Coach; dials: Dial[]; evaluate(values: DialValues): DialState; task?: DialTask; figure?: undefined; showIf?: Condition }
+  | { kind: 'dials'; id: string; title: string; say: Coach; /** Shown once the dials have moved; the weather lessons' wording when missing. */ turnedNote?: string; dials: Dial[]; evaluate(values: DialValues): DialState; task?: DialTask; figure?: undefined; showIf?: Condition }
   | {
       kind: 'decide';
       id: string;

@@ -1,4 +1,4 @@
-// The checks behind module 9's decisions. Each one takes the numbers a lesson
+// The checks behind module 11's decisions. Each one takes the numbers a lesson
 // built and returns a grade per option, so a test can hold the grade against
 // the rule it comes from: weight and fuel (91.9, 91.151), the forecast over
 // the flight (91.103, 91.155), inoperative equipment (91.213, 91.205) and the

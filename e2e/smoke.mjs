@@ -4,7 +4,7 @@
 // Weather and airport requests are stubbed, so it runs offline and exercises
 // both the live path and the practice-weather fallback. Ask the instructor is
 // stubbed too: on in the live runs, with no API key in the offline ones. Covers onboarding,
-// the course home, lessons 1.1 and 2.1 to 9.1 end to
+// the course home, lessons 1.1 and 2.1 to 11.1 end to
 // end, 2.2 through its dials, the daily flight through filing, Trip and its
 // planning lesson, every rail screen, and a radio practice flight, at desktop
 // and phone widths.
@@ -120,7 +120,7 @@ async function run(viewport, live) {
   check(await btn('Start lesson 1.1').isVisible(), `${label} Start lesson button visible`);
   check(/Today's real conditions at/.test(body), `${label} daily flight listed`);
   check((await page.locator('.module.planned').count()) === 0 && !/being written|Coming/.test(body), `${label} every module is written, nothing says coming`);
-  check(await page.getByRole('list', { name: 'Modules' }).locator('li').count() === 9, `${label} strip shows nine modules`);
+  check(await page.getByRole('list', { name: 'Modules' }).locator('li').count() === 11, `${label} strip shows eleven modules`);
   check(!/C172K|N\d{3,5}[A-Z]{0,2}\b/.test(body), `${label} no tail number or type assumed in course copy`);
   await noHScroll('course home');
 
@@ -172,7 +172,7 @@ async function run(viewport, live) {
   await page.getByRole('heading', { name: 'Debrief', exact: true }).waitFor();
   body = await main();
   check(/3 of 3/.test(body) && /PA\.I\.A/.test(body) && /61\.57/.test(body), `${label} 1.1 debrief counts blanks and cites 61.57`);
-  const stored11 = await page.evaluate(() => JSON.parse(localStorage.getItem('downwind.course.v1') ?? '{}'));
+  const stored11 = await page.evaluate(() => JSON.parse(localStorage.getItem('downwind.course.v2') ?? '{}'));
   check(stored11['1.1']?.lastGrade === 'best', `${label} lesson 1.1 recorded in course progress`);
   await noHScroll('lesson 1.1 debrief');
   await btn('Back to course').first().click();
@@ -216,7 +216,7 @@ async function run(viewport, live) {
   check(/Manage\/Decide/.test(body), `${label} debrief shows the LCG level`);
   check(/2 of 3/.test(body), `${label} debrief counts blanks right`);
   check(/PA\.I\.C/.test(body) && /Aviation Weather Handbook, METAR/.test(body), `${label} debrief shows ACS code and reference`);
-  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('downwind.course.v1') ?? '{}'));
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('downwind.course.v2') ?? '{}'));
   check(stored['2.1']?.attempts === 1 && stored['2.1']?.lastGrade === 'best' && stored['1.1'], `${label} lesson 2.1 recorded in course progress`);
   await noHScroll('lesson debrief');
 
@@ -322,7 +322,7 @@ async function run(viewport, live) {
   body = await main();
   check(/4 of 5/.test(body) && /Risk Management Handbook, personal minimums/.test(body), `${label} 8.1 debrief counts blanks and cites the RMH`);
   check(await page.getByRole('button', { name: 'PHAK, the PAVE checklist' }).isVisible(), `${label} 8.1 PAVE reference opens in the viewer`);
-  const stored8 = await page.evaluate(() => JSON.parse(localStorage.getItem('downwind.course.v1') ?? '{}'));
+  const stored8 = await page.evaluate(() => JSON.parse(localStorage.getItem('downwind.course.v2') ?? '{}'));
   check(stored8['8.1']?.lastGrade === 'best', `${label} lesson 8.1 recorded in course progress`);
   await noHScroll('lesson 8.1 debrief');
   await page.getByRole('button', { name: 'Back to course' }).first().click();
@@ -357,7 +357,7 @@ async function run(viewport, live) {
   await page.getByRole('heading', { name: 'Debrief', exact: true }).waitFor();
   body = await main();
   check(/PA\.I\.G/.test(body) && /PHAK, electrical system/.test(body), `${label} 7.1 debrief shows ACS code and reference`);
-  const stored71 = await page.evaluate(() => JSON.parse(localStorage.getItem('downwind.course.v1') ?? '{}'));
+  const stored71 = await page.evaluate(() => JSON.parse(localStorage.getItem('downwind.course.v2') ?? '{}'));
   check(stored71['7.1']?.lastGrade === 'best', `${label} lesson 7.1 recorded in course progress`);
   await noHScroll('lesson 7.1 debrief');
   await btn('Back to course').click();
@@ -395,7 +395,7 @@ async function run(viewport, live) {
   await page.getByRole('heading', { name: 'Debrief', exact: true }).waitFor();
   body = await main();
   check(/PA\.I\.D/.test(body) && /PHAK, flight planning/.test(body) && /3 of 3/.test(body), `${label} 5.1 debrief shows ACS code, reference and 3 of 3`);
-  const stored5 = await page.evaluate(() => JSON.parse(localStorage.getItem('downwind.course.v1') ?? '{}'));
+  const stored5 = await page.evaluate(() => JSON.parse(localStorage.getItem('downwind.course.v2') ?? '{}'));
   check(stored5['5.1']?.lastGrade === 'best', `${label} lesson 5.1 recorded in course progress`);
   await noHScroll('lesson 5.1 debrief');
   await rail('Course').click();
@@ -434,26 +434,26 @@ async function run(viewport, live) {
   body = await main();
   check(/PA\.IX\.B/.test(body) && /AFH, engine failure after takeoff/.test(body), `${label} 6.1 debrief shows ACS code and AFH reference`);
   check(/more than you have/.test(body), `${label} 6.1 debrief explains why the turn back fails`);
-  const stored6 = await page.evaluate(() => JSON.parse(localStorage.getItem('downwind.course.v1') ?? '{}'));
+  const stored6 = await page.evaluate(() => JSON.parse(localStorage.getItem('downwind.course.v2') ?? '{}'));
   check(stored6['6.1']?.attempts === 1 && stored6['6.1']?.lastGrade === 'best', `${label} lesson 6.1 recorded in course progress`);
   await btn('Back to course').last().click();
   await page.getByRole('heading', { name: 'Ground school', exact: true }).waitFor();
   check(/\b\d+ of \d+ lessons flown/.test(await main()), `${label} course home back after 6.1`);
-  // Lesson 9.1, the mock oral, end to end
-  const lesson91 = page.getByRole('button', { name: /9\.1 Mock oral: a weekend trip/ });
+  // Lesson 11.1, the mock oral, end to end
+  const lesson91 = page.getByRole('button', { name: /11\.1 Mock oral: a weekend trip/ });
   if (!(await lesson91.isVisible())) await page.locator('.module summary').filter({ hasText: 'The oral and the flight review' }).click();
   await lesson91.click();
   await page.getByRole('heading', { name: 'The examiner sets the scene' }).waitFor();
-  check(/Quill Valley/.test(await main()) && (await page.locator('.sectional svg').count()) > 0, `${label} 9.1 opens on the trip with the practice sectional`);
+  check(/Quill Valley/.test(await main()) && (await page.locator('.sectional svg').count()) > 0, `${label} 11.1 opens on the trip with the practice sectional`);
   await btn('Continue').click();
   await page.getByRole('heading', { name: 'Are you current?' }).waitFor();
   await page.getByLabel(/Takeoffs and landings in the 90 days/).fill('2');
   await btn('No').click();
   await btn('Check my numbers').click();
-  check((await page.getByText(/Right\./).count()) === 2, `${label} 9.1 currency counted by code`);
+  check((await page.getByText(/Right\./).count()) === 2, `${label} 11.1 currency counted by code`);
   await btn('Continue').click();
   await page.getByRole('heading', { name: 'The first leg, worked' }).waitFor();
-  check((await page.locator('table.navlog').count()) > 0, `${label} 9.1 shows the nav log`);
+  check((await page.locator('table.navlog').count()) > 0, `${label} 11.1 shows the nav log`);
   await btn('Continue').click();
   await page.getByRole('heading', { name: 'The rest of the route' }).waitFor();
   await page.getByLabel(/Total distance/).fill('63');
@@ -465,7 +465,7 @@ async function run(viewport, live) {
   await page.locator('.blank').filter({ hasText: 'Cruising altitude' }).getByRole('button').nth(1).click();
   await btn('E').click();
   await btn('Check my numbers').click();
-  check(/even thousands plus 500/.test(await main()), `${label} 9.1 explains the cruising altitude rule`);
+  check(/even thousands plus 500/.test(await main()), `${label} 11.1 explains the cruising altitude rule`);
   await btn('Continue').click();
   await page.getByRole('heading', { name: 'Weigh it' }).waitFor();
   await page.getByLabel(/Takeoff weight/).fill('2370');
@@ -476,10 +476,10 @@ async function run(viewport, live) {
   await page.getByRole('heading', { name: 'The camping gear' }).waitFor();
   await page.getByRole('button', { name: /of gear behind/ }).click();
   await btn('Commit').click();
-  check(/Best call/.test(await main()), `${label} 9.1 trimming the gear to the placard grades best`);
+  check(/Best call/.test(await main()), `${label} 11.1 trimming the gear to the placard grades best`);
   await btn('Continue').click();
   await page.getByRole('heading', { name: 'Sunday afternoon' }).waitFor();
-  check((await page.locator('.metar').count()) > 0, `${label} 9.1 shows the forecast for home`);
+  check((await page.locator('.metar').count()) > 0, `${label} 11.1 shows the forecast for home`);
   await btn('Continue').click();
   await page.getByRole('heading', { name: 'When do you leave?' }).waitFor();
   await page.getByRole('button', { name: /Leave now, ahead of the rain/ }).click();
@@ -487,10 +487,10 @@ async function run(viewport, live) {
   await btn('Debrief').click();
   await page.getByRole('heading', { name: 'Debrief', exact: true }).waitFor();
   body = await main();
-  check(/Best call/.test(body) && /PA\.I\.D/.test(body) && /14 CFR 61\.57/.test(body), `${label} 9.1 debrief shows the grade, ACS and references`);
-  const stored9 = await page.evaluate(() => JSON.parse(localStorage.getItem('downwind.course.v1') ?? '{}'));
-  check(stored9['9.1']?.lastGrade === 'best', `${label} lesson 9.1 recorded in course progress`);
-  await noHScroll('lesson 9.1 debrief');
+  check(/Best call/.test(body) && /PA\.I\.D/.test(body) && /14 CFR 61\.57/.test(body), `${label} 11.1 debrief shows the grade, ACS and references`);
+  const stored9 = await page.evaluate(() => JSON.parse(localStorage.getItem('downwind.course.v2') ?? '{}'));
+  check(stored9['11.1']?.lastGrade === 'best', `${label} lesson 11.1 recorded in course progress`);
+  await noHScroll('lesson 11.1 debrief');
   await btn('Back to course').click();
   await page.getByRole('heading', { name: 'Ground school', exact: true }).waitFor();
 
@@ -526,7 +526,7 @@ async function run(viewport, live) {
   await page.getByRole('heading', { name: 'Debrief', exact: true }).waitFor();
   body = await main();
   check(/3 of 3/.test(body) && /PHAK ch\. 10/.test(body), `${label} 3.1 debrief counts blanks and cites the PHAK`);
-  const stored31 = await page.evaluate(() => JSON.parse(localStorage.getItem('downwind.course.v1') ?? '{}'));
+  const stored31 = await page.evaluate(() => JSON.parse(localStorage.getItem('downwind.course.v2') ?? '{}'));
   check(stored31['3.1']?.lastGrade === 'best', `${label} lesson 3.1 recorded in course progress`);
   await noHScroll('lesson 3.1 debrief');
   await btn('Back to course').first().click();
@@ -627,9 +627,9 @@ async function run(viewport, live) {
   // Lessons flown join the deck. Make 2.1's decision due now and the rest later,
   // so the session opens with it, rebuilt as a fresh situation.
   await page.evaluate(() => {
-    const s = JSON.parse(localStorage.getItem('downwind.review.v1') ?? '{"cards":{},"history":[]}');
+    const s = JSON.parse(localStorage.getItem('downwind.review.v2') ?? '{"cards":{},"history":[]}');
     for (const id of Object.keys(s.cards)) if (id.startsWith('L:')) s.cards[id].due = id === 'L:2.1:d1' ? '2000-01-01T00:00:00.000Z' : '2999-01-01T00:00:00.000Z';
-    localStorage.setItem('downwind.review.v1', JSON.stringify(s));
+    localStorage.setItem('downwind.review.v2', JSON.stringify(s));
   });
   await page.getByRole('tab', { name: 'Review deck' }).click();
   await page.getByText(/From lesson 2\.1/).waitFor();
@@ -701,7 +701,7 @@ async function run(viewport, live) {
   await page.getByRole('heading', { name: 'Debrief', exact: true }).waitFor();
   body = await main();
   check(/5 of 5/.test(body) && /PA\.I\.E/.test(body) && /14 CFR 91\.159/.test(body), `${label} 4.1 debrief counts blanks and cites the ACS and 91.159`);
-  const stored41 = await page.evaluate(() => JSON.parse(localStorage.getItem('downwind.course.v1') ?? '{}'));
+  const stored41 = await page.evaluate(() => JSON.parse(localStorage.getItem('downwind.course.v2') ?? '{}'));
   check(stored41['4.1']?.lastGrade === 'best', `${label} lesson 4.1 recorded in course progress`);
   await noHScroll('lesson 4.1 debrief');
   await page.getByRole('button', { name: 'Back to course', exact: true }).first().click();
@@ -733,6 +733,36 @@ async function runSkip() {
   body = await page.locator('main').innerText();
   check(/Practice field, not a real airport/.test(body), `${label} lesson header says practice field`);
   check(!/KASH|C172|Cessna/.test(body), `${label} lesson assumes no airport or airplane`);
+  await page.getByRole('button', { name: 'Leave lesson', exact: true }).click();
+  // Module 9: the signs figure. Module 10: the stall speed chart and the bank dial.
+  const lesson91 = page.getByRole('button', { name: /9\.1 Signs, lines and runway crossings/ });
+  if (!(await lesson91.isVisible())) await page.locator('.module summary').filter({ hasText: 'Airport operations' }).click();
+  await lesson91.click();
+  await page.getByRole('heading', { name: 'Red means a runway' }).waitFor();
+  check((await page.locator('.signs .sign').count()) === 4 && (await page.locator('.sign-mandatory').count()) === 1 && (await page.locator('.signs-marking').count()) === 1, `${label} 9.1 draws the signs and the hold line`);
+  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/9-1-signs.png`, fullPage: true });
+  await page.getByRole('button', { name: 'Leave lesson', exact: true }).click();
+  const lesson101 = page.getByRole('button', { name: /10\.1 Bank angle and the stall speed/ });
+  if (!(await lesson101.isVisible())) await page.locator('.module summary').filter({ hasText: 'Aerodynamics' }).click();
+  await lesson101.click();
+  await page.getByRole('heading', { name: "Weight you can't see" }).waitFor();
+  check((await page.locator('svg.lf-chart path.flaps').count()) === 1, `${label} 10.1 draws stall speed against bank`);
+  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/10-1-chart.png`, fullPage: true });
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByRole('heading', { name: 'Work it' }).waitFor();
+  await page.getByLabel(/Load factor at 30/).fill('1.15');
+  await page.getByLabel(/Load factor at 60/).fill('2');
+  await page.getByLabel(/Clean stall speed at 60/).fill('68');
+  await page.getByRole('button', { name: 'Check my numbers', exact: true }).click();
+  check((await page.getByText(/Right\./).count()) === 3, `${label} 10.1 load factor checked by code`);
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByRole('heading', { name: 'Roll it in' }).waitFor();
+  const bank = page.locator('#dial-bank');
+  await bank.fill('60');
+  await page.waitForTimeout(100);
+  body = await page.locator('main').innerText();
+  check(/2\.00 g/.test(body) && /bank angle, as you have set it/.test(body), `${label} 10.1 bank dial re-runs the engine (${(body.match(/\d\.\d\d g/) ?? [''])[0]})`);
+  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/10-1-dials.png`, fullPage: true });
   await page.getByRole('button', { name: 'Leave lesson', exact: true }).click();
   await page.getByRole('navigation', { name: 'Screens' }).getByRole('button', { name: 'Tools', exact: true }).click();
   check(await page.getByText(/No airplane yet/).first().isVisible(), `${label} airplane tool shows the not-set-up state`);

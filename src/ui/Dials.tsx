@@ -40,7 +40,7 @@ export function DialsView({ step, level, values, state, setValue, reset, checked
           <DialControl key={d.id} dial={d} value={values[d.id]} onChange={(v) => setValue(d.id, v)} />
         ))}
         <div className="dials-foot">
-          <span className={`dials-state ${moved ? 'turned' : ''}`}>{moved ? 'Practice weather, as you have turned it.' : 'The lesson\'s own conditions.'}</span>
+          <span className={`dials-state ${moved ? 'turned' : ''}`}>{moved ? step.turnedNote ?? 'Practice weather, as you have turned it.' : 'The lesson\'s own conditions.'}</span>
           <button type="button" className="btn quiet sm" disabled={!moved} onClick={reset}>Back to the lesson's numbers</button>
         </div>
       </div>

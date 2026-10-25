@@ -10,7 +10,7 @@ import { reviewItems, type ReviewItem } from './items';
 import { parseLessonCard, lessonCardId, type StepOutcome } from './lessonCards';
 import { load, save } from '../lib/storage';
 
-const KEY = 'downwind.review.v1';
+const KEY = 'downwind.review.v2';
 const scheduler = fsrs({ enable_fuzz: true });
 
 interface Stored {
