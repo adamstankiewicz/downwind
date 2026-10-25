@@ -282,6 +282,20 @@ export function RecordsFigure({ variant, title, columns, rows }: {
 
 /* ---------- glide circle, top down ---------- */
 
+// Everything on the circle is laid out in viewBox units, so the label
+// placement below only needs rough text widths: a bold 12 px label in the
+// condensed label face runs about 6.6 units a character, the 11 px detail
+// line about 5.8. Erring wide keeps labels apart.
+type Box = { x: number; y: number; w: number; h: number };
+const textW = (s: string, size: number, bold = false) => s.length * size * (bold ? 0.55 : 0.53) + 2;
+const overlapArea = (a: Box, b: Box) =>
+  Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+
+// Ring spacing that keeps two to five rings on the figure, whatever the scale.
+const RING_STEPS = [0.1, 0.25, 0.5, 1, 2, 5, 10, 20];
+const ringStepFor = (reach: number) => RING_STEPS.find((s) => reach / s <= 5) ?? RING_STEPS[RING_STEPS.length - 1];
+const nm = (n: number) => `${Number(n.toFixed(2))} nm`;
+
 export function GlideDiagram({ heightAglFt, rangeNm, windFromTrue, windKt, fields }: {
   heightAglFt: number; rangeNm: number; windFromTrue?: number; windKt?: number;
   fields: { name: string; bearingTrue: number; distanceNm: number; reachable: boolean }[];
@@ -290,22 +304,102 @@ export function GlideDiagram({ heightAglFt, rangeNm, windFromTrue, windKt, field
   const H = 420;
   const cx = W / 2;
   const cy = H / 2;
+  const PAD = 8; // labels stay this far inside the edge
+  const FOOT = 26; // the footer line owns the bottom band
   const wind = windKt && windFromTrue !== undefined ? { from: windFromTrue, kt: windKt } : null;
   // The circle drifts downwind: sketched at a mile a minute, so the shift is the wind's share of the range.
   const shiftNm = wind ? rangeNm * Math.min(0.6, wind.kt / 60) : 0;
   const downwind = wind ? norm(wind.from + 180) : 0;
-  const reach = Math.max(rangeNm + shiftNm, ...fields.map((f) => f.distanceNm), 1) * 1.18;
+  // The scale follows the content: a short glide from 300 ft fills the figure
+  // as much as a long one from 5,000 ft. A quarter mile is the floor.
+  const reach = Math.max(rangeNm + shiftNm, ...fields.map((f) => f.distanceNm), 0.25) * 1.18;
   const px = (W / 2 - 24) / reach;
   const pt = (brg: number, nmDist: number) => {
     const r = (brg * Math.PI) / 180;
     return { x: cx + Math.sin(r) * nmDist * px, y: cy - Math.cos(r) * nmDist * px };
   };
   const shifted = pt(downwind, shiftNm);
-  const ringStep = reach > 12 ? 5 : reach > 6 ? 2 : 1;
+  const ringStep = ringStepFor(reach);
   const rings: number[] = [];
-  for (let r = ringStep; r < reach; r += ringStep) rings.push(r);
-  const windTail = wind ? pt(wind.from, reach * 0.92) : null;
-  const windHead = wind ? pt(wind.from, reach * 0.72) : null;
+  for (let i = 1; i * ringStep < reach; i++) rings.push(i * ringStep);
+
+  // Obstacles nothing may sit on: the airplane, every field marker, the
+  // bottom band. Labels are added as they are placed.
+  const taken: Box[] = [
+    { x: cx - 16, y: cy - 16, w: 32, h: 32 },
+    { x: 0, y: H - FOOT, w: W, h: FOOT },
+    ...fields.map((f) => { const q = pt(f.bearingTrue, f.distanceNm); return { x: q.x - 9, y: q.y - 9, w: 18, h: 18 }; }),
+    ...rings.map((r) => ({ x: cx + 4, y: cy - r * px - 13, w: textW(nm(r), 11), h: 13 })),
+  ];
+  const inside = (b: Box) => b.x >= PAD && b.y >= PAD && b.x + b.w <= W - PAD && b.y + b.h <= H - FOOT;
+  const clash = (b: Box) => taken.reduce((s, t) => s + overlapArea(b, t), 0);
+
+  // The wind arrow rides the rim on the upwind side. If a field sits under
+  // it, the arrow slides sideways, still pointing the way the wind blows.
+  let windArrow: { tail: { x: number; y: number }; head: { x: number; y: number }; label: Box; labelY: number } | null = null;
+  if (wind) {
+    const a = (wind.from * Math.PI) / 180;
+    const side = { x: Math.cos(a), y: Math.sin(a) }; // perpendicular to the wind line
+    const labelText = `${pad3(wind.from)} at ${wind.kt} kt`;
+    const lw = textW(labelText, 11, true);
+    const candidates = [0, 1, -1, 2, -2].map((k) => {
+      const off = k * 26;
+      const tail = { x: pt(wind.from, reach * 0.9).x + side.x * off, y: pt(wind.from, reach * 0.9).y + side.y * off };
+      const head = { x: pt(wind.from, reach * 0.72).x + side.x * off, y: pt(wind.from, reach * 0.72).y + side.y * off };
+      const labelY = tail.y + (tail.y < cy ? -8 : 16);
+      const label: Box = { x: tail.x - lw / 2, y: labelY - 11, w: lw, h: 14 };
+      const line: Box = { x: Math.min(tail.x, head.x) - 4, y: Math.min(tail.y, head.y) - 4, w: Math.abs(tail.x - head.x) + 8, h: Math.abs(tail.y - head.y) + 8 };
+      return { tail, head, label, labelY, cost: clash(label) + clash(line) + (inside(label) ? 0 : 1e6) };
+    });
+    const best = candidates.reduce((p, c) => (c.cost < p.cost ? c : p));
+    windArrow = best;
+    taken.push(best.label);
+  }
+
+  // The height label sits under the airplane unless a field is there; then above.
+  const aglText = `${fmt(heightAglFt)} ft AGL`;
+  const aglW = textW(aglText, 12, true);
+  const aglBelow: Box = { x: cx - aglW / 2, y: cy + 18, w: aglW, h: 14 };
+  const aglAbove: Box = { x: cx - aglW / 2, y: cy - 32, w: aglW, h: 14 };
+  const agl = clash(aglBelow) === 0 || clash(aglAbove) > 0 ? { box: aglBelow, y: cy + 28 } : { box: aglAbove, y: cy - 21 };
+  taken.push(agl.box);
+
+  // Field labels: two lines, placed on the side away from the center first,
+  // then wherever they fit without covering anything already drawn.
+  const placed = fields
+    .map((f, i) => ({ f, i, q: pt(f.bearingTrue, f.distanceNm) }))
+    .sort((a, b) => a.f.distanceNm - b.f.distanceNm) // the crowded middle goes first
+    .map(({ f, i, q }) => {
+      const detail = `${f.distanceNm} nm, ${pad3(f.bearingTrue)}°`;
+      const w = Math.max(textW(f.name, 12, true), textW(detail, 11));
+      const h = 26;
+      const out = { x: q.x - cx, y: q.y - cy };
+      const len = Math.hypot(out.x, out.y) || 1;
+      const ux = out.x / len; const uy = out.y / len;
+      // anchor: where the first line's baseline starts; box: what it covers
+      const dirs = [
+        { dx: 1, dy: 0, anchor: 'start' as const, box: (): Box => ({ x: q.x + 11, y: q.y - 11, w, h }) },
+        { dx: -1, dy: 0, anchor: 'end' as const, box: (): Box => ({ x: q.x - 11 - w, y: q.y - 11, w, h }) },
+        { dx: 0, dy: -1, anchor: 'middle' as const, box: (): Box => ({ x: q.x - w / 2, y: q.y - 11 - h, w, h }) },
+        { dx: 0, dy: 1, anchor: 'middle' as const, box: (): Box => ({ x: q.x - w / 2, y: q.y + 11, w, h }) },
+        { dx: 0.7, dy: -0.7, anchor: 'start' as const, box: (): Box => ({ x: q.x + 8, y: q.y - 8 - h, w, h }) },
+        { dx: -0.7, dy: -0.7, anchor: 'end' as const, box: (): Box => ({ x: q.x - 8 - w, y: q.y - 8 - h, w, h }) },
+        { dx: 0.7, dy: 0.7, anchor: 'start' as const, box: (): Box => ({ x: q.x + 8, y: q.y + 8, w, h }) },
+        { dx: -0.7, dy: 0.7, anchor: 'end' as const, box: (): Box => ({ x: q.x - 8 - w, y: q.y + 8, w, h }) },
+      ];
+      const scored = dirs.map((d, order) => {
+        let box = d.box();
+        // slide a label back inside the figure rather than clip it
+        box = { ...box, x: Math.min(Math.max(box.x, PAD), W - PAD - w), y: Math.min(Math.max(box.y, PAD), H - FOOT - h) };
+        const away = -(d.dx * ux + d.dy * uy); // lower is more outward
+        return { d, box, cost: clash(box) * 10 + away + order * 0.01 };
+      });
+      const best = scored.reduce((p, c) => (c.cost < p.cost ? c : p));
+      taken.push(best.box);
+      const tx = best.d.anchor === 'start' ? best.box.x : best.d.anchor === 'end' ? best.box.x + w : best.box.x + w / 2;
+      return { f, i, q, detail, anchor: best.d.anchor, tx, ty: best.box.y + 10 };
+    })
+    .sort((a, b) => a.i - b.i);
 
   return (
     <div className="fig-glide">
@@ -314,40 +408,36 @@ export function GlideDiagram({ heightAglFt, rangeNm, windFromTrue, windKt, field
         {rings.map((r) => (
           <g key={r}>
             <circle cx={cx} cy={cy} r={r * px} fill="none" stroke="var(--line)" strokeWidth="1" />
-            <text x={cx + 4} y={cy - r * px - 3} fontSize="11" fill="var(--ink-2)">{r} nm</text>
+            <text x={cx + 4} y={cy - r * px - 3} fontSize="11" fill="var(--ink-2)">{nm(r)}</text>
           </g>
         ))}
         {/* still-air circle, then the one the wind moves */}
         {wind && <circle cx={cx} cy={cy} r={rangeNm * px} fill="none" stroke="var(--ink-2)" strokeWidth="1.2" strokeDasharray="5 4" />}
         <circle cx={shifted.x} cy={shifted.y} r={rangeNm * px} fill="var(--sky-tint)" fillOpacity="0.7" stroke="var(--sky-ink)" strokeWidth="2" />
-        {wind && windTail && windHead && (
+        {wind && windArrow && (
           <g>
-            <line x1={windTail.x} y1={windTail.y} x2={windHead.x} y2={windHead.y} stroke="var(--sock)" strokeWidth="3.5" strokeLinecap="round" />
+            <line x1={windArrow.tail.x} y1={windArrow.tail.y} x2={windArrow.head.x} y2={windArrow.head.y} stroke="var(--sock)" strokeWidth="3.5" strokeLinecap="round" />
             {(() => {
               const a = ((downwind) * Math.PI) / 180;
-              const hx = windHead.x; const hy = windHead.y;
+              const hx = windArrow.head.x; const hy = windArrow.head.y;
               const bx = hx - Math.sin(a) * 10; const by = hy + Math.cos(a) * 10;
               const px2 = Math.cos(a) * 6; const py2 = Math.sin(a) * 6;
               return <polygon points={`${hx},${hy} ${bx + px2},${by + py2} ${bx - px2},${by - py2}`} fill="var(--sock)" />;
             })()}
-            <text x={windTail.x} y={windTail.y + (windTail.y < cy ? -8 : 16)} textAnchor="middle" fontSize="11" fontWeight="700" fill="var(--sock-ink)">{pad3(wind.from)} at {wind.kt} kt</text>
+            <text x={windArrow.tail.x} y={windArrow.labelY} textAnchor="middle" fontSize="11" fontWeight="700" fill="var(--sock-ink)">{pad3(wind.from)} at {wind.kt} kt</text>
           </g>
         )}
-        {fields.map((f) => {
-          const q = pt(f.bearingTrue, f.distanceNm);
-          const right = q.x <= cx;
-          return (
-            <g key={f.name}>
-              <circle cx={q.x} cy={q.y} r="7" fill={f.reachable ? 'var(--right)' : 'var(--panel)'} stroke={f.reachable ? 'var(--right)' : 'var(--unsafe)'} strokeWidth="2.5" />
-              {!f.reachable && <path d={`M${q.x - 3},${q.y - 3} l6,6 M${q.x + 3},${q.y - 3} l-6,6`} stroke="var(--unsafe)" strokeWidth="2" strokeLinecap="round" />}
-              <text x={q.x + (right ? 11 : -11)} y={q.y - 1} textAnchor={right ? 'start' : 'end'} fontSize="12" fontWeight="700" fill="var(--ink)">{f.name}</text>
-              <text x={q.x + (right ? 11 : -11)} y={q.y + 12} textAnchor={right ? 'start' : 'end'} fontSize="11" fill="var(--ink-2)">{f.distanceNm} nm, {pad3(f.bearingTrue)}°</text>
-            </g>
-          );
-        })}
+        {placed.map(({ f, q, detail, anchor, tx, ty }) => (
+          <g key={f.name}>
+            <circle cx={q.x} cy={q.y} r="7" fill={f.reachable ? 'var(--right)' : 'var(--panel)'} stroke={f.reachable ? 'var(--right)' : 'var(--unsafe)'} strokeWidth="2.5" />
+            {!f.reachable && <path d={`M${q.x - 3},${q.y - 3} l6,6 M${q.x + 3},${q.y - 3} l-6,6`} stroke="var(--unsafe)" strokeWidth="2" strokeLinecap="round" />}
+            <text x={tx} y={ty} textAnchor={anchor} fontSize="12" fontWeight="700" fill="var(--ink)">{f.name}</text>
+            <text x={tx} y={ty + 13} textAnchor={anchor} fontSize="11" fill="var(--ink-2)">{detail}</text>
+          </g>
+        ))}
         {/* the airplane */}
         <path transform={`translate(${cx} ${cy}) scale(1.4)`} d="M0,-9 L2,-3 L10,1 L10,3 L2,1.5 L1.5,6 L4,8 L4,9 L0,8 L-4,9 L-4,8 L-1.5,6 L-2,1.5 L-10,3 L-10,1 L-2,-3 Z" fill="var(--ink)" stroke="var(--apron)" strokeWidth="1" />
-        <text x={cx} y={cy + 28} textAnchor="middle" fontSize="12" fontWeight="700" fill="var(--ink)">{fmt(heightAglFt)} ft AGL</text>
+        <text x={cx} y={agl.y} textAnchor="middle" fontSize="12" fontWeight="700" fill="var(--ink)">{aglText}</text>
         <text x={12} y={H - 12} fontSize="11" fill="var(--ink-2)">True north up. Glide range {rangeNm} nm{wind ? ', moved downwind by the wind' : ', still air'}.</text>
       </svg>
     </div>

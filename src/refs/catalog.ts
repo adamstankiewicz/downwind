@@ -61,6 +61,7 @@ export const DOCS: Record<string, DocSource> = Object.fromEntries(
     phak(17, 'Aeromedical Factors'),
     afh(6, 'Takeoffs and Departure Climbs'),
     afh(9, 'Approaches and Landings'),
+    afh(18, 'Emergency Procedures'),
     {
       id: 'awh',
       short: 'Aviation Weather Handbook',

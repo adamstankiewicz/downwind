@@ -27,6 +27,12 @@ const PHAK_FLIGHT_PLANNING = ['Charting the Course', 'Flight Planning'];
 const PHAK_WIND_TRIANGLE = ['The Wind Triangle or Vector Analysis', 'Wind Triangle'];
 const PHAK_DIVERSION = ['Flight Diversion', 'Diversion'];
 const PHAK_LOST = ['Lost Procedures'];
+const AFH_EFATO = ['Engine Failure After Takeoff (Single-Engine)', 'Engine Failure After Takeoff'];
+const AFH_TERRAIN = ['Terrain Selection'];
+const AFH_FIRE = ['In-Flight Fire', 'Engine Fire'];
+const AFH_DESCENT = ['Emergency Descents'];
+const AFH_LANDINGS = ['Basic Safety Concepts', 'Emergency Landings'];
+const AFH_LANDING_TYPES = ['Types of Emergency Landings', 'Precautionary landing'];
 
 // Handbook passages, by the exact label used in content. A unit test checks
 // that every label in the course resolves, so a new label without an entry
@@ -35,6 +41,12 @@ const PASSAGES: Record<string, RefLink[]> = {
   "Pilot's Handbook of Aeronautical Knowledge (FAA-H-8083-25), crosswind components": [doc('PHAK, crosswind components', 'phak-11', XWIND_CHART)],
   'Airplane Flying Handbook (FAA-H-8083-3), crosswind approach and landing': [doc('AFH, crosswind approach and landing', 'afh-9', AFH_XW_LANDING)],
   'AFH, crosswind takeoff and landing': [doc('AFH, crosswind takeoff', 'afh-6', AFH_XW_TAKEOFF), doc('AFH, crosswind landing', 'afh-9', AFH_XW_LANDING)],
+  'Airplane Flying Handbook (FAA-H-8083-3), engine failure after takeoff': [doc('AFH, engine failure after takeoff', 'afh-18', AFH_EFATO)],
+  'Airplane Flying Handbook (FAA-H-8083-3), terrain selection': [doc('AFH, terrain selection', 'afh-18', AFH_TERRAIN)],
+  'Airplane Flying Handbook (FAA-H-8083-3), in-flight fire': [doc('AFH, in-flight fire', 'afh-18', AFH_FIRE)],
+  'Airplane Flying Handbook (FAA-H-8083-3), emergency descents': [doc('AFH, emergency descents', 'afh-18', AFH_DESCENT)],
+  'Airplane Flying Handbook (FAA-H-8083-3), emergency landings': [doc('AFH, emergency landings', 'afh-18', AFH_LANDINGS)],
+  'Airplane Flying Handbook (FAA-H-8083-3), types of emergency landings': [doc('AFH, types of emergency landings', 'afh-18', AFH_LANDING_TYPES)],
   'Aviation Weather Handbook (FAA-H-8083-28), METAR': [doc('Aviation Weather Handbook, METAR', 'awh', AWH_METAR)],
   'Aviation Weather Handbook (FAA-H-8083-28), TAF': [doc('Aviation Weather Handbook, TAF', 'awh', AWH_TAF)],
   'Aviation Weather Handbook, TAF section': [doc('Aviation Weather Handbook, TAF', 'awh', AWH_TAF)],

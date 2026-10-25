@@ -3,7 +3,7 @@
 //   node e2e/smoke.mjs [http://localhost:4173]
 // Weather and airport requests are stubbed, so it runs offline and exercises
 // both the live path and the practice-weather fallback. Covers onboarding,
-// the course home, lessons 1.1, 2.1, 5.1, 7.1 and 8.1 end to end, the start
+// the course home, lessons 1.1, 2.1, 5.1, 6.1, 7.1 and 8.1 end to end, the start
 // of 2.2, the daily flight through filing, and every rail screen, at desktop
 // and phone widths.
 import { createRequire } from 'node:module';
@@ -310,6 +310,45 @@ async function run(viewport, live) {
   await noHScroll('lesson 5.1 debrief');
   await rail('Course').click();
   await page.getByRole('heading', { name: 'Ground school', exact: true }).waitFor();
+
+  // Lesson 6.1, end to end: the turn back worked from the airplane, then the decision on the climb out.
+  const lesson61 = page.getByRole('button', { name: /6\.1 Engine failure after takeoff/ });
+  if (!(await lesson61.isVisible())) await page.locator('summary').filter({ hasText: 'Emergencies' }).click();
+  await lesson61.click();
+  await page.getByRole('heading', { name: 'The climb out' }).waitFor();
+  check(/lower the nose/.test(await main()) && /made up for this lesson/.test(await main()), `${label} 6.1 brief says nose down first and labels the ground made up`);
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'What the turn costs' }).waitFor();
+  body = await main();
+  check(/225° at 45° bank/.test(body) && /sample/i.test(body), `${label} 6.1 works the turn back from labeled sample performance`);
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'Your turn', exact: true }).waitFor();
+  await page.getByLabel(/Load factor/).fill('1.41');
+  await page.getByLabel(/Stall speed rise/).fill('19');
+  await page.getByLabel(/Height left/).fill('400');
+  await btn('Check my numbers').click();
+  body = await main();
+  check(/Right\./.test(body) && /Not quite/.test(body) && /square root of the load factor/.test(body), `${label} 6.1 checks the turn-back numbers`);
+  await noHScroll('lesson 6.1 turn');
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: /feet, and quiet/ }).waitFor();
+  check((await page.locator('svg[aria-label^="Glide range"]').count()) > 0, `${label} 6.1 decision shows the glide figure`);
+  check((await page.getByText(/^(Best call|Unsafe|Marginal|Sound)$/).count()) === 0, `${label} 6.1 grades hidden before commit`);
+  await page.getByRole('button', { name: /Nose down, and land in the field ahead/ }).click();
+  await btn('Commit').click();
+  body = await main();
+  check(/Best call/.test(body) && /You walk away/.test(body), `${label} 6.1 grades land-ahead best with its consequence`);
+  await noHScroll('lesson 6.1 decision');
+  await btn('Debrief').click();
+  await page.getByRole('heading', { name: 'Debrief', exact: true }).waitFor();
+  body = await main();
+  check(/PA\.IX\.B/.test(body) && /AFH, engine failure after takeoff/.test(body), `${label} 6.1 debrief shows ACS code and AFH reference`);
+  check(/more than you have/.test(body), `${label} 6.1 debrief explains why the turn back fails`);
+  const stored6 = await page.evaluate(() => JSON.parse(localStorage.getItem('downwind.course.v1') ?? '{}'));
+  check(stored6['6.1']?.attempts === 1 && stored6['6.1']?.lastGrade === 'best', `${label} lesson 6.1 recorded in course progress`);
+  await btn('Back to course').last().click();
+  await page.getByRole('heading', { name: 'Ground school', exact: true }).waitFor();
+  check(/\b\d+ of \d+ lessons flown/.test(await main()), `${label} course home back after 6.1`);
 
   // Daily flight: the sheet
   await page.getByRole('button', { name: new RegExp(`Today's real conditions at ${icao}`) }).click();
