@@ -3,7 +3,7 @@
 //   node e2e/smoke.mjs [http://localhost:4173]
 // Weather and airport requests are stubbed, so it runs offline and exercises
 // both the live path and the practice-weather fallback. Covers onboarding,
-// the course home, lesson 2.1 end to end, the start of 2.2, the daily flight
+// the course home, lessons 1.1 and 2.1 end to end, the start of 2.2, the daily flight
 // through filing, and every rail screen, at desktop and phone widths.
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
@@ -80,16 +80,49 @@ async function run(viewport, live) {
   await page.getByRole('heading', { name: 'Ground school', exact: true }).waitFor();
   check(true, `${label} landed on the course home`);
   let body = await main();
-  check(/Next lesson/.test(body) && /2\.1 Reading the METAR/.test(body), `${label} course home introduces lesson 2.1`);
-  check(await btn('Start lesson 2.1').isVisible(), `${label} Start lesson button visible`);
+  check(/Next lesson/.test(body) && /1\.1 Are you current to carry passengers/.test(body), `${label} course home introduces lesson 1.1`);
+  check(await btn('Start lesson 1.1').isVisible(), `${label} Start lesson button visible`);
   check(/Today's real conditions at/.test(body), `${label} daily flight listed`);
-  check((await page.locator('.module.planned').count()) === 8 && /being written/.test(body), `${label} eight unwritten modules say so`);
+  const planned = await page.locator('.module.planned').count();
+  check(planned < 9 && (await page.locator('.module.planned .m-count').filter({ hasText: 'being written' }).count()) === planned, `${label} every unwritten module says so`);
   check(await page.getByRole('list', { name: 'Modules' }).locator('li').count() === 9, `${label} strip shows nine modules`);
   check(!/C172K|N\d{3,5}[A-Z]{0,2}\b/.test(body), `${label} no tail number or type assumed in course copy`);
   await noHScroll('course home');
 
-  // Lesson 2.1, end to end
-  await btn('Start lesson 2.1').click();
+  // Lesson 1.1, end to end
+  await btn('Start lesson 1.1').click();
+  await page.getByRole('heading', { name: 'A friend wants to come along' }).waitFor();
+  check((await page.locator('.records.logbook').count()) === 1 && /made-up logbook page/.test(await main()), `${label} 1.1 shows the logbook page, labeled made up`);
+  await noHScroll('lesson 1.1 brief');
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'Day currency, worked' }).waitFor();
+  check(/Third most recent/.test(await main()), `${label} 1.1 worked example counts back to the third landing`);
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'Your turn', exact: true }).waitFor();
+  await page.getByLabel(/Landings that count at night/).fill('2');
+  await page.getByRole('button', { name: 'No', exact: true }).click();
+  await page.getByRole('button', { name: '7:12 PM', exact: true }).click();
+  await btn('Check my numbers').click();
+  body = await main();
+  check((body.match(/Right\./g) ?? []).length === 3 && /40 minutes after sunset/.test(body), `${label} 1.1 turn checks all three answers right`);
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: /^The plan for / }).waitFor();
+  await page.getByRole('button', { name: /Leave 45 minutes earlier/ }).click();
+  await btn('Commit').click();
+  check(/Best call/.test(await main()) && /day currency covers it/i.test(await main()), `${label} 1.1 decision graded with its consequence`);
+  await btn('Debrief').click();
+  await page.getByRole('heading', { name: 'Debrief', exact: true }).waitFor();
+  body = await main();
+  check(/3 of 3/.test(body) && /PA\.I\.A/.test(body) && /61\.57/.test(body), `${label} 1.1 debrief counts blanks and cites 61.57`);
+  const stored11 = await page.evaluate(() => JSON.parse(localStorage.getItem('downwind.course.v1') ?? '{}'));
+  check(stored11['1.1']?.lastGrade === 'best', `${label} lesson 1.1 recorded in course progress`);
+  await noHScroll('lesson 1.1 debrief');
+  await btn('Back to course').first().click();
+  await page.getByRole('heading', { name: 'Ground school', exact: true }).waitFor();
+
+  // Lesson 2.1, end to end, from the module list
+  await page.locator('summary').filter({ hasText: 'Weather' }).first().click();
+  await page.getByRole('button', { name: /Reading the METAR before you drive out.*start$/ }).click();
   await page.getByRole('heading', { name: /Before you leave the house/ }).waitFor();
   check(/Practice weather/.test(await main()), `${label} lesson weather labeled practice`);
   check((await page.locator('.metar').count()) > 0, `${label} brief shows the METAR figure`);
@@ -126,7 +159,7 @@ async function run(viewport, live) {
   check(/2 of 3/.test(body), `${label} debrief counts blanks right`);
   check(/PA\.I\.C/.test(body) && /Aviation Weather Handbook, METAR/.test(body), `${label} debrief shows ACS code and reference`);
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('downwind.course.v1') ?? '{}'));
-  check(stored['2.1']?.attempts === 1 && stored['2.1']?.lastGrade === 'best', `${label} lesson 2.1 recorded in course progress`);
+  check(stored['2.1']?.attempts === 1 && stored['2.1']?.lastGrade === 'best' && stored['1.1'], `${label} lesson 2.1 recorded in course progress`);
   await noHScroll('lesson debrief');
 
   // References: regulations and the AIM link out; a handbook opens in the viewer at the passage.
@@ -144,8 +177,12 @@ async function run(viewport, live) {
   await viewer.waitFor({ state: 'detached' });
   check(await page.getByRole('button', { name: 'Aviation Weather Handbook, METAR' }).evaluate((el) => el === document.activeElement), `${label} closing the viewer returns focus to the reference`);
 
-  // Start 2.2 from the debrief
-  await page.getByRole('button', { name: /^Next lesson: 2\.2/ }).click();
+  // The debrief points back to module 1; start 2.2 from the module list.
+  check(await page.getByRole('button', { name: /^Next lesson: 1\.2/ }).isVisible(), `${label} 2.1 debrief offers the next lesson in course order, 1.2`);
+  await btn('Back to course').first().click();
+  await page.getByRole('heading', { name: 'Ground school', exact: true }).waitFor();
+  await page.locator('summary').filter({ hasText: 'Weather' }).first().click();
+  await page.getByRole('button', { name: /Wind on the runway.*start$/ }).click();
   await page.getByRole('heading', { name: 'Two norths' }).waitFor();
   check(/variation/i.test(await main()), `${label} lesson 2.2 starts with the two-norths brief`);
   await btn('Continue').click();
@@ -153,12 +190,12 @@ async function run(viewport, live) {
   await btn('Leave lesson').click();
   await page.getByRole('heading', { name: 'Ground school', exact: true }).waitFor();
   body = await main();
-  check(/2\.2 Wind on the runway/.test(body) && /1 of 40/.test(body), `${label} course home advances to 2.2 with 1 of 40 flown`);
+  check(/1\.2 The documents in the airplane/.test(body) && /2 of 40/.test(body), `${label} course home advances to 1.2 with 2 of 40 flown`);
 
   // Persistence: reload should skip onboarding and keep progress.
   await page.reload();
   await page.getByRole('heading', { name: 'Ground school', exact: true }).waitFor();
-  check(/1 of 40/.test(await main()), `${label} progress survives reload, onboarding not shown again`);
+  check(/2 of 40/.test(await main()), `${label} progress survives reload, onboarding not shown again`);
 
   // Daily flight: the sheet
   await page.getByRole('button', { name: new RegExp(`Today's real conditions at ${icao}`) }).click();
@@ -258,11 +295,11 @@ async function runSkip() {
   check(/practice field/i.test(body), `${label} course home says lessons fly from a practice field`);
   check(!/KASH|Nashua|C172|KPSM/.test(body), `${label} no bundled airport or airplane assumed`);
   check(/Needs a home airport/.test(body), `${label} daily flight asks for a home airport`);
-  await page.getByRole('button', { name: 'Start lesson 2.1', exact: true }).click();
-  await page.getByRole('heading', { name: /Before you leave the house/ }).waitFor();
+  await page.getByRole('button', { name: 'Start lesson 1.1', exact: true }).click();
+  await page.getByRole('heading', { name: 'A friend wants to come along' }).waitFor();
   body = await page.locator('main').innerText();
   check(/Practice field, not a real airport/.test(body), `${label} lesson header says practice field`);
-  check(/KXYZ/.test(body) && !/KASH/.test(body), `${label} lesson report is for the practice field`);
+  check(!/KASH|C172|Cessna/.test(body), `${label} lesson assumes no airport or airplane`);
   await page.getByRole('button', { name: 'Leave lesson', exact: true }).click();
   await page.getByRole('navigation', { name: 'Screens' }).getByRole('button', { name: 'Tools', exact: true }).click();
   check(await page.getByText(/No airplane yet/).first().isVisible(), `${label} airplane tool shows the not-set-up state`);

@@ -812,3 +812,102 @@ dl.kv dd { margin: 0; }
   .navlog th, .navlog td { padding: 6px 5px; }
   .perf-table th, .perf-table td { padding: 5px 6px; }
 }
+
+/* ---------- records: a page of paperwork made up for the lesson ----------
+   One sheet, four variants. The logbook is ruled across and down the way a
+   pilot logbook is; the maintenance log is loose paragraphs with a signature
+   at the end of each; the documents are a card list; the squawk sheet counts
+   its items. Each record is its own <tbody>, so the row and the remark under
+   it share one rule and one focus mark. A focus row gets the sock as a left
+   rule and a tint, and hidden text for a screen reader. Under 560px the
+   table stacks: the first column becomes the heading of the block, the rest
+   label and value pairs, so nothing scrolls sideways on a phone. The switch
+   is a container query on the sheet, so it follows the column it sits in. */
+.records { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 4px 16px 10px; min-width: 0; container: records / inline-size; }
+.records-table { width: 100%; border-collapse: collapse; font-size: 0.9375rem; line-height: 1.4; }
+.records-table caption { caption-side: top; text-align: left; font-weight: 700; font-size: 1rem; padding: 12px 0 10px; color: var(--ink); }
+.records-table th, .records-table td { padding: 8px 10px 8px 0; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line-soft); }
+.records-table th + th, .records-table th + td, .records-table td + td { padding-left: 10px; }
+.records-table thead th { font-size: 13px; line-height: 16px; color: var(--ink-2); font-weight: 600; font-stretch: 87.5%; letter-spacing: 0.01em; border-bottom: 2px solid var(--ink); padding-top: 4px; vertical-align: bottom; }
+.records-table tbody th { font-weight: 600; }
+.records-table .num { text-align: right; white-space: nowrap; }
+.records-table td.mono, .records-table th.mono { font-size: 0.875rem; }
+.records-table tbody th.mono { font-weight: 400; }
+/* The record and its remark share one rule. */
+.records-table tbody.noted > tr:first-child > * { border-bottom: 0; padding-bottom: 2px; }
+.records-table tr.rec-note td { padding-top: 0; padding-bottom: 9px; font-size: 0.8125rem; line-height: 1.4; color: var(--ink-2); }
+.records-table tbody:last-of-type > tr:last-child > * { border-bottom: 0; }
+/* The line this step is about. */
+.records-table tbody.focus { background: var(--sock-tint); }
+.records-table tbody.focus > tr > th:first-child { box-shadow: inset 3px 0 0 var(--sock); }
+.records-table tbody.focus > tr > th:first-child, .records-table tbody.focus tr.rec-note td { padding-left: 10px; }
+.records-table tbody.focus > tr:first-child > * { color: var(--ink); }
+.records-table tbody.focus tr.rec-note td { color: var(--sock-ink); }
+/* Logbook: ruled across and down, the columns boxed like the printed page. Set smaller, since a logbook page has many columns. */
+.records.logbook .records-table { font-size: 0.875rem; }
+.records.logbook .records-table th, .records.logbook .records-table td { padding: 7px 8px 7px 0; }
+.records.logbook .records-table th + th, .records.logbook .records-table th + td, .records.logbook .records-table td + td { padding-left: 8px; }
+.records.logbook .records-table td.mono, .records.logbook .records-table th.mono { font-size: 0.8125rem; }
+.records.logbook .records-table th, .records.logbook .records-table td { border-bottom-color: var(--line); }
+.records.logbook .records-table th + th, .records.logbook .records-table th + td, .records.logbook .records-table td + td { border-left: 1px solid var(--line-soft); }
+.records.logbook .records-table tbody.focus tr.rec-note td { border-left: 0; }
+/* Maintenance: a written entry with a signature at the end of the line. */
+.records.maintenance .records-table th, .records.maintenance .records-table td { padding-top: 10px; padding-bottom: 10px; }
+.records.maintenance .records-table tbody td:last-child { font-weight: 600; font-stretch: 87.5%; letter-spacing: 0.01em; font-size: 0.875rem; min-width: 9ch; }
+.records.maintenance .records-table tbody td:not(:last-child):not(.num) { min-width: 18ch; }
+/* Documents: each one a card on the sheet. */
+.records.documents .records-table { border-collapse: separate; border-spacing: 0 6px; margin-top: -6px; }
+.records.documents .records-table thead th { border-bottom-color: var(--ink); }
+.records.documents .records-table th, .records.documents .records-table td { border-bottom: 0; padding: 10px 12px; }
+.records.documents .records-table th + th, .records.documents .records-table th + td, .records.documents .records-table td + td { padding-left: 12px; }
+.records.documents .records-table tbody th, .records.documents .records-table tbody td { background: var(--apron); }
+.records.documents .records-table tbody > tr:first-child > :first-child { border-radius: var(--r-sm) 0 0 var(--r-sm); }
+.records.documents .records-table tbody > tr:first-child > :last-child { border-radius: 0 var(--r-sm) var(--r-sm) 0; }
+.records.documents .records-table tbody.noted > tr:first-child > * { padding-bottom: 0; }
+.records.documents .records-table tbody.noted > tr:first-child > :first-child { border-radius: var(--r-sm) 0 0 0; }
+.records.documents .records-table tbody.noted > tr:first-child > :last-child { border-radius: 0 var(--r-sm) 0 0; }
+.records.documents .records-table tr.rec-note td { border-radius: 0 0 var(--r-sm) var(--r-sm); padding: 2px 12px 10px; }
+.records.documents .records-table tbody.focus th, .records.documents .records-table tbody.focus td { background: var(--sock-tint); }
+.records.documents .records-table tbody.focus > tr > th:first-child { padding-left: 12px; }
+/* Squawks: a discrepancy sheet, items counted down the margin. */
+.records.squawks .records-table { counter-reset: squawk; }
+.records.squawks .records-table tbody th:first-child { --sq-left: 0px; counter-increment: squawk; position: relative; padding-left: calc(var(--sq-left) + 2.25ch + 8px); }
+.records.squawks .records-table tbody.focus > tr > th:first-child { --sq-left: 10px; padding-left: calc(var(--sq-left) + 2.25ch + 8px); }
+.records.squawks .records-table tbody th:first-child::before { content: counter(squawk); position: absolute; left: var(--sq-left); top: 8px; width: 2.25ch; font-family: var(--mono); font-weight: 400; color: var(--ink-2); font-size: 0.875rem; line-height: 1.5; }
+.records.squawks .records-table tbody.focus th:first-child::before { color: var(--sock-ink); font-weight: 700; }
+.records.squawks .records-table tbody td:last-child { font-weight: 600; font-stretch: 87.5%; letter-spacing: 0.01em; font-size: 0.875rem; white-space: nowrap; }
+.records.squawks .records-table tr.rec-note td { padding-left: calc(2.25ch + 8px); }
+.records.squawks .records-table tbody.focus tr.rec-note td { padding-left: calc(2.25ch + 18px); }
+/* Stacked when the sheet itself is narrow (a phone, or a tight tool column): the first column heads the block, the rest are label and value. */
+@container records (max-width: 439px) {
+  .records { padding: 4px 14px 6px; }
+  .records-table, .records-table tbody, .records-table tr, .records-table th, .records-table td { display: block; }
+  .records-table caption { display: block; }
+  .records-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .records-table tbody.rec { padding: 10px 0 10px; border-bottom: 1px solid var(--line-soft); }
+  .records-table tbody.rec:last-of-type { border-bottom: 0; }
+  .records-table tbody.rec:first-of-type { border-top: 2px solid var(--ink); }
+  .records-table tbody.rec > tr:first-child { display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px 0; }
+  /* [class] outranks every variant rule above, so one reset covers all four sheets. */
+  .records[class] .records-table :is(th, td), .records[class] .records-table tbody.noted > tr:first-child > * { padding: 0; border: 0; border-radius: 0; background: none; text-align: left; white-space: normal; min-width: 0; }
+  .records[class] .records-table :is(th, td) + :is(th, td) { padding-left: 0; border-left: 0; }
+  .records[class] .records-table tbody th:first-child { font-weight: 700; font-family: var(--body); font-size: 0.9375rem; margin-bottom: 3px; }
+  .records-table td[data-label] { display: grid; grid-template-columns: minmax(8ch, 11ch) minmax(0, 1fr); gap: 0 12px; align-items: baseline; }
+  .records-table td[data-label]::before { content: attr(data-label); font-size: 13px; line-height: 16px; color: var(--ink-2); font-weight: 600; font-stretch: 87.5%; letter-spacing: 0.01em; font-family: var(--body); }
+  .records-table td[data-label]:empty { display: none; }
+  .records[class] .records-table td.mono { font-size: 0.875rem; }
+  .records[class] .records-table tr.rec-note td { padding: 4px 0 0; }
+  .records[class] .records-table tbody.focus { background: var(--sock-tint); box-shadow: inset 3px 0 0 var(--sock); padding: 10px 10px; margin: 0 -10px; }
+  .records[class] .records-table tbody.focus > tr > th:first-child { box-shadow: none; padding-left: 0; }
+  .records[class] .records-table tbody.focus tr.rec-note td { padding-left: 0; }
+  .records.logbook .records-table { font-size: 0.9375rem; }
+  .records.logbook .records-table tbody.rec { border-bottom-color: var(--line); }
+  .records.maintenance .records-table tbody td:last-child { font-size: 0.9375rem; }
+  .records.documents .records-table { border-collapse: collapse; border-spacing: 0; margin-top: 0; }
+  .records.documents .records-table tbody.rec { background: var(--apron); border: 0; border-radius: var(--r-sm); padding: 10px 12px; margin-bottom: 6px; }
+  .records.documents .records-table tbody.rec:last-of-type { margin-bottom: 0; }
+  .records[class].documents .records-table tbody.focus { margin: 0 0 6px; padding: 10px 12px; }
+  .records.squawks .records-table tbody th:first-child, .records.squawks .records-table tbody.focus > tr > th:first-child { --sq-left: 0px; padding-left: calc(2.25ch + 8px); }
+  .records.squawks .records-table tbody th:first-child::before { top: 0; }
+  .records[class].squawks .records-table tr.rec-note td { padding-left: calc(2.25ch + 8px); }
+}

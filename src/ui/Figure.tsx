@@ -3,7 +3,7 @@
 // chart with the reading marked, a nav log, or the glide circle. Every lesson
 // figure is practice material built for the lesson, and says so.
 
-import type { Figure as FigureModel, PerfChartId } from '../course/types';
+import type { Figure as FigureModel, PerfChartId, RecordColumn, RecordRow, RecordsVariant } from '../course/types';
 import { readTable, type Performance, type PerfTable } from '../lib/perf';
 import type { NavLog } from '../lib/nav';
 import { parseTaf } from '../lib/taf';
@@ -69,6 +69,14 @@ export function Figure({ figure, practiceField }: { figure: FigureModel; practic
         <figcaption>
           Nav log{figure.altitudeMsl ? ` at ${fmt(figure.altitudeMsl)} ft` : ''}. TC true course, WCA wind correction angle, TH true heading, MH magnetic heading, GS groundspeed. Time in minutes, fuel in gallons.
         </figcaption>
+      </figure>
+    );
+  }
+  if (figure.kind === 'records') {
+    return (
+      <figure className="fig">
+        <RecordsFigure variant={figure.variant} title={figure.title} columns={figure.columns} rows={figure.rows} />
+        <figcaption>{figure.caption}</figcaption>
       </figure>
     );
   }
@@ -212,6 +220,56 @@ export function NavLogTable({ log }: { log: NavLog }) {
           </tfoot>
         )}
       </table>
+    </div>
+  );
+}
+
+/* ---------- records: a page of paperwork made up for the lesson ----------
+   One table for all four variants; the variant is a modifier class on the
+   wrapper. Each record is its own <tbody> so a row and the remark under it
+   travel together and a focus mark covers both. */
+
+export function RecordsFigure({ variant, title, columns, rows }: {
+  variant: RecordsVariant; title: string; columns: RecordColumn[]; rows: RecordRow[];
+}) {
+  return (
+    <div className={`records ${variant}`}>
+      <div className="table-scroll">
+        <table className="records-table">
+          <caption>{title}</caption>
+          <thead>
+            <tr>
+              {columns.map((c, i) => <th key={i} scope="col" className={c.num ? 'num' : undefined}>{c.label}</th>)}
+            </tr>
+          </thead>
+          {rows.map((row, ri) => (
+            <tbody key={ri} className={`rec${row.focus ? ' focus' : ''}${row.note ? ' noted' : ''}`}>
+              <tr>
+                {columns.map((c, ci) => {
+                  const text = row.cells[ci] ?? '';
+                  const cls = c.num ? 'num mono' : undefined;
+                  return ci === 0 ? (
+                    <th key={ci} scope="row" className={cls} data-label={c.label}>
+                      {row.focus && <span className="vh">This step is about this line. </span>}
+                      {text}
+                    </th>
+                  ) : (
+                    <td key={ci} className={cls} data-label={c.label}>{text}</td>
+                  );
+                })}
+              </tr>
+              {row.note && (
+                <tr className="rec-note">
+                  <td colSpan={columns.length}>{row.note}</td>
+                </tr>
+              )}
+            </tbody>
+          ))}
+          {rows.length === 0 && (
+            <tbody><tr><td colSpan={columns.length} className="muted">No entries on this page.</td></tr></tbody>
+          )}
+        </table>
+      </div>
     </div>
   );
 }

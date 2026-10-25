@@ -19,6 +19,9 @@ const RMH_MINS = ['Personal Minimums'];
 const XWIND_CHART = ['Crosswind and Headwind Component', 'Crosswind Component'];
 const AFH_XW_LANDING = ['Crosswind Approach and Landing'];
 const AFH_XW_TAKEOFF = ['Crosswind Takeoff'];
+const PHAK_DOCS = ['Aircraft Documents', 'Certificate of Aircraft Registration'];
+const PHAK_INSPECTIONS = ['Aircraft Inspections', 'Annual Inspection'];
+const PHAK_INOP = ['Operations With Inoperative Equipment', 'Inoperative Equipment'];
 
 // Handbook passages, by the exact label used in content. A unit test checks
 // that every label in the course resolves, so a new label without an entry
@@ -36,6 +39,9 @@ const PASSAGES: Record<string, RefLink[]> = {
   'Risk Management Handbook (FAA-H-8083-2), personal minimums': [doc('Risk Management Handbook, personal minimums', 'rmh', RMH_MINS)],
   'Risk Management Handbook, personal minimums': [doc('Risk Management Handbook, personal minimums', 'rmh', RMH_MINS)],
   'AIM ch. 7, thunderstorm flying': [aim('AIM 7-1, thunderstorm flying', 7, 1)],
+  'PHAK ch. 9, aircraft documents': [doc('PHAK, aircraft documents', 'phak-9', PHAK_DOCS)],
+  'PHAK ch. 9, inspections': [doc('PHAK, aircraft inspections', 'phak-9', PHAK_INSPECTIONS)],
+  'PHAK ch. 9, inoperative equipment': [doc('PHAK, inoperative equipment', 'phak-9', PHAK_INOP)],
 };
 
 /** Every handbook passage the course cites, for the live check against the FAA files. */

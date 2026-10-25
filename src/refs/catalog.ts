@@ -49,6 +49,7 @@ const afh = (n: number, chapter: string): DocSource => ({
 export const DOCS: Record<string, DocSource> = Object.fromEntries(
   [
     phak(4, 'Principles of Flight'),
+    phak(9, 'Flight Manuals and Other Documents'),
     phak(10, 'Weight and Balance'),
     phak(11, 'Aircraft Performance'),
     phak(12, 'Weather Theory'),
