@@ -23,19 +23,27 @@ export interface RadioPrefs {
   voice: string | null;
   /** Speaking rate. Controllers run a little quick. */
   rate: number;
-  /** Who reads: the device's own voice, or Kokoro once it is downloaded. */
+  /** Who reads: Kokoro, or the device's own voice. The device reads while Kokoro is still loading. */
   engine: 'device' | 'kokoro';
   /** Kokoro voice id (models/client.ts, KOKORO_VOICES). */
   kokoroVoice: string;
-  /** Show the hold-to-talk button; needs the Moonshine download. Typing always works. */
+  /** Show the hold-to-talk button once Moonshine is ready. Typing always works. */
   speechInput: boolean;
 }
 
 export const defaultRadioPrefs: RadioPrefs = {
-  sound: false, listenFirst: false, radio: true, voice: null, rate: 1.15, engine: 'device', kokoroVoice: 'am_michael', speechInput: false,
+  sound: false, listenFirst: false, radio: true, voice: null, rate: 1.15, engine: 'kokoro', kokoroVoice: 'am_michael', speechInput: true,
 };
-const KEY = 'downwind.radio.prefs.v1';
-export const loadRadioPrefs = (): RadioPrefs => ({ ...defaultRadioPrefs, ...load<Partial<RadioPrefs>>(KEY, {}) });
+const KEY = 'downwind.radio.prefs.v2';
+// v1 saved the old defaults (device voice, no speech input) whether or not
+// the pilot picked them, so only its other settings carry over.
+const OLD_KEY = 'downwind.radio.prefs.v1';
+export function loadRadioPrefs(): RadioPrefs {
+  const saved = load<Partial<RadioPrefs> | null>(KEY, null);
+  if (saved) return { ...defaultRadioPrefs, ...saved };
+  const { engine: _e, speechInput: _s, ...old } = load<Partial<RadioPrefs>>(OLD_KEY, {});
+  return { ...defaultRadioPrefs, ...old };
+}
 export const saveRadioPrefs = (p: RadioPrefs) => save(KEY, p);
 
 export interface DeviceVoice {

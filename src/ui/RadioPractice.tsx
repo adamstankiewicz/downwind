@@ -15,7 +15,7 @@ import { wordy, type CallResult, type Outcome, type Part } from '../radio/grade'
 import { MAX_TRIES, emptyRadioAnswers, eventDone, gradeTry, loadRadioLog, recordRadio, scoreRadio, transmitState, type RadioAnswers, type RadioLogEntry, type RadioScore } from '../radio/session';
 import { FIELD } from '../radio/field';
 import { canSpeak, deviceVoices, loadRadioPrefs, onVoicesChanged, saveRadioPrefs, speak, stopSpeaking, type RadioPrefs } from '../radio/voice';
-import { KOKORO_VOICES, MODEL_INFO, canRecord, isDownloaded, loadModel, modelState, startRecording, subscribeModels, transcribe } from '../radio/models/client';
+import { KOKORO_VOICES, MODEL_INFO, autoLoadModels, canRecord, loadModel, modelState, startRecording, subscribeModels, transcribe } from '../radio/models/client';
 import type { ModelId } from '../radio/models/protocol';
 import { Field, GRADE_LABEL, Notice, Voice } from './common';
 import { Strip, type StripPoint } from './Strip';
@@ -61,11 +61,8 @@ export function RadioPractice({ aircraft, onExit }: { aircraft: AircraftProfile;
   };
   // Nothing keeps talking after the screen is gone.
   useEffect(() => () => stopSpeaking(), []);
-  // A model the pilot downloaded before loads again on its own. Nothing is ever downloaded unasked.
-  useEffect(() => {
-    if (prefs.engine === 'kokoro') loadIfDownloaded('kokoro');
-    if (prefs.speechInput) loadIfDownloaded('moonshine');
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // The speech models load as part of opening radio practice, from the cache after the first time.
+  useEffect(() => autoLoadModels(prefs.speechInput), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const start = (mission: Mission, seed: number) => {
     stopSpeaking();
@@ -267,8 +264,30 @@ function SoundControl({ prefs, setPrefs }: { prefs: RadioPrefs; setPrefs: (p: Ra
         <SpeakerGlyph on={prefs.sound} />
         Sound settings
       </button>
+      <ModelStatus />
       {open && <SoundSettings prefs={prefs} setPrefs={setPrefs} />}
     </>
+  );
+}
+
+/**
+ * A quiet line beside Sound settings while the speech models come down, so
+ * the pilot knows why the voice is the device's for now. Gone once both are
+ * ready; a failure stays in the settings panel, with its Try again.
+ */
+function ModelStatus() {
+  const kokoro = useModel('kokoro');
+  const moonshine = useModel('moonshine');
+  const [id, m] = kokoro.status === 'loading' ? (['kokoro', kokoro] as const) : moonshine.status === 'loading' ? (['moonshine', moonshine] as const) : [null, null];
+  if (!id || !m) return null;
+  const info = MODEL_INFO[id];
+  const pct = m.progress === null ? null : Math.round(m.progress * 100);
+  const what = id === 'kokoro' ? 'the controller voice' : 'speech input';
+  return (
+    <span className="model-status hint" role="status">
+      <span className="bar" aria-hidden="true"><i style={{ width: `${pct ?? 4}%` }} /></span>
+      {pct === null || pct === 100 ? `Getting ${what} ready` : `Downloading ${what}, ${pct}% of ${info.mb} MB`}
+    </span>
   );
 }
 
@@ -285,15 +304,10 @@ function Switch({ label, sub, on, disabled, onChange }: { label: string; sub: st
 /** The state of one optional model, live. */
 const useModel = (id: ModelId) => useSyncExternalStore(subscribeModels, () => modelState(id), () => modelState(id));
 
-/** If the pilot downloaded a model before, load it again without asking. Never downloads. */
-function loadIfDownloaded(id: ModelId) {
-  if (modelState(id).status !== 'idle') return;
-  void isDownloaded(id).then((d) => { if (d) loadModel(id); });
-}
-
 /**
- * One optional model: the download the pilot starts, its progress, and plain
- * words when it fails. Downloads happen once and run on this device.
+ * One speech model in the settings: its progress, plain words when it fails,
+ * and a download button only when it was not fetched on its own (data saver,
+ * a low-memory device). Downloads happen once and run on this device.
  */
 function ModelRow({ id, fallback, children }: { id: ModelId; fallback: string; children?: ReactNode }) {
   const m = useModel(id);
@@ -304,7 +318,7 @@ function ModelRow({ id, fallback, children }: { id: ModelId; fallback: string; c
       {m.status === 'idle' && (
         <div className="cta">
           <button type="button" className="btn sm" onClick={() => loadModel(id)}>Download {info.name}</button>
-          <span className="hint">{info.mb} MB, once. It runs on this device and nothing you say or hear is sent anywhere.</span>
+          <span className="hint">{info.mb} MB, once. Not fetched on its own because this browser is saving data. It runs on this device and nothing you say or hear is sent anywhere.</span>
         </div>
       )}
       {m.status === 'loading' && (
@@ -332,15 +346,12 @@ function SoundSettings({ prefs, setPrefs }: { prefs: RadioPrefs; setPrefs: (p: R
   const kokoro = useModel('kokoro');
   const noVoice = (!canSpeak() || voices.length === 0) && kokoro.status !== 'ready';
   const set = (p: Partial<RadioPrefs>) => setPrefs({ ...prefs, ...p });
-  const chooseEngine = (engine: RadioPrefs['engine']) => {
-    set({ engine });
-    if (engine === 'kokoro') loadIfDownloaded('kokoro');
-  };
+  const chooseEngine = (engine: RadioPrefs['engine']) => set({ engine });
   const sample = () => void speak(`${FIELD.facility} Tower, Cessna 2XY, runway 24, cleared for takeoff, altimeter 30.08.`, prefs);
   const canSample = prefs.sound && (prefs.engine === 'kokoro' ? kokoro.status === 'ready' : !noVoice);
   return (
     <div className="sound-panel" id="sound-panel" role="group" aria-label="Sound settings">
-      <p className="hint lead">Sound is optional. The words are always on the page, and you type every call. Anything downloaded here runs on this device and is kept for next time.</p>
+      <p className="hint lead">Sound is optional. The words are always on the page, and typing always works. The voice and speech models download once, run on this device and are kept for offline use.</p>
       <Switch label="Sound" sub="A voice reads the controller and the ATIS. Off until you turn it on." on={prefs.sound} onChange={(v) => set({ sound: v })} />
       <Switch label="Listen first" sub={prefs.sound ? 'The words wait behind a button until you ask, so you copy by ear.' : 'Turn sound on first.'} on={prefs.listenFirst} disabled={!prefs.sound} onChange={(v) => set({ listenFirst: v })} />
       <Switch label="Radio squelch" sub="A short burst of static when the controller keys up and lets go." on={prefs.radio} disabled={!prefs.sound} onChange={(v) => set({ radio: v })} />
@@ -348,11 +359,11 @@ function SoundSettings({ prefs, setPrefs }: { prefs: RadioPrefs; setPrefs: (p: R
       <div className={`sound-who ${prefs.sound ? '' : 'off'}`}>
         <span className="sw-l" id="voice-label">Voice</span>
         <div className="seg" role="group" aria-labelledby="voice-label">
+          <button type="button" aria-pressed={prefs.engine === 'kokoro'} disabled={!prefs.sound} onClick={() => chooseEngine('kokoro')}>Kokoro</button>
           <button type="button" aria-pressed={prefs.engine === 'device'} disabled={!prefs.sound} onClick={() => chooseEngine('device')}>Your device's voice</button>
-          <button type="button" aria-pressed={prefs.engine === 'kokoro'} disabled={!prefs.sound} onClick={() => chooseEngine('kokoro')}>Kokoro ({MODEL_INFO.kokoro.mb} MB download, once)</button>
         </div>
         {prefs.engine === 'device' && (noVoice
-          ? <p className="hint">This device has no built-in voice, so the controller stays in writing. Kokoro is a voice you can download instead.</p>
+          ? <p className="hint">This device has no built-in voice, so the controller stays in writing. Kokoro works instead.</p>
           : (
             <Field label="Which voice">
               <select value={prefs.voice ?? ''} disabled={!prefs.sound} onChange={(ev) => set({ voice: ev.target.value || null })}>
@@ -361,7 +372,7 @@ function SoundSettings({ prefs, setPrefs }: { prefs: RadioPrefs; setPrefs: (p: R
               </select>
             </Field>
           ))}
-        {prefs.engine === 'kokoro' && prefs.sound && (
+        {prefs.engine === 'kokoro' && (
           <ModelRow id="kokoro" fallback="Your device's voice reads instead.">
             <Field label="Which voice">
               <select value={prefs.kokoroVoice} onChange={(ev) => set({ kokoroVoice: ev.target.value })}>
@@ -388,7 +399,7 @@ function SoundSettings({ prefs, setPrefs }: { prefs: RadioPrefs; setPrefs: (p: R
           : 'This browser has no microphone access. Typing works the same.'}
         on={prefs.speechInput}
         disabled={!canRecord()}
-        onChange={(v) => { set({ speechInput: v }); if (v) loadIfDownloaded('moonshine'); }}
+        onChange={(v) => { set({ speechInput: v }); if (v) loadModel('moonshine'); }}
       />
       {prefs.speechInput && canRecord() && (
         <ModelRow id="moonshine" fallback="Keep typing your calls.">
