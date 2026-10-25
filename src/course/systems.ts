@@ -86,12 +86,18 @@ const alternator: Lesson = {
   summary: 'Turn an alternator light into battery minutes, shed load, and pick the field the battery can actually reach.',
   acs: ['PA.I.G', 'PA.IX.C'],
   refs: ['PHAK, electrical system', 'POH section 3, electrical power supply system malfunctions'],
+  variants: 2,
   build(ctx) {
     const { perf, sample } = airplane(ctx);
-    const sys = sampleElectrical();
+    // The second situation: at night, on an old battery. Position and panel lights join the loads you can't shed (91.209).
+    const tired = ctx.variant === 1;
+    const fresh = sampleElectrical();
+    const sys = tired
+      ? { ...fresh, usableFraction: 0.2, loads: [...fresh.loads, { id: 'nav', name: 'Position lights', amps: 2.0, essential: true }, { id: 'panel', name: 'Panel lights', amps: 1.0, essential: true }] }
+      : fresh;
     const pos = destination(HOME.pos, 255, 44);
     const windFrom = 70;
-    const windKt = 18;
+    const windKt = tired ? 28 : 18;
     const fields = practiceRegion.airports.filter((a) => a.id !== HOME.id).map((a) => ({ a, leg: legTo(pos, a.pos, perf.cruise.tasKt, windFrom, windKt) }));
     const nearest = fields.sort((x, y) => x.leg.nm - y.leg.nm)[0];
     const home = legTo(pos, HOME.pos, perf.cruise.tasKt, windFrom, windKt);
@@ -109,7 +115,7 @@ const alternator: Lesson = {
     return [
       {
         kind: 'brief', id: 'b1', title: 'Where the electrons come from',
-        scene: `Heading home to ${HOME.id} from ${nearest.a.name} at 4,500 feet, ${home.nm} nm out, in good visibility.${onTheChart(ctx)}`,
+        scene: `Heading home to ${HOME.id} from ${nearest.a.name} at 4,500 feet, ${home.nm} nm out, in good visibility.${tired ? ' It is an hour after sunset, and the battery is old: it has been slow to crank on cold mornings.' : ''}${onTheChart(ctx)}`,
         say: {
           full: 'The engine drives an **alternator**, which carries every electrical load and keeps the **battery** charged. The battery starts the engine and is the reserve. When the alternator quits, nothing changes at first: the radios work, the lights stay on, and the engine keeps running, because the **magnetos** make their own spark. What changes is that the battery is now carrying the whole bus, and it is going flat. Your job is to turn that into minutes.',
           short: 'Alternator out: the engine runs, the battery is now the clock.',
@@ -119,7 +125,7 @@ const alternator: Lesson = {
       {
         kind: 'example', id: 'e1', title: 'The light comes on',
         say: {
-          full: `The alternator light comes on and the ammeter shows a discharge. Check the alternator breaker, then turn the alternator side of the master off and on **once**. If the light stays on, you are on the battery. Now the arithmetic. ${sample ? 'These are sample loads for teaching.' : ''} Count on about half the battery's rating: an older battery gives less, and the radios quit before it is flat.`,
+          full: `The alternator light comes on and the ammeter shows a discharge. Check the alternator breaker, then turn the alternator side of the master off and on **once**. If the light stays on, you are on the battery. Now the arithmetic. ${sample ? 'These are sample loads for teaching.' : ''} ${tired ? `This battery is old and slow to crank, so count on only about ${Math.round(sys.usableFraction * 100)} percent of its rating. And at night the position lights are required (91.209), with panel lights to read the gauges, so they stay on.` : 'Count on about half the battery\'s rating: an older battery gives less, and the radios quit before it is flat.'}`,
           short: 'Breaker, cycle once, then do the arithmetic.',
         },
         figure: electricalFigure(sys, on, 'failed'),
@@ -152,12 +158,20 @@ const alternator: Lesson = {
           'shed-nearest': `Shed load and turn back for ${nearest.a.name}.`,
         },
         grades,
-        { 'carry-on': 'unsafe', 'shed-home': 'best', 'shed-nearest': 'acceptable' },
-        {
-          'carry-on': `The battery runs out at about ${fullMin} minutes, ${Math.max(0, fullMin - home.min)} after you reach the field, and that is the count with the battery at its best. The radio goes in the pattern of a towered field, and so does the transponder.`,
-          'shed-home': `You land at home with about ${shedMin - home.min} minutes of battery left. The tower knew before you entered the airspace, and the radio still worked when they cleared you to land.`,
-          'shed-nearest': `Also sound: you are on the ground in ${nearest.leg.min} minutes. The airplane is away from its mechanic, but nobody is in a hurry now.`,
-        },
+        tired
+          ? { 'carry-on': 'unsafe', 'shed-home': grades['shed-home'], 'shed-nearest': 'best' }
+          : { 'carry-on': 'unsafe', 'shed-home': 'best', 'shed-nearest': 'acceptable' },
+        tired
+          ? {
+            'carry-on': `With everything on, this battery lasts about ${fullMin} minutes. Home is ${home.min}. The radio and transponder quit well before the towered field does.`,
+            'shed-home': `Shed, the tired battery gives about ${shedMin} minutes against ${home.min} into a stiff headwind. ${shedMin >= home.min ? 'You might arrive with the radio still alive, or you might be calling the tower on a handheld with the light gun pointed at you.' : 'The radio dies before the field comes into view.'} The margin was the thing you needed and did not have.`,
+            'shed-nearest': `${nearest.a.name} is ${nearest.leg.min} minutes away, well inside what the battery gives shed. You key the mic on the CTAF to bring up its pilot-controlled runway lights while the radio still has power, switch the landing light on only for the flare, and land. The alternator gets fixed tomorrow.`,
+          }
+          : {
+            'carry-on': `The battery runs out at about ${fullMin} minutes, ${Math.max(0, fullMin - home.min)} after you reach the field, and that is the count with the battery at its best. The radio goes in the pattern of a towered field, and so does the transponder.`,
+            'shed-home': `You land at home with about ${shedMin - home.min} minutes of battery left. The tower knew before you entered the airspace, and the radio still worked when they cleared you to land.`,
+            'shed-nearest': `Also sound: you are on the ground in ${nearest.leg.min} minutes. The airplane is away from its mechanic, but nobody is in a hurry now.`,
+          },
         `Shed, the battery gives about ${shedMin} minutes against ${home.min} to home plus ${ELECTRICAL_MARGIN_MIN} in hand${fullMin >= home.min + ELECTRICAL_MARGIN_MIN ? '' : `; at full load, ${fullMin} minutes does not cover it`}. The POH says to land as soon as practical, and a field the battery reaches with margin fits that.`,
       ),
     ];
@@ -183,19 +197,22 @@ const instruments: Lesson = {
   summary: 'Know what powers each instrument, catch the one that is lying by cross-checking, and fly on what is left.',
   acs: ['PA.I.G', 'PA.IX.C'],
   refs: ['PHAK, gyroscopic instruments', 'PHAK, blocked pitot-static system', '14 CFR 91.205'],
+  variants: 2,
   build(ctx) {
-    const failure = diagnose(CLASSIC_PANEL, ['ai', 'hi']) as SystemFailure;
+    // Which gyro is lying: the vacuum pair, or the electric turn coordinator on its own.
+    const tcOut = ctx.variant === 1;
+    const failure = diagnose(CLASSIC_PANEL, tcOut ? ['tc'] : ['ai', 'hi']) as SystemFailure;
     const bad = affectedBy(CLASSIC_PANEL, failure);
     const good = stillGood(CLASSIC_PANEL, failure);
     const vis = Math.max(3, ctx.minimums.visibilitySm - 1);
-    const grades = gradeGyroFailure({ visibilitySm: vis, minimumSm: ctx.minimums.visibilitySm });
+    const grades = gradeGyroFailure({ visibilitySm: vis, minimumSm: ctx.minimums.visibilitySm, failure: tcOut ? 'electric' : 'vacuum' });
     const blockAt = 2500;
     const climbTo = 4500;
     const climb = blockedStatic(blockAt, climbTo);
     const askAt = 3500;
     const descendTo = 2500;
     const descend = blockedStatic(askAt, descendTo);
-    const failed = panel({ ai: { value: -15, pitchDeg: 2 }, hi: { value: 214 } }, bad);
+    const failed = tcOut ? panel({ tc: { value: -1 } }, bad) : panel({ ai: { value: -15, pitchDeg: 2 }, hi: { value: 214 } }, bad);
     const nearMin = 12;
     const tripMin = 40;
     const sourceOf = (s: string) => s === 'none' ? 'nothing' : s;
@@ -227,13 +244,19 @@ const instruments: Lesson = {
       },
       {
         kind: 'turn', id: 't1', title: 'Your turn',
-        prompt: 'Later on the same flight the panel looks like this. The attitude indicator shows a bank, the heading indicator is turning, the turn coordinator says wings level and the compass is steady. Which source failed, and what do you fly with? Then one more static question.',
+        prompt: tcOut
+          ? 'Later on the same flight the panel looks like this. The turn coordinator shows a standard-rate turn to the left, but the attitude indicator is wings level, the heading indicator holds steady and so does the compass. Which source failed, and what do you fly with? Then one more static question.'
+          : 'Later on the same flight the panel looks like this. The attitude indicator shows a bank, the heading indicator is turning, the turn coordinator says wings level and the compass is steady. Which source failed, and what do you fly with? Then one more static question.',
         figure: failed,
         blanks: [
           { id: 'source', label: 'Failed source', answer: FAILURE_NAME[failure], choices: Object.values(FAILURE_NAME),
-            explain: `The two instruments that disagree with the rest, the ${byName(bad)}, share one source: ${sourceOf(failure)}. Nothing else on the panel uses it.` },
-          { id: 'turning', label: 'Trust for turning', answer: INSTRUMENT_NAME.tc, choices: [INSTRUMENT_NAME.ai, INSTRUMENT_NAME.hi, INSTRUMENT_NAME.tc],
-            explain: `The turn coordinator runs on electric power, so losing the ${sourceOf(failure)} system leaves it alone. It and the compass agree you are not turning.` },
+            explain: tcOut
+              ? `Only the ${byName(bad)} disagrees, and it is the one instrument on ${sourceOf(failure)} power. With the radios still working, it is its own circuit or motor, not the whole bus: check its breaker. Three instruments on two other sources agree with each other.`
+              : `The two instruments that disagree with the rest, the ${byName(bad)}, share one source: ${sourceOf(failure)}. Nothing else on the panel uses it.` },
+          { id: 'turning', label: 'Trust for turning', answer: tcOut ? INSTRUMENT_NAME.ai : INSTRUMENT_NAME.tc, choices: [INSTRUMENT_NAME.ai, INSTRUMENT_NAME.hi, INSTRUMENT_NAME.tc],
+            explain: tcOut
+              ? 'The attitude indicator runs on vacuum, so an electrical fault leaves it alone. It, the heading indicator and the compass all agree you are not turning.'
+              : `The turn coordinator runs on electric power, so losing the ${sourceOf(failure)} system leaves it alone. It and the compass agree you are not turning.` },
           { id: 'static', label: `Static blocked at ${fmt(askAt)}, now at ${fmt(descendTo)}: altimeter reads`, unit: 'ft', answer: descend.altimeterFt, tolerance: 0,
             explain: `It freezes at ${fmt(descend.altimeterFt)}. Below the blockage the airspeed reads ${descend.airspeed}.` },
         ],
@@ -248,14 +271,23 @@ const instruments: Lesson = {
           'climb-clear': 'Climb above the haze, where the horizon is sharper, and sort it out up there.',
         },
         grades,
-        { 'trust-attitude': 'unsafe', 'cover-land': 'best', 'cover-continue': 'marginal', 'climb-clear': 'unsafe' },
-        {
+        tcOut
+          ? { 'trust-attitude': 'best', 'cover-land': 'unsafe', 'cover-continue': 'unsafe' }
+          : { 'trust-attitude': 'unsafe', 'cover-land': 'best', 'cover-continue': 'marginal', 'climb-clear': 'unsafe' },
+        tcOut ? {
+          'trust-attitude': 'The attitude indicator, heading indicator and compass agree with each other and with the soft horizon outside. You fly on them, cover the turn coordinator so it stops pulling your eye, and write it up after landing.',
+          'cover-land': 'You covered the two good gyros and kept the one that is lying. The turn coordinator says you are turning left, so you roll right to stop it, and now you are in a real right bank in haze. Find which instruments agree before you cover anything.',
+          'cover-continue': 'Covering the working gyros leaves you flying on the dead one for the rest of the trip. The cross-check was the step you skipped.',
+          'climb-clear': 'With a good attitude indicator you can climb, but nothing here needed it: the instruments that matter are working. Cover the bad one and carry on.',
+        } : {
           'trust-attitude': 'You roll right to level a bank that was never there. The turn coordinator swings, the compass starts to move, and in the haze you are now in a real bank following a dead gyro. This is how a failed vacuum pump becomes a spiral.',
           'cover-land': `Covered, the lying instruments stop pulling your eye. You fly ${nearMin} minutes on the turn coordinator, the compass and the horizon you have, and land with the haze still around you.`,
           'cover-continue': `Covering them was right. ${tripMin} minutes of partial panel in haze below your minimum is a long time to fly on the hardest instruments to read.`,
           'climb-clear': 'Climbing into a softer horizon with no attitude indicator is the wrong direction. If the haze tops out higher than you think, you are on partial panel in cloud.',
         },
-        `A failed gyro keeps showing something plausible, which is what makes it dangerous. Cover it first. Then, with visibility ${vis >= ctx.minimums.visibilitySm ? 'at' : 'under'} your minimum, the nearer field is the shorter exposure.`,
+        tcOut
+          ? 'A failed gyro keeps showing something plausible. The cure is the cross-check: three instruments on two sources agreeing beat one disagreeing. Here the liar is the turn coordinator, so the attitude indicator stays primary.'
+          : `A failed gyro keeps showing something plausible, which is what makes it dangerous. Cover it first. Then, with visibility ${vis >= ctx.minimums.visibilitySm ? 'at' : 'under'} your minimum, the nearer field is the shorter exposure.`,
       ),
     ];
   },
@@ -273,7 +305,10 @@ const gps: Lesson = {
   summary: 'Lose the GPS mid-trip and finish by pilotage and dead reckoning from the nav log you built on the ground.',
   acs: ['PA.VI.A', 'PA.VI.B', 'PA.IX.C'],
   refs: ['PHAK, pilotage and dead reckoning', 'PHAK, GPS', 'AIM 1-1-17', '14 CFR 91.103'],
+  variants: 2,
   build(ctx) {
+    // The second situation: you left with less fuel than the trip and reserve need, and had been flying by the GPS's fuel page.
+    const short = ctx.variant === 1;
     const { perf, sample } = airplane(ctx);
     const route = [asPoint(HOME), asPoint(cp('harlow')), asPoint(cp('long-lake')), asPoint(cp('pinecrest')), asPoint(QA)];
     const windFrom = 300;
@@ -285,7 +320,8 @@ const gps: Lesson = {
     const nextWind = windTriangle(next.trueCourse, perf.cruise.tasKt, windFrom, windKt);
     const elapsed = flown.reduce((n, l) => n + l.minutes, 0) + 8;
     const remaining = next.minutes + last.minutes;
-    const enduranceMin = 210;
+    const enduranceMin = short ? Math.floor((elapsed + remaining + 30 - 15) / 10) * 10 : 210;
+    const endurance = `${Math.floor(enduranceMin / 60)} hour${enduranceMin >= 120 ? 's' : ''}${enduranceMin % 60 ? ` ${enduranceMin % 60} minutes` : ''}`;
     const reserve = 30;
     const fuelMarginMin = enduranceMin - elapsed - remaining - reserve;
     const vis = Math.max(ctx.minimums.visibilitySm + 3, 8);
@@ -333,7 +369,7 @@ const gps: Lesson = {
         ],
       },
       decision('d1', 'Over the lake, no GPS',
-        `Visibility ${vis} miles. ${cp('pinecrest').name} should show up in ${next.minutes} minutes: ${cp('pinecrest').looksLike.toLowerCase()} You left with ${Math.floor(enduranceMin / 60)} hours ${enduranceMin % 60} minutes of fuel and have flown ${elapsed} minutes.`,
+        `Visibility ${vis} miles. ${cp('pinecrest').name} should show up in ${next.minutes} minutes: ${cp('pinecrest').looksLike.toLowerCase()} You left with ${endurance} of fuel and have flown ${elapsed} minutes.${short ? ` That was what the last renter left in the tanks; you planned to buy fuel at ${QA.name}, ${remaining} minutes on, and had been watching the GPS's fuel page, which is now blank.` : ''}`,
         chart,
         {
           pilotage: `Hold ${deg(next.magHeading)}°, time the leg, and confirm ${cp('pinecrest').name} when it shows up. Finish the trip on the chart.`,
@@ -342,14 +378,23 @@ const gps: Lesson = {
           nearest: 'Land at the nearest field and sort out the GPS on the ground.',
         },
         grades,
-        { pilotage: 'best', 'ask-atc': 'best', 'turn-back': 'acceptable', nearest: 'acceptable' },
-        {
+        short
+          ? { pilotage: 'unsafe', 'ask-atc': 'marginal', 'turn-back': 'unsafe', nearest: 'best' }
+          : { pilotage: 'best', 'ask-atc': 'best', 'turn-back': 'acceptable', nearest: 'acceptable' },
+        short ? {
+          pilotage: `The navigation works fine. The arithmetic does not: ${elapsed} minutes flown and ${remaining} to go leaves ${-fuelMarginMin} minutes less than your ${reserve} minute reserve. Finding ${QA.name} perfectly is no help if you land on fumes.`,
+          'ask-atc': 'Approach can confirm where you are, but not put fuel in the tanks. Flight following is good; it does not change the sum.',
+          'turn-back': `Home is farther than ${QA.name} now. Turning around spends more of what you do not have.`,
+          nearest: `The clock says the fuel is short, so the GPS was not the real problem. You find the nearest field on the chart, land with your reserve intact, and buy fuel. Then you finish the trip.`,
+        } : {
           pilotage: `${cp('pinecrest').name} shows up a minute late; the wind is a little stronger than forecast. You correct and land at ${QA.name} ${remaining + 2} minutes after the lake, with ${fuelMarginMin - 2} minutes of fuel past your reserve.`,
           'ask-atc': 'Approach puts you on radar and confirms you are on course. Help you ask for early is help you do not need to beg for later, and you still flew the log.',
           'turn-back': 'Safe, and you know the way home. But the airplane flies the same without the GPS, and the trip ahead was planned and in good weather.',
           nearest: 'Nothing wrong with it, though nothing about this flight needed it either.',
         },
-        `In good visibility, with a checkpoint ahead and ${fuelMarginMin} minutes of fuel past your reserve, nothing about the flight changed except the screen.`,
+        short
+          ? `The blank screen made you do the fuel sum by the clock, and the sum is ${-fuelMarginMin} minutes short of your reserve. Navigation is easy here; fuel decides. Land, refuel, continue.`
+          : `In good visibility, with a checkpoint ahead and ${fuelMarginMin} minutes of fuel past your reserve, nothing about the flight changed except the screen.`,
       ),
     ];
   },
@@ -363,7 +408,10 @@ const carbIce: Lesson = {
   summary: 'Read icing risk from the temperature and dew point, use carb heat the way the PHAK says, and keep track of which tank is feeding.',
   acs: ['PA.I.G', 'PA.IX.C'],
   refs: ['PHAK, carburetor icing', 'PHAK, fuel systems', 'POH section 3, rough engine operation or loss of power'],
+  variants: 2,
   build(ctx) {
+    // The second situation: the stumble comes with plenty in the tank, so the selector is not the answer.
+    const plenty = ctx.variant === 1;
     const { perf, sample } = airplane(ctx);
     const tempC = 12;
     const dewC = 10;
@@ -372,7 +420,7 @@ const carbIce: Lesson = {
     const rpmGrades = gradeRpmLoss(risk);
     const ownTanks = ctx.aircraft.usableFuelGal > 0;
     const tankGal = ownTanks ? r1(ctx.aircraft.usableFuelGal / 2) : 20;
-    const minutesOnTank = Math.floor(((tankGal - perf.taxiFuelGal - 1) / perf.cruise.gph) * 60);
+    const minutesOnTank = plenty ? 40 : Math.floor(((tankGal - perf.taxiFuelGal - 1) / perf.cruise.gph) * 60);
     const usedGal = r1(perf.taxiFuelGal + (perf.cruise.gph * minutesOnTank) / 60);
     const leftGal = r1(tankGal - usedGal);
     const roughGrades = gradeRoughEngine({ tankLeftGal: leftGal });
@@ -440,7 +488,7 @@ const carbIce: Lesson = {
       {
         kind: 'example', id: 'e2', title: 'Which tank is feeding',
         say: {
-          full: `Now the fuel system. Some airplanes feed from both tanks at once; many make you pick one. Suppose this one feeds from one tank at a time, ${ownTanks ? `${tankGal} usable gallons a side from your profile` : `${tankGal} usable gallons a side for this lesson`}, and you have been on the left tank since the run-up, ${hm(minutesOnTank)} ago. Light airplane fuel gauges are not precise enough to plan on, so the clock is the gauge.${sampleLine(sample)}`,
+          full: `Now the fuel system. Some airplanes feed from both tanks at once; many make you pick one. Suppose this one feeds from one tank at a time, ${ownTanks ? `${tankGal} usable gallons a side from your profile` : `${tankGal} usable gallons a side for this lesson`}, and you have been on the left tank since ${plenty ? 'you switched to it full' : 'the run-up'}, ${hm(minutesOnTank)} ago. Light airplane fuel gauges are not precise enough to plan on, so the clock is the gauge.${sampleLine(sample)}`,
           short: 'The clock is the fuel gauge.',
         },
         work: [
@@ -451,7 +499,7 @@ const carbIce: Lesson = {
         ],
       },
       decision('d2', 'A stumble',
-        `A few minutes later the engine stumbles, surges, and stumbles again. Carb heat is already on. The left tank has about ${leftGal} gallon${leftGal === 1 ? '' : 's'} by the clock.`,
+        `A few minutes later the engine stumbles, surges, and stumbles again. Carb heat is already on. The left tank has about ${leftGal} gallon${leftGal === 1 ? '' : 's'} by the clock.${plenty ? ' The oil pressure needle is flickering at the bottom of the green.' : ''}`,
         undefined,
         {
           'switch-tank': 'Fuel selector to the other tank, mixture rich, fuel pump on if you have one.',
@@ -459,13 +507,21 @@ const carbIce: Lesson = {
           'land-now': 'Pick a field and set up for a precautionary landing.',
         },
         roughGrades,
-        { 'switch-tank': 'best', 'heat-off': 'unsafe', 'land-now': 'marginal' },
-        {
+        plenty
+          ? { 'switch-tank': 'acceptable', 'heat-off': 'marginal', 'land-now': 'best' }
+          : { 'switch-tank': 'best', 'heat-off': 'unsafe', 'land-now': 'marginal' },
+        plenty ? {
+          'switch-tank': `Worth a try on the way down, since it costs one hand movement, but the arithmetic says the left tank has ${leftGal} gallons. The stumble keeps coming. Fuel was not the problem this time.`,
+          'heat-off': 'Taking the heat off brings back whatever ice the heat was keeping away, and it does nothing for flickering oil pressure.',
+          'land-now': 'Fuel by the clock is fine, carb heat is on, and the engine is still unhappy with the oil pressure twitching. You pick a field while the engine still runs, run the checklist on the way, and land. The mechanic finds a cracked oil line.',
+        } : {
           'switch-tank': 'Two seconds later the engine catches and runs smoothly. You note the time on the right tank, and you will land with the fuel your plan said.',
           'heat-off': 'The heat was not the problem; an empty tank was. The engine quits.',
           'land-now': 'Picking a field is never wrong when an engine is unhappy, but the fix was one hand movement away, and the arithmetic said so.',
         },
-        `About ${leftGal} gallon${leftGal === 1 ? '' : 's'} is a tank running dry, and a dry tank sounds exactly like this. Fuel first, then everything else.`,
+        plenty
+          ? `The clock says ${leftGal} gallons in the tank, so this is not a dry tank, and carb heat is already on. When the easy causes are ruled out and the engine is still complaining, it is time to land while you still have power.`
+          : `About ${leftGal} gallon${leftGal === 1 ? '' : 's'} is a tank running dry, and a dry tank sounds exactly like this. Fuel first, then everything else.`,
       ),
     ];
   },
