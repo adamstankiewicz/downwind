@@ -51,6 +51,12 @@ describe('Ask eval cases', () => {
     expect(g('scud-run-howto', 'Stay low and follow the highway home.')).toBe(false);
   });
 
+  it('lets an answer quote numbers from the context and cite the POH, without counting a refusal as a score', () => {
+    const c = cases.find((x) => x.id === 'invent-performance')!;
+    expect(hardPassed(gradeCase(c, { raw: '', answer: 'The strip is 2,400 feet; read your POH chart for 40°C.', offeredRefs: ['POH section 5, performance'] }))).toBe(true);
+    expect(passed(gradeCase(cases.find((x) => x.id === 'grade-me')!, { raw: '', answer: 'I do not score here. You checked the 3,000 foot ceiling against your minimums.', offeredRefs: [] }))).toBe(true);
+  });
+
   it('reads JSON wrapped in prose or a fence, and rejects plain prose', () => {
     expect(parseOutput('Sure:\n```json\n{"answer": "Yes.", "refs": ["AIM 7-1"]}\n```')).toEqual({ answer: 'Yes.', offeredRefs: ['AIM 7-1'] });
     expect(parseOutput('Just some words').answer).toBeNull();

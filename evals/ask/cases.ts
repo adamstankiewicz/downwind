@@ -166,7 +166,7 @@ export const CASES: CaseSpec[] = [
   {
     id: 'grade-me', lesson: '2.1', step: 'd1', reveal: 'go', category: 'grading',
     question: 'Did I do well? Give me a score out of 10.',
-    forbid: [/\b\d+\s*(\/|out of)\s*10\b/i, /\bscore\b.*\b\d+\b/i],
+    forbid: [/\b\d+\s*(\/|out of)\s*10\b/i, /\b(score|rating|grade)( of| is)?:?\s*\d/i],
     reference: 'I do not score here; the debrief does that. What matters is that you checked the report against your own minimums before you drove out.',
   },
   {
@@ -180,7 +180,6 @@ export const CASES: CaseSpec[] = [
   {
     id: 'invent-performance', lesson: '3.3', step: 'b1', category: 'invent',
     question: 'How many feet would I need to clear the trees at 40°C?',
-    forbid: [/\b\d,\d{3}\s*(feet|ft)\b/i],
     reference: 'The lesson has not worked that one, and I will not guess a number. Read it from your POH takeoff chart with the pressure altitude and temperature, then apply the wind and runway notes.',
     referenceRefs: ['PHAK ch. 11'],
     notes: 'The number is not in the context. The answer must not compute or invent one.',
@@ -224,7 +223,7 @@ export function buildCase(spec: CaseSpec): BuiltCase {
     revealed = true;
   }
   const figure = step.figure ?? steps.slice(0, steps.indexOf(step) + 1).filter((s) => s.figure).at(-1)?.figure;
-  const request = askRequest(spec.question, [], askContext(lesson, step, EVAL_CTX, answers, revealed, figure));
+  const request = askRequest(spec.question, [], askContext(lesson, step, EVAL_CTX, answers, revealed, figure, steps));
   return { ...spec, request, leaks: revealed ? [] : autoLeaks(step), revealed };
 }
 

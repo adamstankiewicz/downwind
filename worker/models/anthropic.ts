@@ -18,7 +18,8 @@ export function anthropicModel(apiKey: string, model = DEFAULT_ANTHROPIC_MODEL, 
         message = await call({
           model,
           max_tokens: maxTokens,
-          thinking: { type: 'disabled' },
+          // Haiku takes 'disabled'; Sonnet 5.5 rejects it and turns thinking off with 'between_tools'.
+          thinking: { type: /^claude-sonnet-5-5/.test(model) ? 'between_tools' : 'disabled' } as Anthropic.ThinkingConfigParam,
           output_config: { effort: 'low', format: { type: 'json_schema', schema } },
           system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
           messages: [{ role: 'user', content: user }],

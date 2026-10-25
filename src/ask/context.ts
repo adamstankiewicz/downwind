@@ -36,7 +36,8 @@ export interface AskReply {
 }
 
 export interface AskContext {
-  lesson: { id: string; title: string; acs: string[]; refs: string[] };
+  /** The lesson's opening brief, so every step carries the rule the lesson teaches. */
+  lesson: { id: string; title: string; acs: string[]; refs: string[]; brief?: string };
   step: Record<string, unknown>;
   field: { icao: string; name: string; elevationFt: number; airspace: string; runways: string[]; practice: boolean };
   airplane: { type: string; demonstratedCrosswindKt: number | null; usableFuelGal: number | null; maxGrossLb: number | null; sample: boolean } | null;
@@ -49,11 +50,11 @@ export interface AskContext {
  * blanks or committed the decision; until then answers and grades stay out,
  * so the model cannot give them away.
  */
-export function askContext(lesson: Lesson, step: Step, ctx: LessonContext, answers: LessonAnswers, revealed: boolean, figure?: Figure): AskContext {
+export function askContext(lesson: Lesson, step: Step, ctx: LessonContext, answers: LessonAnswers, revealed: boolean, figure?: Figure, steps?: Step[]): AskContext {
   const a = ctx.aircraft;
   const hasAirplane = Boolean(a.type.trim());
   return {
-    lesson: { id: lesson.id, title: lesson.title, acs: lesson.acs, refs: lesson.refs },
+    lesson: { id: lesson.id, title: lesson.title, acs: lesson.acs, refs: lesson.refs, brief: briefOf(step, steps ?? lesson.build(ctx)) },
     step: stepFacts(step, answers, revealed),
     field: {
       icao: ctx.airport.icao,
@@ -75,6 +76,12 @@ export function askContext(lesson: Lesson, step: Step, ctx: LessonContext, answe
     minimums: ctx.minimums,
     report: reportOf(figure ?? step.figure),
   };
+}
+
+function briefOf(step: Step, steps: Step[]): string | undefined {
+  if (step.kind === 'brief') return undefined;
+  const first = steps.find((s) => s.kind === 'brief');
+  return first?.kind === 'brief' ? clip(first.say.full) : undefined;
 }
 
 function stepFacts(step: Step, answers: LessonAnswers, revealed: boolean): Record<string, unknown> {
@@ -151,14 +158,17 @@ export function askRequest(question: string, earlier: AskTurn[], context: AskCon
   };
 }
 
-/** The model's refs, kept only when the resolver can open them. Duplicates go too. */
+/** The pilot's own POH, cited by section ("POH section 5, performance"). Shown as a plain chip. */
+const POH = /^POH section \d+(, [a-z ,]+)?$/i;
+
+/** The model's refs, kept only when the resolver can open them or they name a POH section. Duplicates go too. */
 export function citableRefs(refs: unknown): string[] {
   if (!Array.isArray(refs)) return [];
   const out: string[] = [];
   for (const r of refs) {
     if (typeof r !== 'string') continue;
     const label = r.trim();
-    if (label && !out.includes(label) && resolvesToSource(label)) out.push(label);
+    if (label && !out.includes(label) && (resolvesToSource(label) || POH.test(label))) out.push(label);
   }
   return out.slice(0, 4);
 }
@@ -192,6 +202,7 @@ export function systemPrompt(): string {
 How to answer:
 - Answer the question they asked, about this step, in two to four short sentences. Plain, direct and kind. Explain why before what. Talk about what a pilot notices, decides and says in the airplane, not only what the book says.
 - No em dashes, no exclamation marks, no headings, no lists unless they asked for steps. You may use **bold** for one key phrase.
+- The lesson's brief and the step state the rules this lesson teaches. When they cover the question, answer from them rather than from memory, and never contradict them.
 - Use only numbers that appear in the context. Do not compute new distances, weights, winds or performance figures; if they need a number the lesson has not shown, tell them which step or tool works it out.
 - Never grade, score or rate the pilot, and never say how well they are doing. The app grades.
 - If the step is a decision that is not committed yet, or blanks that are not checked yet, do not say which option is best or what a blank's answer is. Help them reason toward it: what to look at, which rule applies, what question to ask themselves.
@@ -204,6 +215,7 @@ References: put zero to three labels in "refs", only ones that back what you sai
 - A regulation: "14 CFR 91.155" or "14 CFR 91.155(c)".
 - An AIM section: "AIM 7-1" or "AIM 3-2-5".
 - A PHAK chapter: "PHAK ch. 11".
+- A section of the pilot's own POH: "POH section 5, performance".
 - One of these handbook passages, copied exactly:
 ${passageLabels().map((l) => `  - ${l}`).join('\n')}
 The lesson's own refs in the context are good choices when they fit. Leave "refs" empty rather than guess.`;

@@ -63,8 +63,8 @@ describe('ask context', () => {
 
 describe('references', () => {
   it('keeps only labels the resolver opens', () => {
-    expect(citableRefs(['14 CFR 91.155(c)', 'AIM 7-1', 'PHAK ch. 11', 'PHAK, hypoxia', 'Some blog', 'POH section 4', 'AIM 7-1', 3])).toEqual([
-      '14 CFR 91.155(c)', 'AIM 7-1', 'PHAK ch. 11', 'PHAK, hypoxia',
+    expect(citableRefs(['14 CFR 91.155(c)', 'AIM 7-1', 'PHAK ch. 11', 'Some blog', 'POH section 4', 'AIM 7-1', 'POH page 9', 3])).toEqual([
+      '14 CFR 91.155(c)', 'AIM 7-1', 'PHAK ch. 11', 'POH section 4',
     ]);
     expect(citableRefs('AIM 7-1')).toEqual([]);
   });
@@ -117,6 +117,14 @@ describe('worker /api/ask', () => {
     expect(p.thinking).toEqual({ type: 'disabled' });
     expect(p.system).toEqual([{ type: 'text', text: systemPrompt(), cache_control: { type: 'ephemeral' } }]);
     expect(p.output_config?.effort).toBe('low');
+  });
+
+  it('turns thinking off the way each model accepts', async () => {
+    const sent: unknown[] = [];
+    const grab = async (p: Anthropic.MessageCreateParamsNonStreaming) => { sent.push(p.thinking); return reply(JSON.stringify({ answer: 'Yes.', refs: [] })); };
+    await handleAsk(post(), key, anthropicModel('k', 'claude-sonnet-5-5', grab));
+    await handleAsk(post(), key, anthropicModel('k', 'claude-haiku-5-5', grab));
+    expect(sent).toEqual([{ type: 'between_tools' }, { type: 'disabled' }]);
   });
 
   it('limits bursts from one address when the rate limit is bound', async () => {
