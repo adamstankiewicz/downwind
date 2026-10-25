@@ -3,15 +3,21 @@
 // engine in radio/ builds the flight from a seed and grades each transmission
 // for who, where and what, the way a controller listens, and says what the
 // controller would say back. Three screens: the radio home, the flight with a
-// kneeboard beside it, and the debrief. Typing only, never voice.
+// kneeboard beside it, and the debrief. The pilot always types. With sound on
+// (off until they ask) the controller and the ATIS are read aloud by a voice
+// on the device, and with listen first the words wait behind a button so the
+// pilot copies by ear. The words are never more than one tap away.
 
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import type { AircraftProfile } from '../data/aircraft';
 import { MISSIONS, buildRadioFlight, callsignFor, checkCopy, newSeed, type Event as RadioEvent, type Freq, type Mission, type RadioFlight } from '../radio/flights';
 import { wordy, type CallResult, type Outcome, type Part } from '../radio/grade';
 import { MAX_TRIES, emptyRadioAnswers, eventDone, gradeTry, loadRadioLog, recordRadio, scoreRadio, transmitState, type RadioAnswers, type RadioLogEntry, type RadioScore } from '../radio/session';
 import { FIELD } from '../radio/field';
-import { GRADE_LABEL, Notice, Voice } from './common';
+import { canSpeak, deviceVoices, loadRadioPrefs, onVoicesChanged, saveRadioPrefs, speak, stopSpeaking, type RadioPrefs } from '../radio/voice';
+import { KOKORO_VOICES, MODEL_INFO, canRecord, isDownloaded, loadModel, modelState, startRecording, subscribeModels, transcribe } from '../radio/models/client';
+import type { ModelId } from '../radio/models/protocol';
+import { Field, GRADE_LABEL, Notice, Voice } from './common';
 import { Strip, type StripPoint } from './Strip';
 import { RefChips } from '../refs/RefViewer';
 import { AirportDiagram, focusFor } from './AirportDiagram';
@@ -47,8 +53,22 @@ export function RadioPractice({ aircraft, onExit }: { aircraft: AircraftProfile;
   const [idx, setIdx] = useState(0);
   const [score, setScore] = useState<RadioScore | null>(null);
   const [log, setLog] = useState<RadioLogEntry[]>(loadRadioLog);
+  const [prefs, setPrefsState] = useState<RadioPrefs>(loadRadioPrefs);
+  const setPrefs = (p: RadioPrefs) => {
+    if (!p.sound) stopSpeaking();
+    saveRadioPrefs(p);
+    setPrefsState(p);
+  };
+  // Nothing keeps talking after the screen is gone.
+  useEffect(() => () => stopSpeaking(), []);
+  // A model the pilot downloaded before loads again on its own. Nothing is ever downloaded unasked.
+  useEffect(() => {
+    if (prefs.engine === 'kokoro') loadIfDownloaded('kokoro');
+    if (prefs.speechInput) loadIfDownloaded('moonshine');
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const start = (mission: Mission, seed: number) => {
+    stopSpeaking();
     setPick((p) => ({ mission, seed, attempt: (p?.attempt ?? 0) + 1 }));
     setAnswers(emptyRadioAnswers());
     setIdx(0);
@@ -56,6 +76,7 @@ export function RadioPractice({ aircraft, onExit }: { aircraft: AircraftProfile;
     window.scrollTo({ top: 0 });
   };
   const home = () => {
+    stopSpeaking();
     setPick(null);
     setScore(null);
     window.scrollTo({ top: 0 });
@@ -66,13 +87,14 @@ export function RadioPractice({ aircraft, onExit }: { aircraft: AircraftProfile;
   };
   const finish = () => {
     if (!flight) return;
+    stopSpeaking();
     const s = scoreRadio(flight, answers);
     setScore(s);
     setLog(recordRadio(flight, s));
     window.scrollTo({ top: 0 });
   };
 
-  if (!flight) return <RadioHome aircraft={aircraft} log={log} onStart={start} onExit={onExit} />;
+  if (!flight) return <RadioHome aircraft={aircraft} log={log} prefs={prefs} setPrefs={setPrefs} onStart={start} onExit={onExit} />;
 
   const events = flight.events;
   const e = events[Math.min(idx, events.length - 1)];
@@ -107,7 +129,7 @@ export function RadioPractice({ aircraft, onExit }: { aircraft: AircraftProfile;
       ) : (
         <div className="lesson radio">
           <div className="scene">
-            <EventView key={e.id} flight={flight} e={e} answers={answers} setAnswers={setAnswers} />
+            <EventView key={e.id} flight={flight} e={e} answers={answers} setAnswers={setAnswers} prefs={prefs} setPrefs={setPrefs} />
             <div className="step-nav">
               {idx > 0 && <button type="button" className="btn quiet" onClick={() => go(idx - 1)}>Back</button>}
               <span style={{ flex: 1 }} />
@@ -127,7 +149,7 @@ export function RadioPractice({ aircraft, onExit }: { aircraft: AircraftProfile;
 
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString([], { month: 'short', day: 'numeric' });
 
-function RadioHome({ aircraft, log, onStart, onExit }: { aircraft: AircraftProfile; log: RadioLogEntry[]; onStart: (m: Mission, seed: number) => void; onExit: () => void }) {
+function RadioHome({ aircraft, log, prefs, setPrefs, onStart, onExit }: { aircraft: AircraftProfile; log: RadioLogEntry[]; prefs: RadioPrefs; setPrefs: (p: RadioPrefs) => void; onStart: (m: Mission, seed: number) => void; onExit: () => void }) {
   const cs = callsignFor(aircraft);
   // The facilities each mission talks to, in order, read off a sample flight.
   const sequence = (m: Mission) => {
@@ -166,6 +188,7 @@ function RadioHome({ aircraft, log, onStart, onExit }: { aircraft: AircraftProfi
             <FreqPlate freq={{ name: 'ATIS', mhz: FIELD.atis }} />
             <FreqPlate freq={{ name: `${FIELD.facility} Ground`, mhz: FIELD.ground }} />
             <FreqPlate freq={{ name: `${FIELD.facility} Tower`, mhz: FIELD.tower }} />
+            <SoundControl prefs={prefs} setPrefs={setPrefs} />
           </div>
 
           <section className="missions-sec">
@@ -183,7 +206,7 @@ function RadioHome({ aircraft, log, onStart, onExit }: { aircraft: AircraftProfi
             </ul>
             <div className="cta">
               <button type="button" className="btn" onClick={() => onStart(MISSIONS[Math.floor(Math.random() * MISSIONS.length)].id, newSeed())}>Surprise me</button>
-              <span className="hint">Every flight is different: the ATIS, the runway, the ramp, a closed taxiway, the traffic and what the controller says. Typed, never spoken.</span>
+              <span className="hint">Every flight is different: the ATIS, the runway, the ramp, a closed taxiway, the traffic and what the controller says. You type every call. Turn sound on to hear the controller.</span>
             </div>
           </section>
         </div>
@@ -224,12 +247,271 @@ function FreqPlate({ freq }: { freq: Freq }) {
   );
 }
 
-/** One transmission on the frequency: who said it, then the words. */
-function Xmit({ who, kind, children }: { who: string; kind: 'atc' | 'pilot' | 'model'; children: ReactNode }) {
+// ---------- sound ----------
+
+const SpeakerGlyph = ({ on }: { on: boolean }) => (
+  <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+    <path d="M3 7.5h3.2L10.5 4v12L6.2 12.5H3z" fill="currentColor" />
+    {on
+      ? <path d="M13 7.2a3.6 3.6 0 0 1 0 5.6M15.3 5a6.6 6.6 0 0 1 0 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      : <path d="M13 8l4 4M17 8l-4 4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />}
+  </svg>
+);
+
+/** The sound settings button and, when open, the panel under it. Sits on a frequency row. */
+function SoundControl({ prefs, setPrefs }: { prefs: RadioPrefs; setPrefs: (p: RadioPrefs) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" className={`btn quiet sm sound-btn ${prefs.sound ? 'on' : ''}`} aria-expanded={open} aria-controls="sound-panel" onClick={() => setOpen((o) => !o)}>
+        <SpeakerGlyph on={prefs.sound} />
+        Sound settings
+      </button>
+      {open && <SoundSettings prefs={prefs} setPrefs={setPrefs} />}
+    </>
+  );
+}
+
+function Switch({ label, sub, on, disabled, onChange }: { label: string; sub: string; on: boolean; disabled?: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div className={`sw-row ${disabled ? 'off' : ''}`}>
+      <span className="sw-l">{label}</span>
+      <button type="button" className="sw" aria-pressed={on} aria-label={label} disabled={disabled} onClick={() => onChange(!on)} />
+      <span className="sw-s">{sub}</span>
+    </div>
+  );
+}
+
+/** The state of one optional model, live. */
+const useModel = (id: ModelId) => useSyncExternalStore(subscribeModels, () => modelState(id), () => modelState(id));
+
+/** If the pilot downloaded a model before, load it again without asking. Never downloads. */
+function loadIfDownloaded(id: ModelId) {
+  if (modelState(id).status !== 'idle') return;
+  void isDownloaded(id).then((d) => { if (d) loadModel(id); });
+}
+
+/**
+ * One optional model: the download the pilot starts, its progress, and plain
+ * words when it fails. Downloads happen once and run on this device.
+ */
+function ModelRow({ id, fallback, children }: { id: ModelId; fallback: string; children?: ReactNode }) {
+  const m = useModel(id);
+  const info = MODEL_INFO[id];
+  const pct = m.progress === null ? null : Math.round(m.progress * 100);
+  return (
+    <div className={`model ${m.status}`}>
+      {m.status === 'idle' && (
+        <div className="cta">
+          <button type="button" className="btn sm" onClick={() => loadModel(id)}>Download {info.name}</button>
+          <span className="hint">{info.mb} MB, once. It runs on this device and nothing you say or hear is sent anywhere.</span>
+        </div>
+      )}
+      {m.status === 'loading' && (
+        <div className="model-progress" role="progressbar" aria-label={`Downloading ${info.name}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct ?? undefined} aria-valuetext={pct === null ? 'Starting' : `${pct} percent`}>
+          <span className="bar" aria-hidden="true"><i style={{ width: `${pct ?? 4}%` }} /></span>
+          <span className="hint">{pct === null ? `Getting ${info.name} ready` : pct === 100 ? `Loading ${info.name}` : `Downloading ${info.name}, ${pct} percent`}</span>
+        </div>
+      )}
+      {m.status === 'error' && (
+        <div className="cta">
+          <span className="hint err">{info.name} could not load: {m.error ?? 'unknown problem'}. {fallback}</span>
+          <button type="button" className="btn quiet sm" onClick={() => loadModel(id)}>Try again</button>
+        </div>
+      )}
+      {m.status === 'ready' && children}
+    </div>
+  );
+}
+
+/** Sound on or off, listen first, squelch, who reads and how fast, and speaking your calls. Saved on this device. */
+function SoundSettings({ prefs, setPrefs }: { prefs: RadioPrefs; setPrefs: (p: RadioPrefs) => void }) {
+  const [voices, setVoices] = useState(deviceVoices);
+  // Some browsers hand the voice list over late, or only after it is asked for once.
+  useEffect(() => onVoicesChanged(() => setVoices(deviceVoices())), []);
+  const kokoro = useModel('kokoro');
+  const noVoice = (!canSpeak() || voices.length === 0) && kokoro.status !== 'ready';
+  const set = (p: Partial<RadioPrefs>) => setPrefs({ ...prefs, ...p });
+  const chooseEngine = (engine: RadioPrefs['engine']) => {
+    set({ engine });
+    if (engine === 'kokoro') loadIfDownloaded('kokoro');
+  };
+  const sample = () => void speak(`${FIELD.facility} Tower, Cessna 2XY, runway 24, cleared for takeoff, altimeter 30.08.`, prefs);
+  const canSample = prefs.sound && (prefs.engine === 'kokoro' ? kokoro.status === 'ready' : !noVoice);
+  return (
+    <div className="sound-panel" id="sound-panel" role="group" aria-label="Sound settings">
+      <p className="hint lead">Sound is optional. The words are always on the page, and you type every call. Anything downloaded here runs on this device and is kept for next time.</p>
+      <Switch label="Sound" sub="A voice reads the controller and the ATIS. Off until you turn it on." on={prefs.sound} onChange={(v) => set({ sound: v })} />
+      <Switch label="Listen first" sub={prefs.sound ? 'The words wait behind a button until you ask, so you copy by ear.' : 'Turn sound on first.'} on={prefs.listenFirst} disabled={!prefs.sound} onChange={(v) => set({ listenFirst: v })} />
+      <Switch label="Radio squelch" sub="A short burst of static when the controller keys up and lets go." on={prefs.radio} disabled={!prefs.sound} onChange={(v) => set({ radio: v })} />
+
+      <div className={`sound-who ${prefs.sound ? '' : 'off'}`}>
+        <span className="sw-l" id="voice-label">Voice</span>
+        <div className="seg" role="group" aria-labelledby="voice-label">
+          <button type="button" aria-pressed={prefs.engine === 'device'} disabled={!prefs.sound} onClick={() => chooseEngine('device')}>Your device's voice</button>
+          <button type="button" aria-pressed={prefs.engine === 'kokoro'} disabled={!prefs.sound} onClick={() => chooseEngine('kokoro')}>Kokoro ({MODEL_INFO.kokoro.mb} MB download, once)</button>
+        </div>
+        {prefs.engine === 'device' && (noVoice
+          ? <p className="hint">This device has no built-in voice, so the controller stays in writing. Kokoro is a voice you can download instead.</p>
+          : (
+            <Field label="Which voice">
+              <select value={prefs.voice ?? ''} disabled={!prefs.sound} onChange={(ev) => set({ voice: ev.target.value || null })}>
+                <option value="">Device default</option>
+                {voices.map((v) => <option key={v.name} value={v.name}>{v.name}</option>)}
+              </select>
+            </Field>
+          ))}
+        {prefs.engine === 'kokoro' && prefs.sound && (
+          <ModelRow id="kokoro" fallback="Your device's voice reads instead.">
+            <Field label="Which voice">
+              <select value={prefs.kokoroVoice} onChange={(ev) => set({ kokoroVoice: ev.target.value })}>
+                {KOKORO_VOICES.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
+              </select>
+            </Field>
+          </ModelRow>
+        )}
+        <Field label="Pace" hint="Controllers run a little quick.">
+          <span className="pace">
+            <input type="range" min={0.9} max={1.5} step={0.05} value={prefs.rate} disabled={!prefs.sound} aria-label="Pace" aria-valuetext={`${prefs.rate.toFixed(2)} times normal`} onChange={(ev) => set({ rate: Number(ev.target.value) })} />
+            <b className="mono">{prefs.rate.toFixed(2)}</b>
+          </span>
+        </Field>
+        <div className="cta">
+          <button type="button" className="btn sm" disabled={!canSample} onClick={sample}>Hear a sample</button>
+        </div>
+      </div>
+
+      <Switch
+        label="Speak your calls"
+        sub={canRecord()
+          ? 'Hold a button and say your call. The words land in the box for you to check before you transmit. Typing always works.'
+          : 'This browser has no microphone access. Typing works the same.'}
+        on={prefs.speechInput}
+        disabled={!canRecord()}
+        onChange={(v) => { set({ speechInput: v }); if (v) loadIfDownloaded('moonshine'); }}
+      />
+      {prefs.speechInput && canRecord() && (
+        <ModelRow id="moonshine" fallback="Keep typing your calls.">
+          <p className="hint">Moonshine is ready. Hold the talk button beside Transmit and say your call.</p>
+        </ModelRow>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Hold to talk: the microphone while the button is held, then the words into
+ * the call box for the pilot to check. Nothing is transmitted by itself.
+ * Pointer: down starts, up stops. Keyboard: Space or Enter starts and stops.
+ */
+function HoldToTalk({ onText }: { onText: (text: string) => void }) {
+  const [state, setState] = useState<'idle' | 'listening' | 'reading' | 'error'>('idle');
+  const [error, setError] = useState<string | null>(null);
+  const rec = useRef<Awaited<ReturnType<typeof startRecording>> | null>(null);
+  const starting = useRef<Promise<void> | null>(null);
+  useEffect(() => () => rec.current?.cancel(), []);
+  const begin = () => {
+    if (state !== 'idle' && state !== 'error') return;
+    setState('listening');
+    setError(null);
+    starting.current = startRecording().then((r) => { rec.current = r; }).catch((e: unknown) => {
+      rec.current = null;
+      setState('error');
+      setError(/denied|permission|NotAllowed/i.test(String(e)) ? 'The microphone was not allowed. Type your call instead.' : 'The microphone could not start. Type your call instead.');
+    });
+  };
+  const end = async () => {
+    if (state !== 'listening') return;
+    await starting.current;
+    const r = rec.current;
+    rec.current = null;
+    if (!r) return;
+    setState('reading');
+    try {
+      const text = (await transcribe(await r.stop())).trim();
+      if (text) onText(text);
+      setState('idle');
+    } catch {
+      setState('error');
+      setError('Could not read what you said. Type your call instead.');
+    }
+  };
+  const live = state === 'listening' ? 'Listening' : state === 'reading' ? 'Reading what you said' : state === 'error' ? error : null;
+  return (
+    <span className="talk">
+      <button
+        type="button"
+        className={`btn sm talk-btn ${state}`}
+        aria-pressed={state === 'listening'}
+        disabled={state === 'reading'}
+        onPointerDown={(ev) => { if (ev.button === 0) { ev.preventDefault(); begin(); } }}
+        onPointerUp={() => void end()}
+        onPointerCancel={() => void end()}
+        onPointerLeave={() => void end()}
+        onKeyDown={(ev) => {
+          if (ev.repeat || (ev.key !== ' ' && ev.key !== 'Enter')) return;
+          ev.preventDefault();
+          if (state === 'listening') void end();
+          else begin();
+        }}
+        onContextMenu={(ev) => ev.preventDefault()}
+      >
+        <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><rect x="7" y="2.5" width="6" height="9" rx="3" /><path d="M4.5 9.5a5.5 5.5 0 0 0 11 0M10 15v3M7 18h6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
+        Hold to talk
+      </button>
+      <span className={`hint ${state === 'error' ? 'err' : ''}`} role="status">{live}</span>
+    </span>
+  );
+}
+
+/** Speaks on request and remembers which line is playing. Stops when the owner unmounts. */
+function useSpeaker(prefs: RadioPrefs) {
+  const [playing, setPlaying] = useState<string | null>(null);
+  const token = useRef(0);
+  const say = useCallback((id: string, text: string) => {
+    const t = ++token.current;
+    setPlaying(id);
+    void speak(text, prefs).then(() => { if (token.current === t) setPlaying(null); });
+  }, [prefs]);
+  useEffect(() => () => { token.current++; stopSpeaking(); }, []);
+  return { playing, say };
+}
+
+/** A line heard on the frequency but not yet read: a trace of the transmission, and the way to the words. */
+function HeardLine({ text, playing, onShow }: { text: string; playing: boolean; onShow: () => void }) {
+  // Bar heights follow the text, so the same transmission always draws the same trace.
+  const n = Math.min(40, Math.max(14, Math.round(text.length / 4)));
+  const bars = Array.from({ length: n }, (_, i) => 3 + ((text.charCodeAt(i % text.length) * 7 + i * 13) % 13));
+  return (
+    <div className={`heard ${playing ? 'on' : ''}`}>
+      <svg viewBox={`0 0 ${n * 5} 20`} height="20" width={n * 5} aria-hidden="true" focusable="false">
+        {bars.map((h, i) => <rect key={i} x={i * 5} y={10 - h / 2} width="3" height={h} rx="1.5" />)}
+      </svg>
+      <span className="vh">The controller's words are hidden until you ask.</span>
+      <button type="button" className="btn sm" onClick={onShow}>Show the words</button>
+    </div>
+  );
+}
+
+/**
+ * One transmission on the frequency: who said it, then the words. A controller
+ * line can carry a play control and, under listen first, hide its words behind
+ * a trace until the pilot asks for them.
+ */
+function Xmit({ who, kind, children, play, playLabel, playing, hidden, onShow }: { who: string; kind: 'atc' | 'pilot' | 'model'; children: ReactNode; play?: () => void; playLabel?: string; playing?: boolean; hidden?: boolean; onShow?: () => void }) {
   return (
     <div className={`xmit ${kind}`}>
-      <span className="who">{who}</span>
-      <p className="say">{children}</p>
+      <span className="who">
+        {who}
+        {play && (
+          <button type="button" className={`play ${playing ? 'on' : ''}`} aria-label={playLabel} onClick={play}>
+            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M6 4.5v11l9-5.5z" /></svg>
+          </button>
+        )}
+      </span>
+      {hidden && onShow
+        ? <HeardLine text={typeof children === 'string' ? children : who} playing={Boolean(playing)} onShow={onShow} />
+        : <p className="say">{children}</p>}
     </div>
   );
 }
@@ -277,9 +559,15 @@ function Readback({ r, e }: { r: CallResult; e: Transmit }) {
   );
 }
 
-/** The text box and the Transmit button. Enter transmits, Shift+Enter starts a new line. */
-function CallBox({ e, retry, onTransmit }: { e: Transmit; retry: boolean; onTransmit: (text: string) => void }) {
+/**
+ * The text box and the Transmit button. Enter transmits, Shift+Enter starts a
+ * new line. With speech input on and Moonshine ready, a hold-to-talk button
+ * puts what the pilot said into the box; they still read it and transmit.
+ */
+function CallBox({ e, retry, prefs, onTransmit }: { e: Transmit; retry: boolean; prefs: RadioPrefs; onTransmit: (text: string) => void }) {
   const [draft, setDraft] = useState('');
+  const moonshine = useModel('moonshine');
+  const talk = prefs.speechInput && moonshine.status === 'ready' && canRecord();
   const send = () => {
     const t = draft.trim();
     if (t) onTransmit(t);
@@ -304,7 +592,8 @@ function CallBox({ e, retry, onTransmit }: { e: Transmit; retry: boolean; onTran
       />
       <div className="cta">
         <button type="submit" className="btn primary" disabled={!draft.trim()}>Transmit</button>
-        <span className="hint">Type it the way you would say it. Enter transmits.</span>
+        {talk && <HoldToTalk onText={(t) => setDraft((d) => (d.trim() ? `${d.trim()} ${t}` : t))} />}
+        <span className="hint">{talk ? 'Type it, or hold to talk and check the words. Enter transmits.' : 'Type it the way you would say it. Enter transmits.'}</span>
       </div>
     </form>
   );
@@ -312,24 +601,42 @@ function CallBox({ e, retry, onTransmit }: { e: Transmit; retry: boolean; onTran
 
 // ---------- one event of the flight ----------
 
-function EventView({ flight, e, answers, setAnswers }: { flight: RadioFlight; e: RadioEvent; answers: RadioAnswers; setAnswers: (f: (a: RadioAnswers) => RadioAnswers) => void }) {
-  if (e.kind === 'atis') return <AtisView e={e} flight={flight} answers={answers} setAnswers={setAnswers} />;
+type Sound = { prefs: RadioPrefs; setPrefs: (p: RadioPrefs) => void };
+
+function EventView({ flight, e, answers, setAnswers, prefs, setPrefs }: { flight: RadioFlight; e: RadioEvent; answers: RadioAnswers; setAnswers: (f: (a: RadioAnswers) => RadioAnswers) => void } & Sound) {
+  if (e.kind === 'atis') return <AtisView e={e} flight={flight} answers={answers} setAnswers={setAnswers} prefs={prefs} setPrefs={setPrefs} />;
   if (e.kind === 'decide') return <DecideView e={e} answers={answers} setAnswers={setAnswers} />;
-  return <TransmitView e={e} flight={flight} answers={answers} setAnswers={setAnswers} />;
+  return <TransmitView e={e} flight={flight} answers={answers} setAnswers={setAnswers} prefs={prefs} setPrefs={setPrefs} />;
 }
 
-function AtisView({ e, flight, answers, setAnswers }: { e: AtisEvent; flight: RadioFlight; answers: RadioAnswers; setAnswers: (f: (a: RadioAnswers) => RadioAnswers) => void }) {
+/** The top of the tape: the frequency, and the sound settings beside it. */
+function TapeHead({ freq, prefs, setPrefs }: { freq: Freq } & Sound) {
+  return (
+    <div className="tape-head">
+      <FreqPlate freq={freq} />
+      <SoundControl prefs={prefs} setPrefs={setPrefs} />
+    </div>
+  );
+}
+
+function AtisView({ e, flight, answers, setAnswers, prefs, setPrefs }: { e: AtisEvent; flight: RadioFlight; answers: RadioAnswers; setAnswers: (f: (a: RadioAnswers) => RadioAnswers) => void } & Sound) {
   const checked = answers.copyChecked;
   const set = (id: string, v: string) => setAnswers((a) => ({ ...a, copy: { ...a.copy, [id]: v } }));
   const filled = e.fields.every((f) => (answers.copy[f.id] ?? '').trim() !== '');
+  const { playing, say } = useSpeaker(prefs);
+  const [shown, setShown] = useState(false);
+  // Listen first: the broadcast stays hidden until asked for, or until the copy is checked.
+  const hidden = prefs.sound && prefs.listenFirst && !shown && !checked;
+  useEffect(() => { if (prefs.sound) say('atis', e.atis.text); }, [e.id]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <section className="step">
       <h2>{e.title}</h2>
       <Voice>{e.situation}</Voice>
       <div className="tape">
-        <FreqPlate freq={e.freq} />
-        <Xmit who="Recorded, repeating" kind="atc">{e.atis.text}</Xmit>
+        <TapeHead freq={e.freq} prefs={prefs} setPrefs={setPrefs} />
+        <Xmit who="Recorded, repeating" kind="atc" play={() => say('atis', e.atis.text)} playLabel="Play the ATIS" playing={playing === 'atis'} hidden={hidden} onShow={() => setShown(true)}>{e.atis.text}</Xmit>
       </div>
+      {hidden && <p className="hint">Fill the pad from what you heard. The words are one tap away if you need them.</p>}
       <div className="blanks copy-pad">
         {e.fields.map((f) => {
           const v = answers.copy[f.id] ?? '';
@@ -361,15 +668,29 @@ function AtisView({ e, flight, answers, setAnswers }: { e: AtisEvent; flight: Ra
   );
 }
 
-function TransmitView({ e, flight, answers, setAnswers }: { e: Transmit; flight: RadioFlight; answers: RadioAnswers; setAnswers: (f: (a: RadioAnswers) => RadioAnswers) => void }) {
+function TransmitView({ e, flight, answers, setAnswers, prefs, setPrefs }: { e: Transmit; flight: RadioFlight; answers: RadioAnswers; setAnswers: (f: (a: RadioAnswers) => RadioAnswers) => void } & Sound) {
   const tries = answers.calls[e.id] ?? [];
   const state = transmitState(flight, e, tries);
   const results = tries.map((t) => gradeTry(flight, e, t));
   const lastResult = results[results.length - 1];
   const transmit = (text: string) => setAnswers((a) => ({ ...a, calls: { ...a.calls, [e.id]: [...(a.calls[e.id] ?? []), text] } }));
+  const { playing, say } = useSpeaker(prefs);
+  const [shown, setShown] = useState(false);
+  // Listen first: the controller's words wait until asked for. Once the pilot has
+  // transmitted they always show, so the readback check makes sense.
+  const hidden = prefs.sound && prefs.listenFirst && !shown && tries.length === 0;
+  // With sound on, the controller speaks when the step opens and when they correct a call.
+  // Both follow a click (Continue, Transmit), so the browser allows the audio.
+  useEffect(() => { if (prefs.sound && e.atc) say('atc', e.atc); }, [e.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (prefs.sound && state === 'retry' && lastResult?.fix) say(`fix-${tries.length}`, lastResult.fix);
+  }, [tries.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  const fixLine = (fix: string, n: number) => (
+    <Xmit who={e.freq.name} kind="atc" play={() => say(`fix-${n}`, fix)} playLabel="Play the controller" playing={playing === `fix-${n}`}>{fix}</Xmit>
+  );
   // What the controller says back to the latest call, announced as it arrives.
   const reply = state === 'retry' && lastResult?.fix
-    ? <Xmit who={e.freq.name} kind="atc">{lastResult.fix}</Xmit>
+    ? fixLine(lastResult.fix, tries.length)
     : state === 'done'
       ? <Xmit who="A good call" kind="model">{e.model}</Xmit>
       : null;
@@ -378,17 +699,17 @@ function TransmitView({ e, flight, answers, setAnswers }: { e: Transmit; flight:
       <h2>{e.title}</h2>
       <Voice>{e.situation}</Voice>
       <div className="tape">
-        <FreqPlate freq={e.freq} />
-        {e.atc && <Xmit who={e.freq.name} kind="atc">{e.atc}</Xmit>}
+        <TapeHead freq={e.freq} prefs={prefs} setPrefs={setPrefs} />
+        {e.atc && <Xmit who={e.freq.name} kind="atc" play={() => say('atc', e.atc!)} playLabel="Play the controller" playing={playing === 'atc'} hidden={hidden} onShow={() => setShown(true)}>{e.atc}</Xmit>}
         {tries.map((t, i) => (
           <Fragment key={i}>
             <Xmit who={flight.callsign.sayFull} kind="pilot">{t}</Xmit>
             <Readback r={results[i]} e={e} />
-            {i < tries.length - 1 && results[i].fix && <Xmit who={e.freq.name} kind="atc">{results[i].fix}</Xmit>}
+            {i < tries.length - 1 && results[i].fix && fixLine(results[i].fix!, i + 1)}
           </Fragment>
         ))}
         <div aria-live="polite">{reply}</div>
-        {state !== 'done' && <CallBox key={tries.length} e={e} retry={state === 'retry'} onTransmit={transmit} />}
+        {state !== 'done' && <CallBox key={tries.length} e={e} retry={state === 'retry'} prefs={prefs} onTransmit={transmit} />}
       </div>
       {state === 'open' && <p className="hint">Grades stay hidden until you transmit. Once you have, the controller answers and you can try again once if they ask.</p>}
       {state === 'retry' && <p className="hint">Try {tries.length + 1} of {MAX_TRIES}. The first try is the one that counts in the debrief.</p>}
@@ -435,6 +756,8 @@ function Kneeboard({ flight, e, answers }: { flight: RadioFlight; e: RadioEvent;
   const phone = usePhone();
   const [open, setOpen] = useState(false);
   const atisEvent = flight.events.find((x): x is AtisEvent => x.kind === 'atis');
+  // The copied ATIS, and with it the broadcast's words, only appear once the copy
+  // pad is checked. So under listen first the kneeboard never gives the words away.
   const copied = answers.copyChecked && atisEvent && e.kind !== 'atis';
   const focus = focusFor(e);
   // On a phone the kneeboard opens itself when the diagram matters: a hold short point or a runway crossing.

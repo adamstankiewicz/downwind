@@ -1388,6 +1388,67 @@ dl.kv dd { margin: 0; }
 .diagram { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 8px 8px 10px; gap: 6px; }
 .diagram svg { display: block; width: 100%; height: auto; font-family: var(--label); font-stretch: 87.5%; letter-spacing: 0.01em; font-variant-numeric: tabular-nums; }
 .diagram figcaption { padding: 0 6px; }
+/* sound: the settings button sits on the frequency row; the panel opens under it.
+   The controller's play control is a sky hoop in the "who" line. Under listen
+   first the words give way to a trace of the transmission, sky bars that hum
+   while it plays, with the words one tap away. The switch thumb is the hoop,
+   sock when on. Nothing here imitates a radio's face. */
+.tape-head { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; justify-self: stretch; }
+.sound-btn { display: inline-flex; align-items: center; gap: 7px; }
+.sound-btn svg { width: 18px; height: 18px; }
+.sound-btn.on { color: var(--sky-ink); }
+.sound-btn[aria-expanded="true"] { color: var(--ink); background: var(--panel-2); }
+.sound-panel { flex: 1 1 100%; display: grid; gap: 16px; max-width: 64ch; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px 16px; }
+.sound-panel .hint.lead { line-height: 1.45; }
+.sw-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 14px; align-items: center; }
+.sw-l { font-weight: 600; }
+.sw-s { grid-column: 1; font-size: 0.85rem; line-height: 1.4; color: var(--ink-2); }
+.sw-row.off .sw-l, .sw-row.off .sw-s, .sound-who.off > .sw-l { opacity: 0.5; }
+.sw { position: relative; width: 50px; height: 30px; padding: 0; border: 2px solid var(--ink-2); border-radius: var(--r-full); background: var(--panel); flex: none; }
+.sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; border: 2.5px solid var(--ink-2); box-sizing: border-box; background: var(--panel); }
+.sw[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); }
+.sw[aria-pressed="true"]::after { left: 23px; border-color: var(--sock); background: var(--sock); }
+.sw:disabled { opacity: 0.4; cursor: default; }
+@media (prefers-reduced-motion: no-preference) { .sw::after { transition: left 140ms ease-out; } }
+.sound-who { display: grid; gap: 12px; }
+.sound-who .seg button { min-height: 40px; padding: 6px 14px; font-size: 0.9rem; text-align: left; }
+.sound-who .seg button:disabled { opacity: 0.5; cursor: default; }
+@media (max-width: 559px) {
+  .sound-who .seg { flex-direction: column; border-radius: var(--r); justify-self: stretch; }
+  .sound-who .seg button { border-right: 0; border-bottom: 1px solid var(--line); }
+  .sound-who .seg button:last-child { border-bottom: 0; }
+}
+.sound-panel .field input[type="range"] { min-height: 0; padding: 0; border: 0; background: none; accent-color: var(--ink); }
+.pace { display: grid; grid-template-columns: minmax(0, 1fr) 4ch; gap: 12px; align-items: center; }
+.pace b { font-size: 0.9rem; text-align: right; }
+.model { display: grid; gap: 8px; }
+.model-progress { display: grid; gap: 6px; }
+.model-progress .bar { display: block; height: 8px; border-radius: var(--r-full); background: var(--panel-2); overflow: hidden; }
+.model-progress .bar i { display: block; height: 100%; background: var(--sky); border-radius: var(--r-full); }
+@media (prefers-reduced-motion: no-preference) { .model-progress .bar i { transition: width 300ms ease-out; } }
+.hint.err { color: var(--unsafe); }
+/* the controller's line */
+.xmit .who { display: flex; align-items: center; gap: 10px; min-height: 28px; }
+.play { width: 28px; height: 28px; padding: 0; border-radius: 50%; border: 1.5px solid var(--sky); color: var(--sky-ink); background: var(--panel); display: inline-grid; place-items: center; flex: none; }
+.play svg { width: 14px; height: 14px; fill: currentColor; }
+.play:hover { background: var(--sky-tint); }
+.play.on { background: var(--sky); border-color: var(--sky); color: var(--on-sky); }
+.heard { display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; min-height: 36px; padding: 2px 0; }
+.heard svg { display: block; height: 20px; max-width: 100%; color: var(--sky); }
+.heard rect { fill: currentColor; transform-box: fill-box; transform-origin: center; }
+@keyframes hum { from { transform: scaleY(0.55); } to { transform: scaleY(1.25); } }
+@media (prefers-reduced-motion: no-preference) {
+  .heard.on rect { animation: hum 700ms ease-in-out infinite alternate; }
+  .heard.on rect:nth-child(3n) { animation-duration: 900ms; }
+  .heard.on rect:nth-child(3n + 1) { animation-delay: -300ms; }
+}
+/* hold to talk, beside Transmit */
+.talk { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.talk-btn { display: inline-flex; align-items: center; gap: 6px; touch-action: none; user-select: none; -webkit-user-select: none; }
+.talk-btn svg { width: 16px; height: 16px; fill: currentColor; }
+.talk-btn.listening { background: var(--sock); border-color: var(--sock); color: var(--on-sock); }
+.talk-btn.reading { opacity: 0.7; }
+.talk [role="status"]:empty { display: none; }
 /* debrief */
 .calls .xmit { justify-self: stretch; }
 .calls .rb-list { padding: 2px 0; }
