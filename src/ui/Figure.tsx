@@ -4,12 +4,14 @@
 // figure is practice material built for the lesson, and says so.
 
 import type { Figure as FigureModel, PerfChartId, RecordColumn, RecordRow, RecordsVariant } from '../course/types';
-import { practiceRegion } from '../chart/practiceRegion';
+import { practiceRegion, withVolumes } from '../chart/practiceRegion';
 import { readTable, type Performance, type PerfTable } from '../lib/perf';
 import type { NavLog } from '../lib/nav';
 import { parseTaf } from '../lib/taf';
 import { norm } from '../lib/wind';
+import { profileAlong } from '../scenarios/airspacePlan';
 import { RawReport } from './MetarBlock';
+import { ProfileFigure } from './ProfileFigure';
 import { SectionalChart } from './SectionalChart';
 import { CarbIceFigure, ElectricalFigure, PanelFigure } from './SystemsFigures';
 import { TafTimeline } from './TafTimeline';
@@ -43,13 +45,28 @@ export function Figure({ figure, practiceField }: { figure: FigureModel; practic
   if (figure.kind === 'chart') {
     const place = (id: string) => practiceRegion.checkpoints.find((c) => c.id === id)?.name ?? id;
     const legs = figure.route && figure.route.length > 1 ? `${figure.route.map(place).join(' to ')}. ` : '';
+    const extra = figure.extra ?? [];
+    const tfr = extra.some((v) => v.cls === 'TFR');
     return (
       <figure className="fig">
         <div className="fig-chart">
-          <SectionalChart route={figure.route} highlight={figure.highlight} focus={figure.focus} marker={figure.marker} maxHeight={520} />
+          <SectionalChart region={withVolumes(practiceRegion, extra)} route={figure.route} highlight={figure.highlight} focus={figure.focus} marker={figure.marker} maxHeight={520} />
         </div>
         <figcaption>
-          The practice sectional, a made-up stretch of country around KXYZ. {legs}Blue is towered and the airspace around towers; the orange here stands for the chart's magenta: untowered fields, Class C and the Class E edge. Not a real chart.
+          The practice sectional, a made-up stretch of country around KXYZ. {legs}Blue is towered and the airspace around towers; the orange here stands for the chart's magenta: untowered fields, Class C and the Class E edge.{tfr ? ' The TFR is drawn from the NOTAM; TFRs are not printed on sectionals.' : extra.length ? ` ${extra.map((v) => v.name).join(', ')}: drawn for this lesson, not printed on the chart.` : ''} Not a real chart.
+        </figcaption>
+      </figure>
+    );
+  }
+  if (figure.kind === 'profile') {
+    const profile = profileAlong(withVolumes(practiceRegion, figure.extra), figure);
+    const alt = figure.airplaneAtNm !== undefined ? ' The airplane sits where you are now.' : '';
+    const climbs = figure.legs.some((l) => l.altMsl !== figure.startAltMsl) || figure.legs.some((l, i) => i > 0 && l.altMsl !== figure.legs[i - 1].altMsl);
+    return (
+      <figure className="fig">
+        <ProfileFigure profile={profile} marks={figure.marks} airplaneAtNm={figure.airplaneAtNm} />
+        <figcaption>
+          The practice sectional's airspace seen from the side along your path, the way an instructor sketches it: distance across, altitude up, the ground shaded. Each box is a floor and ceiling over the path, labeled in hundreds of feet as the chart prints them. The bold line is your planned altitude{climbs ? ', climbing or descending between legs' : ''}.{alt}{figure.extra?.length ? ' Volumes from the NOTAM are drawn too.' : ''} Not a real chart.
         </figcaption>
       </figure>
     );

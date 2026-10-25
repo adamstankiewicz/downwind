@@ -979,3 +979,7 @@ dl.kv dd { margin: 0; }
   .gauge-label { font-size: 0.75rem; }
   .gauge-label .muted { font-size: 0.7rem; }
 }
+/* side view of the airspace along a path */
+.profile { width: 100%; min-width: 0; border-radius: var(--r); overflow: hidden; border: 1px solid var(--line); background: var(--panel); }
+.profile svg { display: block; width: 100%; height: auto; font-family: var(--label); font-stretch: 87.5%; letter-spacing: 0.01em; }
+.profile svg text { font-variant-numeric: tabular-nums; }

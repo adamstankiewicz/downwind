@@ -3,7 +3,7 @@
 //   node e2e/smoke.mjs [http://localhost:4173]
 // Weather and airport requests are stubbed, so it runs offline and exercises
 // both the live path and the practice-weather fallback. Covers onboarding,
-// the course home, lessons 1.1, 2.1, 5.1, 6.1, 7.1 and 8.1 end to end, the start
+// the course home, lessons 1.1, 2.1, 4.1, 5.1, 6.1, 7.1 and 8.1 end to end, the start
 // of 2.2, the daily flight through filing, and every rail screen, at desktop
 // and phone widths.
 import { createRequire } from 'node:module';
@@ -425,6 +425,43 @@ async function run(viewport, live) {
   check(/Class D/.test(lookup) && /Over Practice field at 2,500 ft/.test(lookup), `${label} lookup over KXYZ at 2,500 ft says Class D`);
   check(/Two-way radio communication established with the tower/.test(lookup) && /3 SM/.test(lookup), `${label} lookup lists the Class D requirement and 3 SM`);
   await noHScroll('tools');
+
+  // Lesson 4.1, end to end: the practice sectional, a data block, and a cruising altitude.
+  await rail('Course').click();
+  await page.getByRole('heading', { name: 'Ground school', exact: true }).waitFor();
+  await page.locator('.module summary', { hasText: 'Airspace and the chart' }).click();
+  await page.getByRole('button', { name: /4\.1 Reading the chart around your field/ }).click();
+  await page.getByRole('heading', { name: 'A chart is a list of facts' }).waitFor();
+  check(/practice sectional/i.test(await main()) && (await page.locator('.sectional svg').count()) === 1, `${label} 4.1 brief shows the practice sectional`);
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'KXYZ, taken apart' }).waitFor();
+  body = await main();
+  check(/3,100 ft MSL/.test(body) && /2,500 ft above the field/.test(body), `${label} 4.1 example decodes the Class D ceiling from the engine`);
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'Your turn', exact: true }).waitFor();
+  await page.getByLabel(/^Field elevation/).fill('820');
+  await page.getByRole('button', { name: '122.90', exact: true }).click();
+  await page.getByLabel(/^Pattern height/).fill('1000');
+  await page.getByLabel(/^Maximum elevation figure/).fill('2000');
+  await page.getByRole('button', { name: 'Class E', exact: true }).click();
+  await btn('Check my numbers').click();
+  body = await main();
+  check((body.match(/Right\./g) ?? []).length === 5 && !/Not quite/.test(body), `${label} 4.1 turn: all five readings right`);
+  await noHScroll('lesson 4.1 turn');
+  await btn('Continue').click();
+  await page.getByRole('heading', { name: 'How high to Long Lake?' }).waitFor();
+  await page.locator('button.choice', { hasText: '4,500 ft' }).click();
+  await btn('Commit').click();
+  body = await main();
+  check(/Best call/.test(body) && /legal cruising altitude/.test(body), `${label} 4.1 decision graded best with the engine's reason`);
+  await btn('Debrief').click();
+  await page.getByRole('heading', { name: 'Debrief', exact: true }).waitFor();
+  body = await main();
+  check(/5 of 5/.test(body) && /PA\.I\.E/.test(body) && /14 CFR 91\.159/.test(body), `${label} 4.1 debrief counts blanks and cites the ACS and 91.159`);
+  const stored41 = await page.evaluate(() => JSON.parse(localStorage.getItem('downwind.course.v1') ?? '{}'));
+  check(stored41['4.1']?.lastGrade === 'best', `${label} lesson 4.1 recorded in course progress`);
+  await noHScroll('lesson 4.1 debrief');
+  await page.getByRole('button', { name: 'Back to course', exact: true }).first().click();
 
   // Pilot
   await rail('Pilot').click();
