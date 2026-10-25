@@ -9,7 +9,6 @@ import {
   checkBlank, coachLevel, emptyAnswers, nextLesson, recordLesson, scoreLesson, visibleSteps,
   type CourseProgress, type LessonAnswers, type LessonResult,
 } from '../course/progress';
-import type { ChoiceId } from '../scenarios/goNoGo';
 import { GRADE_LABEL, Voice } from './common';
 import { Figure } from './Figure';
 import { Strip, type StripPoint } from './Strip';
@@ -207,7 +206,7 @@ function StepView({ step, level, answers, setAnswers, checked, onCheck, committe
   }
   const a = answers.decisions[step.id];
   const choice = a?.choice ?? null;
-  const setChoice = (id: ChoiceId) =>
+  const setChoice = (id: string) =>
     setAnswers((x) => ({ ...x, decisions: { ...x.decisions, [step.id]: { choice: id } } }));
   return (
     <section className="step">

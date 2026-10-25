@@ -13,7 +13,8 @@ function labelsInSource(): string[] {
       for (const s of m[1].matchAll(/'((?:[^'\\]|\\.)*)'/g)) out.add(s[1].replace(/\\'/g, "'"));
     }
   }
-  return [...out];
+  // `ref: 'msl' | 'agl'` is an altitude reference in the airspace data, not a citation.
+  return [...out].filter((l) => l !== 'msl' && l !== 'agl');
 }
 
 describe('reference resolver', () => {

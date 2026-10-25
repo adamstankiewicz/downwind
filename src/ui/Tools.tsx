@@ -1,17 +1,19 @@
 // Tools: what you reach for from inside a flight. The airplane and its weight
-// and balance, the current weather at your field, and the review deck.
+// and balance, the current weather at your field, the practice sectional, and
+// the review deck.
 
 import { useEffect, useRef, useState } from 'react';
 import type { AircraftProfile } from '../data/aircraft';
 import type { Airport } from '../data/airports';
 import { fetchWeather, sampleWeather, type WeatherBundle } from '../lib/weather';
 import { Airplane } from './Airplane';
+import { ChartTool } from './ChartTool';
 import { Icons, Notice } from './common';
 import { MetarLegend, RawReport } from './MetarBlock';
 import { Review } from './Review';
 import type { Loading } from './state';
 
-export type Tool = 'airplane' | 'weather' | 'review';
+export type Tool = 'airplane' | 'weather' | 'chart' | 'review';
 
 export function Tools({ tool, setTool, airport, aircraft, setAircraft, loading, setLoading, epoch, onSetup }: {
   tool: Tool;
@@ -34,7 +36,7 @@ export function Tools({ tool, setTool, airport, aircraft, setAircraft, loading, 
           </div>
         </div>
         <div className="seg tabs" role="tablist" aria-label="Tools">
-          {([['airplane', 'Airplane'], ['weather', 'Weather now'], ['review', 'Review deck']] as [Tool, string][]).map(([id, label]) => (
+          {([['airplane', 'Airplane'], ['weather', 'Weather now'], ['chart', 'Chart'], ['review', 'Review deck']] as [Tool, string][]).map(([id, label]) => (
             <button key={id} type="button" role="tab" aria-selected={tool === id} aria-pressed={tool === id} onClick={() => setTool(id)}>{label}</button>
           ))}
         </div>
@@ -47,6 +49,7 @@ export function Tools({ tool, setTool, airport, aircraft, setAircraft, loading, 
           <button type="button" className="btn primary" onClick={onSetup}>Set home airport</button>
         </div>
       ))}
+      {tool === 'chart' && <ChartTool aircraft={aircraft} />}
       {tool === 'review' && <Review key={epoch} />}
     </>
   );

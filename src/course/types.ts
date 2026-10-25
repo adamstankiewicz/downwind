@@ -9,7 +9,9 @@
 import type { Airport } from '../data/airports';
 import type { AircraftProfile } from '../data/aircraft';
 import type { PersonalMinimums } from '../data/pilot';
-import type { Brief, ChoiceId, Grade } from '../scenarios/goNoGo';
+import type { Brief, Grade } from '../scenarios/goNoGo';
+import type { LatLon, NavLog } from '../lib/nav';
+import type { Performance } from '../lib/perf';
 
 export interface LessonContext {
   /** The pilot's home field, or the practice field when it can't be used. */
@@ -30,7 +32,20 @@ export interface Coach {
 export type Figure =
   | { kind: 'metar'; raw: string; /** Tokens to underline in the raw report. */ marks?: string[] }
   | { kind: 'taf'; raw: string; departure: Date; returnAt: Date }
-  | { kind: 'wind'; airport: Airport; windMag: number; speedKt: number; gustKt: number | null; runwayId: string };
+  | { kind: 'wind'; airport: Airport; windMag: number; speedKt: number; gustKt: number | null; runwayId: string }
+  /**
+   * The practice sectional (chart/practiceRegion.ts). `route` and `highlight`
+   * name airports, checkpoints or airspace volumes by id; `focus` centers and
+   * zooms on one of them; `marker` drops an airplane at a position and altitude.
+   */
+  | { kind: 'chart'; route?: string[]; highlight?: string[]; focus?: { id: string; radiusNm: number }; marker?: { pos: LatLon; altMsl: number; label?: string } }
+  /** A POH-style performance chart with the four corners used for the reading marked. */
+  | { kind: 'perf'; chart: PerfChartId; performance: Performance; paFt: number; oatC: number; sample: boolean }
+  | { kind: 'navlog'; log: NavLog; altitudeMsl?: number }
+  /** Glide range from a height, with candidate fields by bearing and distance. */
+  | { kind: 'glide'; heightAglFt: number; rangeNm: number; windFromTrue?: number; windKt?: number; fields: { name: string; bearingTrue: number; distanceNm: number; reachable: boolean }[] };
+
+export type PerfChartId = 'takeoff-roll' | 'takeoff-50' | 'landing-roll' | 'landing-50' | 'climb';
 
 export interface WorkRow {
   label: string;
@@ -50,15 +65,22 @@ export interface Blank {
   explain: string;
 }
 
+/**
+ * A decision option id. Weather decisions use the go/no-go ids ('go',
+ * 'go-plan', 'delay', 'cancel'); other lessons name their own ('land-ahead',
+ * 'turn-back'). Grades always come from code, keyed by these ids.
+ */
+export type OptionId = string;
+
 export interface Option {
-  id: ChoiceId;
+  id: OptionId;
   label: string;
 }
 
 /** Shown only when an earlier decision went a certain way. */
 export interface Condition {
   step: string;
-  choices: ChoiceId[];
+  choices: OptionId[];
 }
 
 export type Step =
@@ -72,9 +94,9 @@ export type Step =
       situation: string;
       figure?: Figure;
       options: Option[];
-      grades: Record<ChoiceId, Grade>;
+      grades: Record<OptionId, Grade>;
       /** What happened next, for the option chosen. */
-      consequence: Record<ChoiceId, string>;
+      consequence: Record<OptionId, string>;
       /** The instructor's reasoning, shown in the debrief. */
       why: string;
       /** Engine brief behind the grades, when there is one. */
