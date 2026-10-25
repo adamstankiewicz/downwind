@@ -3,6 +3,7 @@
 // chart with the reading marked, a nav log, or the glide circle. Every lesson
 // figure is practice material built for the lesson, and says so.
 
+import { DEG_PER_DOT } from '../lib/vor';
 import type { AirportSign } from '../lib/airportOps';
 import type { Figure as FigureModel, PerfChartId, RecordColumn, RecordRow, RecordsVariant } from '../course/types';
 import { practiceRegion, withVolumes } from '../chart/practiceRegion';
@@ -130,6 +131,24 @@ export function Figure({ figure, practiceField }: { figure: FigureModel; practic
       <figure className="fig">
         <LoadFactorChart {...figure} />
         <figcaption>Stall speed rises with bank in a level turn: clean, and with the flaps down, against your approach speed. The dot is the bank in this step. {figure.sample ? 'Sample trainer speeds for teaching; use your POH.' : 'From your airplane\'s speeds.'}</figcaption>
+      </figure>
+    );
+  }
+  if (figure.kind === 'reports') {
+    return (
+      <figure className="fig">
+        {figure.reports.map((r, i) => (
+          <pre key={i} className="metar report" aria-label={`${r.label} raw text`}><span className="lbl">{r.label}</span>{r.raw}</pre>
+        ))}
+        <figcaption>{figure.caption}</figcaption>
+      </figure>
+    );
+  }
+  if (figure.kind === 'vor') {
+    return (
+      <figure className="fig">
+        <VorIndicator obs={figure.obs} needleDeg={figure.needleDeg} flag={figure.flag} ident={figure.ident} />
+        <figcaption>{figure.caption}</figcaption>
       </figure>
     );
   }
@@ -608,3 +627,33 @@ function LoadFactorChart({ bankDeg, vs0Kias, vs1Kias, approachKias }: { bankDeg:
   );
 }
 
+
+/** A VOR head: the OBS course at the top, the needle across five dots each side, and the flag. */
+function VorIndicator({ obs, needleDeg, flag, ident }: { obs: number; needleDeg: number; flag: 'TO' | 'FROM' | 'OFF'; ident: string }) {
+  const C = 100, R = 84, dot = 12;
+  const nx = C + (needleDeg / DEG_PER_DOT) * dot;
+  const card = Array.from({ length: 36 }, (_, i) => i * 10);
+  const label = (d: number) => (d === 0 ? 'N' : d === 90 ? 'E' : d === 180 ? 'S' : d === 270 ? 'W' : String(d / 10));
+  const course = String(obs || 360).padStart(3, '0');
+  return (
+    <svg className="vor-head" viewBox="0 0 200 220" role="img" aria-label={`VOR indicator. Course ${course} set on the OBS, ${flag === 'OFF' ? 'flag off' : `${flag} flag`}, needle ${Math.abs(needleDeg) < 1 ? 'centered' : `${Math.round(Math.abs(needleDeg) / DEG_PER_DOT)} dots ${needleDeg > 0 ? 'right' : 'left'}`}. Ident ${ident}.`}>
+      <circle cx={C} cy={C} r={R + 12} className="bezel" />
+      <circle cx={C} cy={C} r={R} className="face" />
+      <g transform={`rotate(${-obs} ${C} ${C})`}>
+        {card.map((d) => (
+          <g key={d} transform={`rotate(${d} ${C} ${C})`}>
+            <line x1={C} y1={C - R} x2={C} y2={C - R + (d % 30 === 0 ? 9 : 5)} className="tick" />
+            {d % 30 === 0 && <text x={C} y={C - R + 20} textAnchor="middle" className="card">{label(d)}</text>}
+          </g>
+        ))}
+      </g>
+      <path d={`M${C - 6},${C - R - 10} L${C + 6},${C - R - 10} L${C},${C - R - 2} Z`} className="index" />
+      {[-5, -4, -3, -2, -1, 1, 2, 3, 4, 5].map((i) => <circle key={i} cx={C + i * dot} cy={C} r={2.2} className="dot" />)}
+      <circle cx={C} cy={C} r={5} className="ring" />
+      <line x1={nx} y1={C - 46} x2={nx} y2={C + 46} className="needle" />
+      <rect x={C + 12} y={C + 14} width={32} height={15} rx={2} className={`flag ${flag.toLowerCase()}`} />
+      <text x={C + 28} y={C + 25} textAnchor="middle" className="flag-t">{flag}</text>
+      <text x={C} y={214} textAnchor="middle" className="course">OBS {course} · {ident}</text>
+    </svg>
+  );
+}

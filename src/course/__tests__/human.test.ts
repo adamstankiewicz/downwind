@@ -35,10 +35,10 @@ function copy(s: Step): string[] {
 }
 
 describe('module 8 is written', () => {
-  it('replaces the outline with four lessons', () => {
+  it('replaces the outline with five lessons', () => {
     const m = modules.find((x) => x.n === 8)!;
     expect(m.outline).toEqual([]);
-    expect(m.lessons.map((l) => l.id)).toEqual(['8.1', '8.2', '8.3', '8.4']);
+    expect(m.lessons.map((l) => l.id)).toEqual(['8.1', '8.2', '8.3', '8.4', '8.5']);
     expect(m.lessons.every((l) => l.module === 8)).toBe(true);
   });
 });

@@ -249,7 +249,7 @@ describe('module 5 teaches what it says', () => {
 
   it('is written and listed in the course', () => {
     const m = modules.find((x) => x.n === 5)!;
-    expect(m.lessons.map((l) => l.id)).toEqual(['5.1', '5.2', '5.3', '5.4', '5.5']);
+    expect(m.lessons.map((l) => l.id)).toEqual(['5.1', '5.2', '5.3', '5.4', '5.5', '5.6']);
     expect(m.outline).toEqual([]);
     for (const l of m.lessons) expect(l.acs.every((a) => /^PA\.[IVX]+\.[A-Z]$/.test(a))).toBe(true);
   });
