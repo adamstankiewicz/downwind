@@ -17,6 +17,7 @@ import type { Volume } from '../lib/airspace';
 import type { PlanLeg } from '../scenarios/airspacePlan';
 import type { Envelope, WbResult } from '../lib/wb';
 import type { AirportSign } from '../lib/airportOps';
+import type { RegionId } from '../chart/regions';
 
 export interface LessonContext {
   /** The pilot's home field, or the practice field when it can't be used. */
@@ -51,14 +52,14 @@ export type Figure =
    * zooms on one of them; `marker` drops an airplane at a position and altitude.
    * `extra` adds volumes that aren't printed on the chart, such as a TFR from a NOTAM.
    */
-  | { kind: 'chart'; route?: string[]; highlight?: string[]; focus?: { id: string; radiusNm: number }; marker?: { pos: LatLon; altMsl: number; label?: string }; extra?: Volume[] }
+  | { kind: 'chart'; /** Which practice sectional (chart/regions.ts); the first when missing. */ region?: RegionId; route?: string[]; highlight?: string[]; focus?: { id: string; radiusNm: number }; marker?: { pos: LatLon; altMsl: number; label?: string }; extra?: Volume[] }
   /**
    * The side view of a path across the practice sectional: ground, the planned
    * altitude, and the floors and ceilings overhead (scenarios/airspacePlan.ts,
    * profileAlong). `marks` label points along the path; `airplaneAtNm` puts the
    * airplane on it.
    */
-  | { kind: 'profile'; start: LatLon; startAltMsl: number; legs: PlanLeg[]; marks?: { atNm: number; label: string }[]; airplaneAtNm?: number; extra?: Volume[] }
+  | { kind: 'profile'; region?: RegionId; start: LatLon; startAltMsl: number; legs: PlanLeg[]; marks?: { atNm: number; label: string }[]; airplaneAtNm?: number; extra?: Volume[] }
   /** A POH-style performance chart with the four corners used for the reading marked. */
   | { kind: 'perf'; chart: PerfChartId; performance: Performance; paFt: number; oatC: number; sample: boolean }
   | { kind: 'navlog'; log: NavLog; altitudeMsl?: number }

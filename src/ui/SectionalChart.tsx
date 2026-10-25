@@ -159,7 +159,7 @@ export function SectionalChart({ region = practiceRegion, route = [], highlight 
   const roseBox: Box = { x: W - 70, y: 10, w: 60, h: 70 };
   const scaleNm = S > 24 ? 2 : S > 12 ? 5 : S > 3.2 ? 10 : 20;
   const scaleBox: Box = { x: W - nm(scaleNm) - 30, y: H - 34, w: nm(scaleNm) + 20, h: 26 };
-  const signText = 'Practice sectional. Not a real chart.';
+  const signText = region.id === 'practice' ? 'Practice sectional. Not a real chart.' : 'Practice sectional 2. Not a real chart.';
   const signBox: Box = { x: 10, y: H - 32, w: textWidth(signText, 11) + 16, h: 22 };
   placed.push(roseBox, scaleBox, signBox);
 
@@ -258,6 +258,9 @@ export function SectionalChart({ region = practiceRegion, route = [], highlight 
           nodes.push(<circle key={`${rNm}-line`} cx={c.x} cy={c.y} r={r} fill="none" stroke={color} strokeWidth="2" />);
         } else if (v.cls === 'D') {
           nodes.push(<circle key={`${rNm}-d`} cx={c.x} cy={c.y} r={r} fill="none" stroke={color} strokeWidth="1.8" strokeDasharray="6 4" />);
+        } else if (v.cls === 'E' && v.eKind === 'surface') {
+          // A Class E surface area is a dashed magenta line, like a Class D in the other color.
+          nodes.push(<circle key={`${rNm}-es`} cx={c.x} cy={c.y} r={r} fill="none" stroke={color} strokeWidth="1.6" strokeDasharray="6 4" />);
         } else if (v.cls === 'E') {
           nodes.push(<circle key={`${rNm}-e1`} cx={c.x} cy={c.y} r={Math.max(0, r - 6)} fill="none" stroke={color} strokeOpacity="0.2" strokeWidth="12" />);
           nodes.push(<circle key={`${rNm}-e2`} cx={c.x} cy={c.y} r={r} fill="none" stroke={color} strokeOpacity="0.6" strokeWidth="1" />);

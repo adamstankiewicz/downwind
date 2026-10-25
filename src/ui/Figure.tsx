@@ -6,7 +6,8 @@
 import { DEG_PER_DOT } from '../lib/vor';
 import type { AirportSign } from '../lib/airportOps';
 import type { Figure as FigureModel, PerfChartId, RecordColumn, RecordRow, RecordsVariant } from '../course/types';
-import { practiceRegion, withVolumes } from '../chart/practiceRegion';
+import { withVolumes } from '../chart/practiceRegion';
+import { regionById } from '../chart/regions';
 import { readTable, type Performance, type PerfTable } from '../lib/perf';
 import type { NavLog } from '../lib/nav';
 import { parseTaf } from '../lib/taf';
@@ -48,23 +49,24 @@ export function Figure({ figure, practiceField }: { figure: FigureModel; practic
     );
   }
   if (figure.kind === 'chart') {
-    const place = (id: string) => practiceRegion.checkpoints.find((c) => c.id === id)?.name ?? id;
+    const region = regionById(figure.region);
+    const place = (id: string) => region.checkpoints.find((c) => c.id === id)?.name ?? id;
     const legs = figure.route && figure.route.length > 1 ? `${figure.route.map(place).join(' to ')}. ` : '';
     const extra = figure.extra ?? [];
     const tfr = extra.some((v) => v.cls === 'TFR');
     return (
       <figure className="fig">
         <div className="fig-chart">
-          <SectionalChart region={withVolumes(practiceRegion, extra)} route={figure.route} highlight={figure.highlight} focus={figure.focus} marker={figure.marker} maxHeight={520} />
+          <SectionalChart region={withVolumes(region, extra)} route={figure.route} highlight={figure.highlight} focus={figure.focus} marker={figure.marker} maxHeight={520} />
         </div>
         <figcaption>
-          The practice sectional, a made-up stretch of country around KXYZ. {legs}Blue is towered and the airspace around towers; the orange here stands for the chart's magenta: untowered fields, Class C and the Class E edge.{tfr ? ' The TFR is drawn from the NOTAM; TFRs are not printed on sectionals.' : extra.length ? ` ${extra.map((v) => v.name).join(', ')}: drawn for this lesson, not printed on the chart.` : ''} Not a real chart.
+          {region.id === 'practice' ? 'The practice sectional, a made-up stretch of country around KXYZ.' : 'The second practice sectional, made-up lake country around KWVA.'} {legs}Blue is towered and the airspace around towers; the orange here stands for the chart's magenta: untowered fields, Class C and the Class E edge.{tfr ? ' The TFR is drawn from the NOTAM; TFRs are not printed on sectionals.' : extra.length ? ` ${extra.map((v) => v.name).join(', ')}: drawn for this lesson, not printed on the chart.` : ''} Not a real chart.
         </figcaption>
       </figure>
     );
   }
   if (figure.kind === 'profile') {
-    const profile = profileAlong(withVolumes(practiceRegion, figure.extra), figure);
+    const profile = profileAlong(withVolumes(regionById(figure.region), figure.extra), figure);
     const alt = figure.airplaneAtNm !== undefined ? ' The airplane sits where you are now.' : '';
     const climbs = figure.legs.some((l) => l.altMsl !== figure.startAltMsl) || figure.legs.some((l, i) => i > 0 && l.altMsl !== figure.legs[i - 1].altMsl);
     return (
