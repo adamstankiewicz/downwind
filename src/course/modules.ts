@@ -5,6 +5,7 @@
 import type { Lesson, Module } from './types';
 import { pilotAirplaneLessons } from './pilotAirplane';
 import { systemsLessons } from './systems';
+import { emergencyLessons } from './emergencies';
 import { weatherLessons } from './weather';
 import { crossCountryLessons } from './crossCountry';
 import { humanFactorsLessons } from './human';
@@ -43,8 +44,8 @@ export const modules: Module[] = [
   {
     n: 6, title: 'Emergencies', acsAreas: ['IX'],
     summary: 'Engine failures, fires and forced landings, decided in the seconds you actually have.',
-    lessons: [],
-    outline: ['Engine failure after takeoff', 'Engine failure at altitude', 'Fire in flight', 'Forced landing field selection', 'Partial power'],
+    lessons: emergencyLessons,
+    outline: [],
   },
   {
     n: 7, title: 'Systems and the panel', acsAreas: ['I.G', 'IX.C'],
