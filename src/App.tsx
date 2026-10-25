@@ -7,6 +7,7 @@ import { Trip } from './ui/Trip';
 import { Logbook } from './ui/Logbook';
 import { Settings } from './ui/Settings';
 import { Onboarding } from './ui/Onboarding';
+import { RadioPractice } from './ui/RadioPractice';
 import { Icons, Mark } from './ui/common';
 import { useAircraft, useAirport, useCourse, useLoading, useLogbook, useOnboarding, usePilot, useTheme } from './ui/state';
 import { lessonById } from './course/modules';
@@ -15,7 +16,7 @@ import type { Lesson } from './course/types';
 import { RefProvider } from './refs/RefViewer';
 
 type Rail = 'course' | 'trip' | 'tools' | 'logbook' | 'pilot';
-type Screen = { rail: Rail; view?: 'lesson' | 'daily'; lessonId?: string };
+type Screen = { rail: Rail; view?: 'lesson' | 'daily' | 'radio'; lessonId?: string };
 
 const RAILS: { id: Rail; label: string; icon: React.ReactNode }[] = [
   { id: 'course', label: 'Course', icon: Icons.course },
@@ -117,13 +118,17 @@ export function App() {
               onExit={() => go({ rail: 'course' })}
             />
           )}
-          {screen.rail === 'course' && !lesson && (screen.view !== 'daily' || !airport) && (
+          {screen.rail === 'course' && screen.view === 'radio' && (
+            <RadioPractice aircraft={aircraft} onExit={() => go({ rail: 'course' })} />
+          )}
+          {screen.rail === 'course' && !lesson && screen.view !== 'radio' && (screen.view !== 'daily' || !airport) && (
             <CourseHome
               progress={progress}
               airport={airport}
               hasAircraft={aircraft.id !== 'custom' || aircraft.emptyWeightLb > 0}
               onStart={startLesson}
               onDaily={() => go({ rail: 'course', view: 'daily' })}
+              onRadio={() => go({ rail: 'course', view: 'radio' })}
               onSetup={() => rerunSetup(1)}
             />
           )}
