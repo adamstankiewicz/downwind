@@ -6,7 +6,7 @@
 // reads like a story: Class B to the east, Class C to the north, hills and a
 // MOA to the west, a restricted area to the south.
 
-import { destination, type LatLon } from '../lib/nav';
+import { destination, distanceNm, type LatLon } from '../lib/nav';
 import type { Volume } from '../lib/airspace';
 
 export interface ChartAirport {
@@ -71,28 +71,47 @@ const XRB = at(200, 38);
 const MILL = at(290, 14);
 
 /** Hills rise to the west: about 400 ft along the coast plain, 2,600 ft on the ridge. */
-function groundFt(p: LatLon): number {
+function terrainFt(p: LatLon): number {
   const west = Math.min(1, Math.max(0, (-71.75 - p.lon) / 1.1));
   const ridge = Math.exp(-(((p.lat - 42.95) / 0.35) ** 2)) * west;
   return Math.round(350 + 900 * west + 1350 * ridge);
+}
+
+/**
+ * The terrain, levelled to each field's charted elevation within a mile and
+ * blended back over the next two, so heights above the ground agree with the
+ * airport data blocks (a Class C shelf 1,200 ft above its field, a pattern
+ * 1,000 ft above the runway).
+ */
+function groundFt(p: LatLon): number {
+  let g = terrainFt(p);
+  for (const a of FIELDS) {
+    const d = distanceNm(p, a.pos);
+    if (d >= 3) continue;
+    const w = d <= 1 ? 1 : 1 - (d - 1) / 2;
+    g = g * (1 - w) + a.elevationFt * w;
+  }
+  return Math.round(g);
 }
 
 const box = (c: LatLon, dNs: number, dEw: number): LatLon[] => [
   at(0, dNs, at(270, dEw, c)), at(0, dNs, at(90, dEw, c)), at(180, dNs, at(90, dEw, c)), at(180, dNs, at(270, dEw, c)),
 ];
 
+const FIELDS: ChartAirport[] = [
+  { id: 'KXYZ', name: 'Practice field', pos: HOME, elevationFt: 600, towered: true, runwayFt: 5500, surface: 'paved', runways: ['06', '24'], freq: '125.10', freqKind: 'Tower', atis: '119.45', fuel: true, tpaMsl: 1600 },
+  { id: 'KXBB', name: 'Bayport Intl', pos: XBB, elevationFt: 20, towered: true, runwayFt: 10000, surface: 'paved', runways: ['04L', '22R', '15', '33'], freq: '119.10', freqKind: 'Tower', atis: '135.00', fuel: true, tpaMsl: 1520 },
+  { id: 'KXQC', name: 'Quarry County', pos: XQC, elevationFt: 400, towered: true, runwayFt: 7000, surface: 'paved', runways: ['17', '35', '06', '24'], freq: '120.30', freqKind: 'Tower', atis: '128.20', fuel: true, tpaMsl: 1400 },
+  { id: 'KXQA', name: 'Quill Valley', pos: XQA, elevationFt: 450, towered: false, runwayFt: 4200, surface: 'paved', runways: ['02', '20'], freq: '122.80', freqKind: 'CTAF', fuel: true, tpaMsl: 1450 },
+  { id: 'KXRB', name: 'Ridgeback', pos: XRB, elevationFt: 1100, towered: false, runwayFt: 3400, surface: 'paved', runways: ['14', '32'], freq: '123.00', freqKind: 'CTAF', fuel: false, tpaMsl: 2100 },
+  { id: '2X5', name: 'Mill Pond', pos: MILL, elevationFt: 820, towered: false, runwayFt: 2100, surface: 'grass', runways: ['09', '27'], freq: '122.90', freqKind: 'CTAF', fuel: false, tpaMsl: 1820 },
+];
+
 export const practiceRegion: Region = {
   name: 'Practice sectional (not a real chart)',
   variationDeg: -14,
   bounds: { north: 43.45, south: 42.15, east: -71.0, west: -73.55 },
-  airports: [
-    { id: 'KXYZ', name: 'Practice field', pos: HOME, elevationFt: 600, towered: true, runwayFt: 5500, surface: 'paved', runways: ['06', '24'], freq: '125.10', freqKind: 'Tower', atis: '119.45', fuel: true, tpaMsl: 1600 },
-    { id: 'KXBB', name: 'Bayport Intl', pos: XBB, elevationFt: 20, towered: true, runwayFt: 10000, surface: 'paved', runways: ['04L', '22R', '15', '33'], freq: '119.10', freqKind: 'Tower', atis: '135.00', fuel: true, tpaMsl: 1520 },
-    { id: 'KXQC', name: 'Quarry County', pos: XQC, elevationFt: 400, towered: true, runwayFt: 7000, surface: 'paved', runways: ['17', '35', '06', '24'], freq: '120.30', freqKind: 'Tower', atis: '128.20', fuel: true, tpaMsl: 1400 },
-    { id: 'KXQA', name: 'Quill Valley', pos: XQA, elevationFt: 450, towered: false, runwayFt: 4200, surface: 'paved', runways: ['02', '20'], freq: '122.80', freqKind: 'CTAF', fuel: true, tpaMsl: 1450 },
-    { id: 'KXRB', name: 'Ridgeback', pos: XRB, elevationFt: 1100, towered: false, runwayFt: 3400, surface: 'paved', runways: ['14', '32'], freq: '123.00', freqKind: 'CTAF', fuel: false, tpaMsl: 2100 },
-    { id: '2X5', name: 'Mill Pond', pos: MILL, elevationFt: 820, towered: false, runwayFt: 2100, surface: 'grass', runways: ['09', '27'], freq: '122.90', freqKind: 'CTAF', fuel: false, tpaMsl: 1820 },
-  ],
+  airports: FIELDS,
   airspace: [
     { id: 'xyz-d', name: 'KXYZ Class D', cls: 'D', shape: { kind: 'circle', center: HOME, radiusNm: 4.3 }, floor: 'sfc', ceiling: { ft: 3100, ref: 'msl' }, note: 'Tower 125.10, 0600 to 2200 local. Class E when the tower is closed.' },
     { id: 'xbb-b1', name: 'Bayport Class B, surface area', cls: 'B', shape: { kind: 'circle', center: XBB, radiusNm: 10 }, floor: 'sfc', ceiling: { ft: 10000, ref: 'msl' }, note: 'Bayport Approach 124.75.' },
@@ -121,6 +140,11 @@ export const practiceRegion: Region = {
   ],
   groundFt,
 };
+
+/** The region with volumes added for one lesson, such as a TFR from a NOTAM. */
+export function withVolumes(r: Region, extra: Volume[] = []): Region {
+  return extra.length ? { ...r, airspace: [...r.airspace, ...extra] } : r;
+}
 
 export const chartAirport = (id: string) => practiceRegion.airports.find((a) => a.id === id);
 

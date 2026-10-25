@@ -57,6 +57,7 @@ export const DOCS: Record<string, DocSource> = Object.fromEntries(
     phak(11, 'Aircraft Performance'),
     phak(12, 'Weather Theory'),
     phak(13, 'Aviation Weather Services'),
+    phak(15, 'Airspace'),
     phak(16, 'Navigation'),
     phak(17, 'Aeromedical Factors'),
     afh(6, 'Takeoffs and Departure Climbs'),

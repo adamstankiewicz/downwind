@@ -9,6 +9,7 @@ import { emergencyLessons } from './emergencies';
 import { weatherLessons } from './weather';
 import { crossCountryLessons } from './crossCountry';
 import { humanFactorsLessons } from './human';
+import { airspaceLessons } from './airspace';
 
 export const modules: Module[] = [
   {
@@ -32,8 +33,8 @@ export const modules: Module[] = [
   {
     n: 4, title: 'Airspace and the chart', acsAreas: ['I.E', 'III.A'],
     summary: 'Read the sectional around your field, and know who to talk to before you cross a line.',
-    lessons: [],
-    outline: ['Reading the chart around your field', 'The Class D next door', 'Class C: rings and radar', 'Class B shelves and Mode C', 'TFRs and special use airspace'],
+    lessons: airspaceLessons,
+    outline: [],
   },
   {
     n: 5, title: 'Cross-country and diversion', acsAreas: ['I.D', 'VI'],
