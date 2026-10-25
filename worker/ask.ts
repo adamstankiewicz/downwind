@@ -2,9 +2,10 @@
 // GET /api/ask says whether the feature is on. It is on only when the worker
 // has the ANTHROPIC_API_KEY secret; without it the app hides the feature.
 //
-// Cost: the system prompt is the same on every request and cached; the
-// lesson context is short; answers are capped; and identical questions on
-// the same step are served from the edge cache for a day.
+// Cost: the cheapest current model with thinking off; the system prompt is
+// the same on every request and cached; the lesson context is short; answers
+// are capped; identical questions on the same step are served from the edge
+// cache for a day; and an optional rate limit caps bursts per address.
 
 import Anthropic from '@anthropic-ai/sdk';
 import { MAX_FOLLOWUPS, MAX_QUESTION, REPLY_SCHEMA, parseReply, systemPrompt, userMessage, type AskRequest } from '../src/ask/context';
@@ -15,13 +16,16 @@ export interface AskEnv {
   ASK_MODEL?: string;
   /** Optional comma-separated origins allowed to ask, such as the app's own. Unset allows any. */
   ASK_ORIGINS?: string;
+  /** Optional Workers rate limit binding (wrangler.toml [[ratelimits]]), keyed by client address. */
+  ASK_LIMIT?: { limit(opts: { key: string }): Promise<{ success: boolean }> };
 }
 
-const MODEL = 'claude-opus-5-5';
+const MODEL = 'claude-haiku-5-5';
+const MAX_TOKENS = 400;
 const ANSWER_CACHE_SECONDS = 24 * 60 * 60;
 const MAX_BODY = 16_000;
 
-type Create = (params: Anthropic.Beta.MessageCreateParamsNonStreaming) => Promise<Anthropic.Beta.BetaMessage>;
+type Create = (params: Anthropic.MessageCreateParamsNonStreaming) => Promise<Anthropic.Message>;
 
 export async function handleAsk(request: Request, env: AskEnv, create?: Create): Promise<Response> {
   const origin = request.headers.get('Origin');
@@ -44,14 +48,19 @@ export async function handleAsk(request: Request, env: AskEnv, create?: Create):
   const hit = await cache?.match(key);
   if (hit) return withHeaders(hit, cors);
 
-  const call = create ?? ((p) => new Anthropic({ apiKey: env.ANTHROPIC_API_KEY }).beta.messages.create(p));
-  let message: Anthropic.Beta.BetaMessage;
+  if (env.ASK_LIMIT) {
+    const who = request.headers.get('CF-Connecting-IP') ?? 'unknown';
+    if (!(await env.ASK_LIMIT.limit({ key: who })).success) return json({ error: 'Busy. Try again in a minute.' }, 429, cors);
+  }
+
+  const call = create ?? ((p) => new Anthropic({ apiKey: env.ANTHROPIC_API_KEY }).messages.create(p));
+  let message: Anthropic.Message;
   try {
     message = await call({
       model,
-      max_tokens: 1024,
-      betas: ['server-side-fallback-2026-07-01'],
-      fallbacks: 'default',
+      max_tokens: MAX_TOKENS,
+      // A short explanation from context does not need reasoning tokens.
+      thinking: { type: 'disabled' },
       output_config: { effort: 'low', format: { type: 'json_schema', schema: REPLY_SCHEMA } },
       system: [{ type: 'text', text: systemPrompt(), cache_control: { type: 'ephemeral' } }],
       messages: [{ role: 'user', content: userMessage(req) }],
@@ -64,7 +73,7 @@ export async function handleAsk(request: Request, env: AskEnv, create?: Create):
   if (message.stop_reason === 'refusal') {
     return json({ answer: 'I can only help with this lesson. Try asking about the step in front of you.', refs: [] }, 200, cors);
   }
-  const textBlock = message.content.find((b): b is Anthropic.Beta.BetaTextBlock => b.type === 'text');
+  const textBlock = message.content.find((b): b is Anthropic.TextBlock => b.type === 'text');
   let reply = null;
   try {
     reply = parseReply(JSON.parse(textBlock?.text ?? ''));

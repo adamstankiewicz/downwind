@@ -12,7 +12,10 @@ import { passageLabels, resolvesToSource } from '../refs/resolve';
 /** Longest question the worker accepts. A pilot's question is a sentence or two. */
 export const MAX_QUESTION = 400;
 /** Earlier questions on the same step that go along with a new one. */
-export const MAX_FOLLOWUPS = 3;
+export const MAX_FOLLOWUPS = 2;
+/** Longest text field sent from a step, and longest earlier answer. Keeps the prompt short. */
+const MAX_TEXT = 700;
+const clip = (s: string | undefined, n = MAX_TEXT) => (s && s.length > n ? `${s.slice(0, n)}...` : s);
 
 export interface AskTurn {
   question: string;
@@ -78,9 +81,9 @@ function stepFacts(step: Step, answers: LessonAnswers, revealed: boolean): Recor
   const base = { kind: step.kind, title: step.title };
   switch (step.kind) {
     case 'brief':
-      return { ...base, scene: step.scene, instructor: step.say.full };
+      return { ...base, scene: clip(step.scene), instructor: clip(step.say.full) };
     case 'example':
-      return { ...base, instructor: step.say.full, work: step.work };
+      return { ...base, instructor: clip(step.say.full), work: step.work };
     case 'turn': {
       const mine = answers.blanks[step.id] ?? {};
       return {
@@ -92,7 +95,7 @@ function stepFacts(step: Step, answers: LessonAnswers, revealed: boolean): Recor
           unit: b.unit,
           choices: b.choices,
           pilotEntered: mine[b.id] || null,
-          ...(revealed ? { answer: b.answer, explain: b.explain } : {}),
+          ...(revealed ? { answer: b.answer, explain: clip(b.explain, 300) } : {}),
         })),
       };
     }
@@ -100,7 +103,7 @@ function stepFacts(step: Step, answers: LessonAnswers, revealed: boolean): Recor
       const choice = answers.decisions[step.id]?.choice ?? null;
       return {
         ...base,
-        situation: step.situation,
+        situation: clip(step.situation),
         options: step.options.map((o) => o.label),
         committed: revealed,
         ...(revealed && choice
@@ -108,8 +111,8 @@ function stepFacts(step: Step, answers: LessonAnswers, revealed: boolean): Recor
               pilotChose: step.options.find((o) => o.id === choice)?.label,
               grade: step.grades[choice],
               bestCalls: step.options.filter((o) => step.grades[o.id] === 'best').map((o) => o.label),
-              consequence: step.consequence[choice],
-              instructorWhy: step.why,
+              consequence: clip(step.consequence[choice]),
+              instructorWhy: clip(step.why),
             }
           : {}),
       };
@@ -127,7 +130,7 @@ function reportOf(figure: Figure | undefined): AskContext['report'] {
 export function askRequest(question: string, earlier: AskTurn[], context: AskContext): AskRequest {
   return {
     question: question.trim().slice(0, MAX_QUESTION),
-    earlier: earlier.slice(-MAX_FOLLOWUPS),
+    earlier: earlier.slice(-MAX_FOLLOWUPS).map((t) => ({ question: t.question, answer: clip(t.answer, 500) ?? '' })),
     context,
   };
 }
@@ -171,7 +174,7 @@ export function systemPrompt(): string {
   return `You are the flight instructor in Downwind, a ground school for private pilots. A pilot is partway through a lesson and has typed a question about the step in front of them. You get the lesson, the step, their home field, their airplane, their personal minimums and any weather report on screen, as JSON.
 
 How to answer:
-- Answer the question they asked, about this step, in two to five short sentences. Plain, direct and kind. Explain why before what. Talk about what a pilot notices, decides and says in the airplane, not only what the book says.
+- Answer the question they asked, about this step, in two to four short sentences. Plain, direct and kind. Explain why before what. Talk about what a pilot notices, decides and says in the airplane, not only what the book says.
 - No em dashes, no exclamation marks, no headings, no lists unless they asked for steps. You may use **bold** for one key phrase.
 - Use only numbers that appear in the context. Do not compute new distances, weights, winds or performance figures; if they need a number the lesson has not shown, tell them which step or tool works it out.
 - Never grade, score or rate the pilot, and never say how well they are doing. The app grades.

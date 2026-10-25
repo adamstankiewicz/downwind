@@ -49,9 +49,9 @@ npx wrangler secret put ANTHROPIC_API_KEY   # paste the key when asked
 npx wrangler deploy
 ```
 
-Optional worker variables: `ASK_ORIGINS` (comma-separated origins allowed to ask, such as your app's URL; recommended once deployed so others can't spend your key) and `ASK_MODEL` (overrides the default `claude-opus-5-5`). If the app is served from another origin than the worker, build it with `VITE_ASK_BASE=https://<worker>/api/ask`. To try it locally, run `npx wrangler dev` in `worker/` with the key in `worker/.dev.vars` (`ANTHROPIC_API_KEY=...`) and start the app with `VITE_ASK_BASE=http://localhost:8787/api/ask npm run dev`.
+Optional worker variables: `ASK_ORIGINS` (comma-separated origins allowed to ask, such as your app's URL; recommended once deployed so others can't spend your key) and `ASK_MODEL` (overrides the default `claude-haiku-5-5`). `wrangler.toml` binds a rate limit of 6 questions a minute per address. If the app is served from another origin than the worker, build it with `VITE_ASK_BASE=https://<worker>/api/ask`. To try it locally, run `npx wrangler dev` in `worker/` with the key in `worker/.dev.vars` (`ANTHROPIC_API_KEY=...`) and start the app with `VITE_ASK_BASE=http://localhost:8787/api/ask npm run dev`.
 
-Cost is kept low: the system prompt is identical on every request and prompt-cached, the context is one step, answers are capped at 1,024 tokens at low effort, and the same question on the same step is served from the edge cache for a day.
+Cost is kept low: the cheapest current model (Claude Haiku 5.5) with thinking off and low effort, a system prompt that is identical on every request and prompt-cached, a context of one step with long text clipped, answers capped at 400 tokens, the same question on the same step served from the edge cache for a day, and a limit of 30 questions a day per device. A typical question is about 1,400 input tokens and 150 output tokens, roughly $0.0002.
 
 ## Data sources
 

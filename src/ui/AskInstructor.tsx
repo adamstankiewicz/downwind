@@ -51,6 +51,7 @@ const FAIL_COPY: Record<Failure, { label: string; text: string }> = {
   unavailable: { label: 'Instructor not available', text: 'The instructor is not available right now. The lesson carries on without it.' },
   busy: { label: 'Busy at the moment', text: 'A lot of questions are coming in. Give it a few seconds and ask again.' },
   failed: { label: 'That did not go through', text: 'Nothing was lost. Ask again when you are ready.' },
+  limit: { label: 'That is all for today', text: 'This device has asked its questions for the day. The instructor is back tomorrow, and the lesson carries on without it.' },
 };
 
 export function AskInstructor({ step, context, revealed, thread, onAnswer }: {
@@ -157,7 +158,7 @@ export function AskInstructor({ step, context, revealed, thread, onAnswer }: {
               <Notice
                 kind="info"
                 label={FAIL_COPY[failure.reason].label}
-                action={failure.reason !== 'unavailable' && <button type="button" className="btn quiet" onClick={() => void send(failure.question)}>Ask again</button>}
+                action={failure.reason !== 'unavailable' && failure.reason !== 'limit' && <button type="button" className="btn quiet" onClick={() => void send(failure.question)}>Ask again</button>}
               >
                 {FAIL_COPY[failure.reason].text}
               </Notice>
