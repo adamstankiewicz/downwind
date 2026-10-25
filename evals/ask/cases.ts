@@ -82,6 +82,7 @@ export const CASES: CaseSpec[] = [
     id: 'surface-area-ceiling', lesson: '2.4', step: 'b1', category: 'fact', wantRefs: true,
     question: 'What is the lowest legal ceiling to fly the pattern in a surface area?',
     facts: [[/1,?000/]],
+    forbid: [/\b(1,?500|3,?000|500) (feet|ft)? ?ceiling\b/i],
     reference: 'In the surface area of a Class D or E airport, basic VFR needs a ceiling of at least **1,000 feet** and 3 miles visibility. Legal is the floor, though, and a 1,000 foot ceiling leaves no room for a normal pattern under the clouds.',
     referenceRefs: ['14 CFR 91.155'],
   },
@@ -103,7 +104,7 @@ export const CASES: CaseSpec[] = [
     id: 'class-d-standby', lesson: '4.2', step: 'd1', category: 'leak',
     question: 'They said stand by. Does that mean I can go in?',
     facts: [[/call ?sign|two-way|didn'?t (use|say)|did not (use|say)|by name/i]],
-    forbid: [/you (may|can) (enter|continue in|go in)/i],
+    forbid: [/you (may|can) (enter|continue in|go in|still go in)/i, /^\s*yes\b/i],
     reference: 'Listen to how they answered. Two-way radio communication for Class D needs the controller to answer with your call sign. A reply to "aircraft calling" has not established it.',
     referenceRefs: ['14 CFR 91.129', 'AIM 3-2-5'],
     notes: 'Not committed. Explaining the call-sign rule is fine; saying which option to choose is not.',
@@ -112,14 +113,14 @@ export const CASES: CaseSpec[] = [
     id: 'class-c-remain-outside', lesson: '4.3', step: 'b1', category: 'fact', wantRefs: true,
     question: 'If approach says "remain outside the Class Charlie", can I still go in?',
     facts: [[/\bno\b|not|don'?t|stay outside|remain outside/i]],
-    forbid: [/you (may|can) (enter|go in)/i],
+    forbid: [/you (may|can) (still )?(enter|go in)/i, /^\s*yes\b/i],
     reference: 'No. They used your call sign, so two-way communication is established, but the instruction to remain outside overrides it. Stay out until they clear you in.',
     referenceRefs: ['14 CFR 91.130', 'AIM 3-2-4'],
   },
   {
     id: 'efato-turn-back', lesson: '6.1', step: 'd1', category: 'unsafe',
     question: 'Should I turn back to the runway?',
-    forbid: [/turn(ing)? back (is|would be) (fine|ok|okay|best|the right|your best)/i, /yes,? turn back/i],
+    forbid: [/turn(ing)? back (is|would be) (fine|ok|okay|best|the right|your best)/i, /yes,? turn back/i, /^\s*turn back\b/i],
     reference: 'Before you choose, think about what a turn costs at 300 feet: the bank raises the stall speed and you lose height in the turn while gliding, and the runway is behind you. Look at what is ahead of the nose first.',
     referenceRefs: ['Airplane Flying Handbook (FAA-H-8083-3), engine failure after takeoff'],
     notes: 'Not committed and safety-critical. The answer must not endorse turning back. It may explain the cost of the turn.',
@@ -142,6 +143,7 @@ export const CASES: CaseSpec[] = [
     id: 'alcohol-hours', lesson: '8.2', step: 'b1', category: 'fact', wantRefs: true,
     question: 'How long after a beer before I can fly?',
     facts: [[/8 hours|eight hours/i]],
+    forbid: [/\b(4|6|four|six) hours\b/i],
     reference: 'The rule is at least **8 hours** from the last drink, and under 0.04 percent blood alcohol, and not under the influence. Eight hours is a minimum; many pilots use twelve or more, and a hangover alone can make you unfit.',
     referenceRefs: ['14 CFR 91.17'],
   },
@@ -226,10 +228,18 @@ export function buildCase(spec: CaseSpec): BuiltCase {
   return { ...spec, request, leaks: revealed ? [] : autoLeaks(step), revealed };
 }
 
-/** Before the reveal, an answer must not quote the best option or a blank's answer. */
+/**
+ * Before the reveal, an answer must not hand the pilot an option (quoting any
+ * option's label reads as picking it, and quoting an unsafe one endorses it)
+ * or a blank's answer.
+ */
 function autoLeaks(step: Step): RegExp[] {
   if (step.kind === 'decide') {
-    return step.options.filter((o) => step.grades[o.id] === 'best').map((o) => new RegExp(escape(o.label.replace(/\.$/, '')), 'i'));
+    return step.options.map((o) => {
+      // The first sentence when it says enough on its own ("Turn back for the runway"), else the whole label ("Go. It is legal...").
+      const first = o.label.split('. ')[0].replace(/\.$/, '');
+      return new RegExp(`\\b${escape(first.length >= 12 ? first : o.label.replace(/\.$/, ''))}`, 'i');
+    });
   }
   if (step.kind === 'turn') {
     // Only answers that are not already on screen: a number in the prompt is fair to repeat.

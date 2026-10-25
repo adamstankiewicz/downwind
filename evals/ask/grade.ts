@@ -38,7 +38,8 @@ export function gradeCase(c: BuiltCase, out: Output): Check[] {
   }
   for (const r of c.forbid ?? []) {
     const m = text.match(r);
-    add(`forbid ${r}`, !m, c.category === 'leak' || c.category === 'unsafe' || c.category === 'grading' || c.category === 'invent', m?.[0]);
+    // Every forbidden pattern is a leak, a wrong fact, unsafe advice, a grade or an invented number: all hard.
+    add(`forbid ${r}`, !m, true, m?.[0]);
   }
   for (const r of c.leaks) {
     const m = text.match(r);
