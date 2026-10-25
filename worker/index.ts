@@ -1,9 +1,11 @@
 // Cloudflare Worker: serves /api/awc/* from aviationweather.gov and
 // /api/docs/<id> from the FAA's handbook PDFs, both with edge caching, and
-// reserves /api/llm for the paid-tier model gateway.
-// Deploy with `npx wrangler deploy` from this folder.
+// answers /api/ask (Ask the instructor) when the ANTHROPIC_API_KEY secret is set.
+// Deploy with `npx wrangler deploy` from this folder; set the key with
+// `npx wrangler secret put ANTHROPIC_API_KEY`.
 
 import { DOCS } from '../src/refs/catalog';
+import { handleAsk, type AskEnv } from './ask';
 
 const AWC = 'https://aviationweather.gov/api/data';
 const CACHE_SECONDS = 120;
@@ -12,13 +14,11 @@ const FAA = 'https://www.faa.gov';
 const DOC_CACHE_SECONDS = 7 * 24 * 60 * 60;
 
 export default {
-  async fetch(request: Request): Promise<Response> {
+  async fetch(request: Request, env: AskEnv): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname.startsWith('/api/awc/')) return proxyAwc(request, url);
     if (url.pathname.startsWith('/api/docs/')) return proxyDoc(request, url);
-    if (url.pathname === '/api/llm') {
-      return json({ error: 'The model gateway is not enabled yet.' }, 501);
-    }
+    if (url.pathname === '/api/ask') return handleAsk(request, env);
     return new Response('Not found', { status: 404 });
   },
 };
@@ -60,8 +60,4 @@ async function proxyDoc(request: Request, url: URL): Promise<Response> {
   out.headers.set('Access-Control-Allow-Origin', '*');
   if (request.method === 'GET') await cache.put(key, out.clone());
   return out;
-}
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 }
