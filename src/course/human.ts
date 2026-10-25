@@ -582,9 +582,9 @@ const night: Lesson = {
         situation: `${cur.current ? 'You are night current.' : `You are ${cur.needed} full-stop landing${cur.needed === 1 ? '' : 's'} short of carrying a passenger after ${local(t.currencyFrom)}.`} Your friend has been looking forward to this all week.`,
         options: [
           { id: 'go', label: cur.current ? `Go as planned, off at ${local(s.plannedOff)}.` : `Go as planned, off at ${local(s.plannedOff)}. It's only one landing short.` },
-          { id: 'land-first', label: `Fly ${plans['land-first'].soloFirst} full-stop landings alone after ${local(t.currencyFrom)}, then take your friend up.` },
+          { id: 'land-first', label: `Fly ${plans['land-first'].soloFirst} full stops alone after ${local(t.currencyFrom)}, then take your friend.` },
           { id: 'early', label: `Leave now with your friend and land by ${local(plans.early.landsAt!)}.` },
-          { id: 'cancel', label: 'Make it a daytime flight another weekend.' },
+          { id: 'cancel', label: 'Make it a daytime flight with your friend another weekend.' },
         ],
         grades,
         consequence: {

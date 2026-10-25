@@ -348,9 +348,9 @@ const hotAfternoon: Lesson = {
         kind: 'decide', id: 'd1', title: 'Toward the ridge',
         situation: `It's ${local(pmAt)} and ${pmT}°C. For this lesson, picture a ridge ${RIDGE_NM} miles off the end of runway ${rwy.id}, ${fmt(ridge)} feet above the field, right on your course. You want ${RIDGE_CLEAR_FT} feet over it.`,
         options: [
-          { id: 'straight-out', label: 'Take off and climb straight out on course at Vy.' },
-          { id: 'climb-overhead', label: `Climb over the field to ${fmt(topMsl)} feet, then head for the ridge.` },
-          { id: 'wait-morning', label: 'Put it off to tomorrow morning, when it is cool.' },
+          { id: 'straight-out', label: 'Take off and climb straight out on course at Vy, the best rate.' },
+          { id: 'climb-overhead', label: `Climb over the field to ${fmt(topMsl)} feet, then head out.` },
+          { id: 'wait-morning', label: 'Put it off to tomorrow morning, when the air is cool.' },
         ],
         grades,
         consequence,

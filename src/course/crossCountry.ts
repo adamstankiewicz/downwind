@@ -688,10 +688,10 @@ const lost: Lesson = {
         kind: 'decide', id: 'd1', title: 'Unsure of your position',
         situation: `${local(lostAt)}, ${fmt(LOST_ALT)} feet, ${fmt1(s.fuelGal)} gallons. ${fixName} is ${mins(LOST_LATE_MIN)} overdue and nothing out the window matches the chart.`,
         options: [
-          option('climb-call', `Hold heading, climb a little, and call ${app.name}: unsure of position.`),
+          option('climb-call', `Hold heading, climb, and call ${app.name} for help.`),
           option('reverse', `Turn around and fly the reciprocal back toward ${nameOf(LOST_FROM)}.`),
-          option('descend-look', 'Descend to read a water tower or a sign.'),
-          option('press-on', 'Keep going. Home has to show up eventually.'),
+          option('descend-look', 'Descend low enough to read a water tower or a sign.'),
+          option('press-on', 'Keep going on this heading. Home has to show up eventually.'),
         ],
         grades: s.grades,
         consequence: {

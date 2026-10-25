@@ -269,10 +269,10 @@ const windOnRunway: Lesson = {
           `Run-up done. Crosswind about ${Math.round(steadyX)} knots, ${Math.round(gustX)} in the gusts. Your personal minimum is ${ctx.minimums.crosswindKt} knots${demo > 0 ? `, and the airplane's demonstrated crosswind is ${demo}` : ''}. It feels windier than you're used to.`,
           brief,
           {
-            go: 'Go. Fly the crosswind technique, and add half the gust factor on final.',
-            'go-plan': 'Go, but only for one lap, then decide.',
-            delay: 'Taxi back and wait an hour to see if it settles.',
-            cancel: 'Taxi back. It feels like too much.',
+            go: 'Go. Crosswind technique, plus half the gust factor on final.',
+            'go-plan': 'Go, but fly only one lap, then decide on the rest.',
+            delay: 'Taxi back and wait an hour to see if the gusts settle.',
+            cancel: 'Taxi back. It feels like too much wind for you.',
           },
           { go: 'best', 'go-plan': 'acceptable' },
           {
@@ -290,7 +290,7 @@ const windOnRunway: Lesson = {
             {
               go: 'Go. There is hardly any crosswind.',
               'go-plan': 'Go, and add the whole gust factor to the approach speed.',
-              delay: 'Taxi back and wait an hour to see if it settles.',
+              delay: 'Taxi back and wait an hour to see if the gusts settle.',
               cancel: 'Taxi back and put the airplane away.',
             },
             { go: 'unsafe', 'go-plan': 'marginal' },
@@ -308,7 +308,7 @@ const windOnRunway: Lesson = {
             {
               go: 'Go. It is legal, and the airplane can handle it.',
               'go-plan': 'Go, but abort the takeoff if it gets squirrelly, and plan a full-stop landing.',
-              delay: 'Taxi back and wait an hour to see if it settles.',
+              delay: 'Taxi back and wait an hour to see if the gusts settle.',
               cancel: 'Taxi back and put the airplane away.',
             },
             { go: 'unsafe', 'go-plan': 'marginal' },
@@ -430,10 +430,10 @@ const tafReturn: Lesson = {
           `It is ${hhmmZ(addHours(dep, -0.5))}, and it is lovely out. The TAF lowers to ${fmt(lowBase)} broken in rain from ${hhmmZ(fm)}, under your ${fmt(mins.ceilingFt)} foot minimum, an hour before you planned to be back.`,
           brief,
           {
-            go: 'Go as planned. It is beautiful now.',
-            'go-plan': `Leave now instead, fly a shorter loop, and be on the ground by ${hhmmZ(back)}.`,
-            delay: 'Wait for the next TAF.',
-            cancel: 'Cancel for today.',
+            go: 'Go as planned. It is beautiful out there right now.',
+            'go-plan': `Leave now, fly a shorter loop, and land by ${hhmmZ(back)}.`,
+            delay: 'Wait for the next TAF before you decide.',
+            cancel: 'Cancel the flight for today.',
           },
           { go: 'acceptable', 'go-plan': 'best' },
           {
@@ -470,7 +470,7 @@ const tafReturn: Lesson = {
               go: 'Go now. The TAF says it gets better anyway.',
               'go-plan': 'Go now, and come back early if it is bad.',
               delay: `Move the flight to after ${hhmmZ(fm)}.`,
-              cancel: 'Cancel for today.',
+              cancel: 'Cancel the flight for today.',
             },
             { go: 'unsafe', 'go-plan': 'marginal', delay: 'best' },
             {
@@ -681,10 +681,10 @@ const spread: Lesson = {
         `Clear, light wind, a 2 degree spread. The TAF has mist ${hhmmZ(fm)}, an hour and a half after you plan to be back.`,
         brief,
         {
-          go: 'Go as planned.',
-          'go-plan': 'Go, stay within 15 minutes of the field, pick an inland alternate, and turn back at the first sign of mist.',
-          delay: 'Wait and watch the next report.',
-          cancel: 'Cancel. Fog is coming.',
+          go: 'Go as planned, for the full hour and a half of sightseeing.',
+          'go-plan': 'Go, stay close, pick an inland alternate, turn back at the first mist.',
+          delay: 'Wait on the ground and watch the next report come in.',
+          cancel: 'Cancel. Fog is coming, and that is enough.',
         },
         { 'go-plan': 'best' },
         {

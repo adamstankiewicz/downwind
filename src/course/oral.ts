@@ -328,8 +328,8 @@ function inopDecision(id: string, title: string, item: InopItem, situation: stri
     options: [
       { id: 'fly-as-is', label: 'Fly as it is. You can manage without it.' },
       { id: 'placard-fly', label: 'Placard it "INOPERATIVE", note it, and fly.' },
-      { id: 'fix-first', label: 'Get it fixed, or a special flight permit, before the airplane goes anywhere.' },
-      { id: 'cancel', label: 'Cancel and think about it.' },
+      { id: 'fix-first', label: 'Fix it first, or get a special flight permit.' },
+      { id: 'cancel', label: 'Cancel the flight and think about it some more.' },
     ],
     grades,
     consequence: follow(grades, intended, written, () => (rule ? `It is required by ${rule}, so it has to work.` : 'Nothing requires it for this flight, so 91.213(d) lets you placard it and go.')),
@@ -433,9 +433,9 @@ const airplaneOral: Lesson = {
         situation: 'The ELT is sorted. On the walkaround the landing light doesn\'t come on: the bulb is burnt out. It is your airplane, today\'s flight is not for hire, and there is a spare bulb with the right part number in the hangar.',
         options: [
           { id: 'swap-fly', label: 'Swap the bulb yourself and go.' },
-          { id: 'swap-log', label: 'Swap the bulb yourself, then write it up in the maintenance records and sign it.' },
+          { id: 'swap-log', label: 'Swap the bulb yourself, then log it in the maintenance records.' },
           { id: 'placard-fly', label: 'Placard it "INOPERATIVE" and fly. Swap it another day.' },
-          { id: 'wait-mechanic', label: 'Leave it for a mechanic. Pilots don\'t work on airplanes.' },
+          { id: 'wait-mechanic', label: 'Leave it for a mechanic. Pilots don\'t work on their airplanes.' },
         ],
         grades: bulb,
         consequence: follow(bulb, { 'swap-fly': 'marginal', 'swap-log': 'best', 'placard-fly': 'acceptable', 'wait-mechanic': 'acceptable' }, {

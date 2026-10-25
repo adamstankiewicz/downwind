@@ -97,3 +97,25 @@ describe.each(allLessons.map((l) => [l.id, l] as const))('lesson %s situations',
     }
   });
 });
+
+describe('no answer patterns', () => {
+  const decisions = ctxs.flatMap((ctx) => allLessons.flatMap((l) =>
+    Array.from({ length: variantCount(l) }, (_, v) => l.build({ ...ctx, variant: v }).map((s) => ({ l, v, s }))).flat()))
+    .flatMap(({ l, v, s }) => (s.kind === 'decide' ? [{ id: `${l.id} v${v} ${s.id}`, s }] : []));
+
+  it('never gives away the best option by making it much the longest', () => {
+    for (const { id, s } of decisions) {
+      const best = s.options.filter((o) => s.grades[o.id] === 'best');
+      const lens = s.options.map((o) => o.label.length).sort((a, b) => b - a);
+      const standsOut = best.length === 1 && best[0].label.length === lens[0] && lens[0] >= lens[1] * 1.2;
+      expect(standsOut, `${id}: "${best[0]?.label}"`).toBe(false);
+    }
+  });
+
+  it('does not make cancelling the safe bet', () => {
+    const cancels = decisions.filter(({ s }) => s.options.some((o) => o.id === 'cancel'));
+    const cancelBest = cancels.filter(({ s }) => s.grades.cancel === 'best');
+    expect(cancels.length).toBeGreaterThan(20);
+    expect(cancelBest.length / cancels.length).toBeLessThan(0.25);
+  });
+});

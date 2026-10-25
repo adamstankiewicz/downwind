@@ -265,9 +265,9 @@ const instruments: Lesson = {
         `Visibility is about ${vis} miles in haze and your minimum is ${ctx.minimums.visibilitySm}. Still working: the ${byName(good)}. A field with a long runway is ${nearMin} minutes away; the trip has ${tripMin} minutes left.`,
         failed,
         {
-          'trust-attitude': 'Level the wings on the attitude indicator. It is the primary instrument for bank.',
-          'cover-land': 'Cover the attitude and heading indicators, fly by the turn coordinator, compass and the view outside, and land at the nearer field.',
-          'cover-continue': 'Cover them and finish the trip on the rest of the panel.',
+          'trust-attitude': 'Level the wings on the attitude indicator. It is the primary instrument for bank, so believe it.',
+          'cover-land': 'Cover the failed gyros, fly the turn coordinator and compass, and land at the nearer field.',
+          'cover-continue': 'Cover the failed gyros and finish the trip home on the rest of the panel.',
           'climb-clear': 'Climb above the haze, where the horizon is sharper, and sort it out up there.',
         },
         grades,
@@ -502,9 +502,9 @@ const carbIce: Lesson = {
         `A few minutes later the engine stumbles, surges, and stumbles again. Carb heat is already on. The left tank has about ${leftGal} gallon${leftGal === 1 ? '' : 's'} by the clock.${plenty ? ' The oil pressure needle is flickering at the bottom of the green.' : ''}`,
         undefined,
         {
-          'switch-tank': 'Fuel selector to the other tank, mixture rich, fuel pump on if you have one.',
-          'heat-off': 'Carb heat off. Maybe the heat is making it run rough.',
-          'land-now': 'Pick a field and set up for a precautionary landing.',
+          'switch-tank': 'Selector to the other tank, mixture rich, fuel pump on if fitted.',
+          'heat-off': 'Carb heat off. Maybe the heat itself is making it run rough.',
+          'land-now': 'Pick a field now and set up for a precautionary landing.',
         },
         roughGrades,
         plenty
