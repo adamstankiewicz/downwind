@@ -76,7 +76,7 @@ export function CourseHome({ progress, airport, hasAircraft, onStart, onDaily, o
           <ol className="modules">
             {modules.map((m) => <ModuleRow key={m.n} m={m} progress={progress} onStart={onStart} current={m.n === currentModule} nextId={next?.id ?? null} />)}
           </ol>
-          <p className="help">Nine modules in the order of the Private Pilot ACS. Modules marked "being written" show their planned lessons; the daily flight only asks what the written ones have covered.{!hasAircraft ? ' Lessons that need the airplane\'s numbers use what you have entered and say when something is missing.' : ''}</p>
+          <p className="help">Nine modules in the order of the Private Pilot ACS. The daily flight only asks about what the lessons you have flown have covered.{!hasAircraft ? ' Lessons that need the airplane\'s numbers use what you have entered and say when something is missing.' : ''}</p>
         </section>
       </div>
     </>
@@ -117,8 +117,8 @@ function AllDone() {
   return (
     <section className="next">
       <h2>Next lesson</h2>
-      <h3 className="next-title">Every written lesson is flown</h3>
-      <Voice>The rest of the course is being written. Fly the daily flight to keep the habit, and fly any lesson again from the list below.</Voice>
+      <h3 className="next-title">Every lesson is flown</h3>
+      <Voice>That is the whole course. Fly the daily flight to keep the habit, fly any lesson again from the list below, and print your flight review summary from the logbook for your CFI.</Voice>
     </section>
   );
 }

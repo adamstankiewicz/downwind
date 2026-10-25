@@ -84,11 +84,7 @@ async function run(viewport, live) {
   check(/Next lesson/.test(body) && /1\.1 Are you current to carry passengers/.test(body), `${label} course home introduces lesson 1.1`);
   check(await btn('Start lesson 1.1').isVisible(), `${label} Start lesson button visible`);
   check(/Today's real conditions at/.test(body), `${label} daily flight listed`);
-  const planned = await page.locator('.module.planned').count();
-  check(planned < 9 && (await page.locator('.module.planned .m-count').filter({ hasText: 'being written' }).count()) === planned, `${label} every unwritten module says so`);
-  check((await page.locator('.module.planned').filter({ hasText: 'Human factors and risk' }).count()) === 0, `${label} module 8 is written`);
-  check((await page.locator('.module.planned').filter({ hasText: 'The oral and the flight review' }).count()) === 0, `${label} module 9 is written`);
-  check((await page.locator('.module.planned').filter({ hasText: 'Performance and loading' }).count()) === 0, `${label} module 3 is written`);
+  check((await page.locator('.module.planned').count()) === 0 && !/being written|Coming/.test(body), `${label} every module is written, nothing says coming`);
   check(await page.getByRole('list', { name: 'Modules' }).locator('li').count() === 9, `${label} strip shows nine modules`);
   check(!/C172K|N\d{3,5}[A-Z]{0,2}\b/.test(body), `${label} no tail number or type assumed in course copy`);
   await noHScroll('course home');
