@@ -86,6 +86,10 @@ export type Figure =
    * and two dashed yellow lines) or the ILS critical area ladder.
    */
   /** Stall speed against bank angle, clean and flaps down, with the approach speed and the bank in use marked. */
+  /** Raw text reports in briefing order: advisories, PIREPs, NOTAMs. */
+  | { kind: 'reports'; reports: { label: string; raw: string }[]; caption: string }
+  /** A VOR indicator: the OBS course, the needle and the TO/FROM flag, from lib/vor.ts. */
+  | { kind: 'vor'; obs: number; needleDeg: number; flag: 'TO' | 'FROM' | 'OFF'; ident: string; caption: string }
   | { kind: 'loadFactor'; bankDeg: number; vs0Kias: number; vs1Kias: number; approachKias: number; sample: boolean }
   | { kind: 'signs'; signs: AirportSign[]; marking?: 'runway-hold' | 'ils-hold'; caption: string }
   | { kind: 'records'; variant: RecordsVariant; title: string; columns: RecordColumn[]; rows: RecordRow[]; caption: string }

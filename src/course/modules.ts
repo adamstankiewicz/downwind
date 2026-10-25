@@ -14,6 +14,9 @@ import { airspaceLessons } from './airspace';
 import { performanceLessons } from './performance';
 import { airportOpsLessons } from './airportOps';
 import { aeroLessons } from './aero';
+import { hazardsLesson } from './hazards';
+import { illusionsLesson } from './illusions';
+import { vorLesson } from './vor';
 
 export const modules: Module[] = [
   {
@@ -25,7 +28,7 @@ export const modules: Module[] = [
   {
     n: 2, title: 'Weather', acsAreas: ['I.C'],
     summary: 'Reports, forecasts and the decisions they feed, read against your own field and your own minimums.',
-    lessons: weatherLessons,
+    lessons: [...weatherLessons, hazardsLesson],
     outline: [],
   },
   {
@@ -43,7 +46,7 @@ export const modules: Module[] = [
   {
     n: 5, title: 'Cross-country and diversion', acsAreas: ['I.D', 'VI'],
     summary: 'Plan a cross-country, fly it on the chart, and divert when the plan stops working.',
-    lessons: crossCountryLessons,
+    lessons: [...crossCountryLessons, vorLesson],
     outline: [],
   },
   {
@@ -61,7 +64,7 @@ export const modules: Module[] = [
   {
     n: 8, title: 'Human factors and risk', acsAreas: ['I.H', 'II'],
     summary: 'IMSAFE, PAVE, the hazardous attitudes and external pressure, applied to your own flying.',
-    lessons: humanFactorsLessons,
+    lessons: [...humanFactorsLessons, illusionsLesson],
     outline: [],
   },
   {

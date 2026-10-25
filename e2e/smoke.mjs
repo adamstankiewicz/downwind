@@ -764,6 +764,28 @@ async function runSkip() {
   check(/2\.00 g/.test(body) && /bank angle, as you have set it/.test(body), `${label} 10.1 bank dial re-runs the engine (${(body.match(/\d\.\d\d g/) ?? [''])[0]})`);
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/10-1-dials.png`, fullPage: true });
   await page.getByRole('button', { name: 'Leave lesson', exact: true }).click();
+  // Lesson 5.6: the VOR head, its blanks, and the OBS dial.
+  const lesson56 = page.getByRole('button', { name: /5\.6 The VOR when the GPS goes quiet/ });
+  if (!(await lesson56.isVisible())) await page.locator('.module summary').filter({ hasText: 'Cross-country' }).click();
+  await lesson56.click();
+  await page.getByRole('heading', { name: 'A backup worth knowing' }).waitFor();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByRole('heading', { name: 'Your turn' }).waitFor();
+  check((await page.locator('svg.vor-head .needle').count()) === 1 && /TO flag/.test(await page.locator('svg.vor-head').getAttribute('aria-label')), `${label} 5.6 draws the VOR head`);
+  await page.locator('#t1-radial').fill('210');
+  await page.locator('#t1-flip').getByRole('button', { name: 'FROM', exact: true }).click();
+  await page.locator('#t1-abeam').getByRole('button', { name: 'OFF', exact: true }).click();
+  await page.locator('#t1-test').getByRole('button', { name: "Under maintenance, don't use it", exact: true }).click();
+  await page.getByRole('button', { name: 'Check my numbers', exact: true }).click();
+  check((await page.getByText(/Right\./).count()) === 4, `${label} 5.6 VOR blanks checked by code`);
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByRole('heading', { name: 'Find the way in' }).waitFor();
+  await page.locator('#dial-obs').fill('25');
+  await page.waitForTimeout(100);
+  await page.getByRole('button', { name: 'Check this setting', exact: true }).click();
+  body = await page.locator('main').innerText();
+  check(/Right\./.test(body) && /025 TO/.test(body) && /centered/.test(await page.locator('svg.vor-head').getAttribute('aria-label')), `${label} 5.6 OBS dial centers the needle with TO`);
+  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/5-6-vor.png`, fullPage: true });
   await page.getByRole('navigation', { name: 'Screens' }).getByRole('button', { name: 'Tools', exact: true }).click();
   check(await page.getByText(/No airplane yet/).first().isVisible(), `${label} airplane tool shows the not-set-up state`);
   await page.getByRole('tab', { name: 'Weather now' }).click();

@@ -1479,3 +1479,20 @@ dl.kv dd { margin: 0; }
 .lf-chart .clean { fill: none; stroke: var(--ink-2); stroke-width: 2; }
 .lf-chart .flaps { fill: none; stroke: var(--sock); stroke-width: 2.5; }
 .lf-chart .dot { fill: var(--sock); stroke: var(--panel); stroke-width: 2; }
+
+/* VOR indicator (lesson 5.6). The instrument stays dark in both themes, as the real one is. */
+.vor-head { width: 100%; max-width: 280px; display: block; margin: 0 auto; }
+.vor-head .bezel { fill: #171c21; }
+.vor-head .face { fill: #23292f; stroke: #3a424a; stroke-width: 1; }
+.vor-head .tick { stroke: #eef0ec; stroke-width: 1.5; }
+.vor-head .card { fill: #eef0ec; font-size: 11px; font-family: var(--mono); }
+.vor-head .index { fill: var(--sock); }
+.vor-head .dot { fill: #eef0ec; }
+.vor-head .ring { fill: none; stroke: #eef0ec; stroke-width: 1.5; }
+.vor-head .needle { stroke: #ffffff; stroke-width: 3.5; stroke-linecap: round; }
+.vor-head .flag { fill: #eef0ec; }
+.vor-head .flag.off { fill: #c62828; }
+.vor-head .flag-t { fill: #171c21; font-size: 10px; font-weight: 700; font-family: var(--body); }
+.vor-head .flag.off + .flag-t { fill: #ffffff; }
+.vor-head .course { fill: var(--ink-2); font-size: 12px; font-family: var(--mono); }
+.metar.report { font-size: 0.875rem; color: var(--ink); }

@@ -158,7 +158,7 @@ describe('scoring', () => {
 
   it('lists the modules in ACS order with the oral last', () => {
     expect(modules.map((m) => m.n)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
-    expect(modules[1].lessons).toHaveLength(5);
+    expect(modules[1].lessons).toHaveLength(6);
   });
 });
 
