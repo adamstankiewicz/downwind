@@ -7,7 +7,7 @@ import { calendarStatus, dateOnly, daysBetween, endOfCalendarMonth, flightReview
 import { reviewSummary } from '../flightReview';
 import { exampleReview, grassStrip, inspectionDates, oralLessons, weekendTrip } from '../oral';
 import {
-  forecastFor, gradeForecastWindow, gradeInop, gradeLoading, gradeReviewLapse, gradeRunway, INOP_FUEL_GAUGE, INOP_LANDING_LIGHT, INOP_POSITION_LIGHTS,
+  forecastFor, gradeBags, gradeBulb, gradeForecastWindow, gradeInop, gradeLoading, gradeReviewLapse, gradeRunway, INOP_FUEL_GAUGE, INOP_LANDING_LIGHT, INOP_POSITION_LIGHTS,
   maxFuelThatFits, oralAirplane, weighTrip,
 } from '../oralChecks';
 import { lessonContext } from '../practice';
@@ -105,6 +105,18 @@ describe('module 9 checks', () => {
     expect(gradeInop({ ...INOP_LANDING_LIGHT, requiredByAirplane: true }, false)['fly-as-is']).toBe('unsafe');
   });
 
+  it('keeps the baggage placard separate from gross weight', () => {
+    const load = { frontLb: 360, rearLb: 200, bagsLb: 150, bagStation: 'bag1' };
+    const g = gradeBags(plane, load, 120, trip);
+    expect(g.grades['less-fuel']).toBe('unsafe');
+    expect(gradeBags(plane, { ...load, rearLb: 100, bagsLb: 100 }, 120, trip).grades['all-in']).toBe('best');
+  });
+
+  it('lets an owner change a bulb, with the entry, under 43.3(g)', () => {
+    expect(gradeBulb({ pilotOwns: true, forHire: false })).toMatchObject({ 'swap-log': 'best', 'swap-fly': 'marginal' });
+    expect(gradeBulb({ pilotOwns: false, forHire: false })).toMatchObject({ 'swap-log': 'unsafe', 'wait-mechanic': 'best' });
+  });
+
   it('grades a runway against the book number and the margin', () => {
     expect(gradeRunway(2200, 2100)).toBe('unsafe');
     expect(gradeRunway(1800, 2100)).toBe('marginal');
@@ -114,6 +126,8 @@ describe('module 9 checks', () => {
   it('grades a lapsed review', () => {
     expect(gradeReviewLapse(calendarStatus(d('2024-08-10'), 24, d('2026-10-24')))).toMatchObject({ 'fly-solo': 'unsafe', 'review-first': 'best' });
     expect(gradeReviewLapse(calendarStatus(d('2025-08-10'), 24, d('2026-10-24')))['fly-friend']).toBe('best');
+    // A checkride in the 24 months counts as the review (61.56(d)).
+    expect(gradeReviewLapse(calendarStatus(d('2024-08-10'), 24, d('2026-10-24')), true)).toMatchObject({ 'fly-friend': 'best', 'fly-solo': 'acceptable' });
   });
 });
 
@@ -151,15 +165,19 @@ describe.each(contexts)('module 9 lessons: %s', (_name, ctx) => {
 
 describe('module 9 teaches what it says', () => {
   for (const [name, ctx] of contexts) {
-    it(`9.1 needs one more landing, trades fuel for people, and leaves before the rain (${name})`, () => {
+    it(`9.1 needs one more landing, keeps the gear to the placard, and leaves before the rain (${name})`, () => {
       const steps = oralLessons[0].build(ctx);
       expect(blank(steps, 't1', 'count').answer).toBe(2);
       expect(blank(steps, 't1', 'current').answer).toBe('No');
       const t = weekendTrip(ctx);
       expect(t.full.overGross).toBe(true);
       expect(blank(steps, 't4', 'over').answer).toBe(t.full.totalLb - t.plane.aircraft.maxGrossLb);
-      expect(decide(steps, 'd1').grades).toEqual({ 'full-tanks': 'unsafe', 'leave-bags': 'unsafe', 'fuel-to-fit': 'best', cancel: 'acceptable' });
-      expect(t.fit.fuel.marginGal).toBeGreaterThan(0);
+      expect(blank(steps, 't4', 'bagover').answer).toBe(30);
+      expect(decide(steps, 'd1').grades).toEqual({ 'all-in': 'unsafe', 'less-fuel': 'unsafe', 'trim-bags': 'best', cancel: 'acceptable' });
+      // Taking less fuel fixes gross weight but never the baggage placard.
+      const lessFuel = t.bags!.cases.find((c) => c.id === 'less-fuel')!;
+      expect(lessFuel.wb.overGross).toBe(false);
+      expect(lessFuel.wb.stationsOverMax).toContain('bag1');
       expect(blank(steps, 't3', 'alt').answer).toBe(t.cruiseMsl.toLocaleString('en-US'));
       expect(t.cruiseMsl).toBeGreaterThanOrEqual(t.mef + 1000);
       expect(t.cruiseMsl % 2000).toBe(500);
@@ -167,18 +185,20 @@ describe('module 9 teaches what it says', () => {
       expect(decide(steps, 'd2').grades).toMatchObject({ 'leave-now': 'best', 'leave-late': 'unsafe', 'under-it': 'unsafe', stay: 'acceptable' });
     });
 
-    it(`9.2 lapses the ELT, grounds the gauge, and moves lunch to the paved field (${name})`, () => {
+    it(`9.2 lapses the ELT, logs the bulb, grounds the gauge, and leaves uphill into the wind (${name})`, () => {
       const steps = oralLessons[1].build(ctx);
       const dates = inspectionDates(ctx.now);
       expect(dates.annualStatus.current).toBe(true);
       expect(dates.eltStatus.current).toBe(false);
       expect(dates.xpdrStatus.current).toBe(true);
       expect(blank(steps, 't1', 'eltok').answer).toBe('No');
-      expect(decide(steps, 'd1').grades['placard-fly']).toBe('best');
+      expect(decide(steps, 'd1').grades).toEqual({ 'swap-fly': 'marginal', 'swap-log': 'best', 'placard-fly': 'acceptable', 'wait-mechanic': 'acceptable' });
       expect(decide(steps, 'd2').grades['fix-first']).toBe('best');
       const s = grassStrip(ctx);
-      expect(s.hot.over50Ft).toBeGreaterThan(s.strip.runwayFt);
-      expect(decide(steps, 'd3').grades).toMatchObject({ 'go-afternoon': 'unsafe', 'go-morning': 'marginal', 'other-field': 'best' });
+      // Uphill into the wind beats downhill with it behind, and waiting for the sun doesn't help.
+      expect(s.upFt).toBeLessThan(s.downFt);
+      expect(s.upFt).toBeLessThan(s.dryFt);
+      expect(decide(steps, 'd3').grades).toMatchObject({ 'up-wind': 'best', 'down-slope': 'marginal', 'wait-dry': 'marginal', 'leave-it': 'acceptable' });
     });
 
     it(`9.3 counts the review to month end (${name})`, () => {
@@ -186,7 +206,7 @@ describe('module 9 teaches what it says', () => {
       const ex = exampleReview(ctx.now);
       expect(ex.status.current).toBe(true);
       expect(ex.status.dueEnd.getUTCMonth()).toBe(ctx.now.getUTCMonth());
-      expect(decide(steps, 'd1').grades['fly-solo']).toBe('unsafe');
+      expect(decide(steps, 'd1').grades).toMatchObject({ 'fly-friend': 'best', wait: 'marginal' });
       const e1 = steps.find((x) => x.id === 'e1')!;
       expect(e1.title).toBe(ctx.lastFlightReview ? 'Your date' : 'An example date');
     });
@@ -195,9 +215,9 @@ describe('module 9 teaches what it says', () => {
   it('scores a full run of 9.1 by the worst decision', () => {
     const ctx = contexts[0][1];
     const steps = oralLessons[0].build(ctx);
-    const answers = { blanks: {}, decisions: { d1: { choice: 'fuel-to-fit' }, d2: { choice: 'leave-late' } } };
+    const answers = { blanks: {}, decisions: { d1: { choice: 'trim-bags' }, d2: { choice: 'leave-late' } } };
     expect(scoreLesson(steps, answers).grade).toBe('unsafe');
-    expect(scoreLesson(steps, { blanks: {}, decisions: { d1: { choice: 'fuel-to-fit' }, d2: { choice: 'leave-now' } } }).grade).toBe('best');
+    expect(scoreLesson(steps, { blanks: {}, decisions: { d1: { choice: 'trim-bags' }, d2: { choice: 'leave-now' } } }).grade).toBe('best');
   });
 
   it('writes module 9 with no outline left', () => {

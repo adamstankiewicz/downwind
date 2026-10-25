@@ -133,6 +133,57 @@ export function gradeLoading(
   return { cases, grades: g };
 }
 
+export type BagOption = 'all-in' | 'less-fuel' | 'trim-bags' | 'cancel';
+
+export interface BagCase {
+  id: Exclude<BagOption, 'cancel'>;
+  fuelGal: number;
+  bagsLb: number;
+  wb: WbResult;
+  fuel: FuelPlan;
+}
+
+/** The most whole gallons that keep the loading under gross and inside the envelope, ignoring station limits. */
+function fuelUnderGross(plane: AircraftProfile, load: TripLoad): number {
+  for (let g = Math.floor(plane.usableFuelGal); g >= 0; g--) {
+    const w = weighTrip(plane, load, g);
+    if (!w.overGross && w.withinEnvelope) return g;
+  }
+  return 0;
+}
+
+/**
+ * Bags over the baggage area's placarded limit. Gross weight and the
+ * compartment limit are separate limits (91.9): taking less fuel can fix the
+ * first and never the second. Leaving gear behind fixes both.
+ */
+export function gradeBags(
+  plane: OralAirplane,
+  load: TripLoad,
+  limitLb: number,
+  trip: { climbMin: number; cruiseMin: number; night: boolean },
+  extraMin = 30,
+): { cases: BagCase[]; grades: Record<BagOption, Grade> } {
+  const a = plane.aircraft;
+  const make = (id: BagCase['id'], fuelGal: number, bagsLb: number): BagCase => ({
+    id, fuelGal, bagsLb,
+    wb: weighTrip(a, { ...load, bagsLb }, fuelGal),
+    fuel: fuelPlan(plane.performance, { ...trip, onBoardGal: fuelGal }),
+  });
+  const cases = [
+    make('all-in', a.usableFuelGal, load.bagsLb),
+    make('less-fuel', fuelUnderGross(a, load), load.bagsLb),
+    make('trim-bags', a.usableFuelGal, Math.min(load.bagsLb, limitLb)),
+  ];
+  const grade = (c: BagCase): Grade => {
+    if (!legalWb(c.wb) || c.fuel.marginGal < 0) return 'unsafe';
+    return c.fuel.marginGal >= (plane.performance.cruise.gph * extraMin) / 60 ? 'best' : 'acceptable';
+  };
+  const g = Object.fromEntries(cases.map((c) => [c.id, grade(c)])) as Record<BagOption, Grade>;
+  g.cancel = cases.some((c) => g[c.id] !== 'unsafe') ? 'acceptable' : 'best';
+  return { cases, grades: g };
+}
+
 // ---------------------------------------------------------------- the forecast over the flight
 
 export interface ForecastWindow {
@@ -241,6 +292,27 @@ export const INOP_POSITION_LIGHTS: InopItem = {
   requiredByAirplane: false,
 };
 
+// ---------------------------------------------------------------- preventive maintenance
+
+export type BulbOption = 'swap-fly' | 'swap-log' | 'placard-fly' | 'wait-mechanic';
+
+/**
+ * A burnt-out landing light bulb. Replacing landing light bulbs is preventive
+ * maintenance (Part 43 appendix A(c)), which a certificated pilot may do on an
+ * airplane they own or operate, not used for hire (43.3(g)), as long as it is
+ * entered in the maintenance records (43.9). Flying without the light by day,
+ * not for hire, is legal once it is placarded (91.213(d)).
+ */
+export function gradeBulb(o: { pilotOwns: boolean; forHire: boolean }): Record<BulbOption, Grade> {
+  const mayDoIt = o.pilotOwns && !o.forHire;
+  return {
+    'swap-fly': mayDoIt ? 'marginal' : 'unsafe',
+    'swap-log': mayDoIt ? 'best' : 'unsafe',
+    'placard-fly': o.forHire ? 'unsafe' : 'acceptable',
+    'wait-mechanic': mayDoIt ? 'acceptable' : 'best',
+  };
+}
+
 // ---------------------------------------------------------------- the runway
 
 /** Margin many instructors add to a book takeoff distance for an older airplane and an average pilot. */
@@ -259,9 +331,11 @@ export type ReviewOption = 'fly-friend' | 'fly-solo' | 'review-first' | 'wait';
 /**
  * 14 CFR 61.56(c): no acting as pilot in command, with passengers or alone,
  * without a flight review in the preceding 24 calendar months. A review with a
- * CFI as pilot in command is the way back.
+ * CFI as pilot in command is the way back. A practical test for a certificate
+ * or rating in the same 24 months counts instead (61.56(d)).
  */
-export function gradeReviewLapse(s: CalendarStatus): Record<ReviewOption, Grade> {
+export function gradeReviewLapse(s: CalendarStatus, checkrideCurrent = false): Record<ReviewOption, Grade> {
+  if (checkrideCurrent) return { 'fly-friend': 'best', 'fly-solo': 'acceptable', 'review-first': 'acceptable', wait: 'marginal' };
   if (!s.current) return { 'fly-friend': 'unsafe', 'fly-solo': 'unsafe', 'review-first': 'best', wait: 'acceptable' };
   return { 'fly-friend': 'best', 'fly-solo': 'acceptable', 'review-first': 'acceptable', wait: 'acceptable' };
 }

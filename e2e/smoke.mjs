@@ -378,13 +378,14 @@ async function run(viewport, live) {
   await btn('Continue').click();
   await page.getByRole('heading', { name: 'Weigh it' }).waitFor();
   await page.getByLabel(/Takeoff weight/).fill('2370');
-  await page.getByLabel(/Over maximum gross/).fill('70');
+  await page.getByLabel(/Over maximum gross/).fill('8');
+  await page.getByLabel(/baggage area placard/).fill('30');
   await btn('Check my numbers').click();
   await btn('Continue').click();
-  await page.getByRole('heading', { name: 'Make it fit' }).waitFor();
-  await page.getByRole('button', { name: /the most that fits/ }).click();
+  await page.getByRole('heading', { name: 'The camping gear' }).waitFor();
+  await page.getByRole('button', { name: /of gear behind/ }).click();
   await btn('Commit').click();
-  check(/Best call/.test(await main()), `${label} 9.1 trading fuel for people grades best`);
+  check(/Best call/.test(await main()), `${label} 9.1 trimming the gear to the placard grades best`);
   await btn('Continue').click();
   await page.getByRole('heading', { name: 'Sunday afternoon' }).waitFor();
   check((await page.locator('.metar').count()) > 0, `${label} 9.1 shows the forecast for home`);
