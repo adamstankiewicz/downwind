@@ -4,3 +4,4 @@ dev-dist
 .wrangler
 *.local
 *.tsbuildinfo
+worker/.dev.vars
